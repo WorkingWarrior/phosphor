@@ -4,7 +4,7 @@
 
 #define FW_VERSION "0.10.0"
 
-enum class Mode { Clock, Info, Message, Image, Aquarium, AquariumNight, Radio, Weather, Timer, Snow, Fire, Sea, Study, Wave, Lava, Hourglass };
+enum class Mode { Clock, Info, Message, Image, Aquarium, AquariumNight, Radio, Weather, Timer, Snow, Fire, Sea, Study, Wave, Lava, Hourglass, Settings };
 
 struct DeviceState {
   Mode mode = Mode::Clock;

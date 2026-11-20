@@ -10,6 +10,7 @@
 //   lon=-9.1333
 //   lang=tr                 tr | en
 //   h24=1                   24-hour clock
+//   unit=c                  c | f, temperatures (and wind in mph with f)
 //   focus=25  short=5  long=15   pomodoro minutes
 //   group=80S|80s           radio button label (up to 6 letters) | full genre name; order = button order
 //   station=0|Heart 80s|http://...   group index | name | stream URL (MP3 or AAC over HTTP/HTTPS)
@@ -39,6 +40,7 @@ uint32_t version();                          // goes up on every apply (weather 
 
 bool tr();  // Turkish texts on screen, else English
 bool h24();
+bool fahrenheit();
 String city();
 float lat();
 float lon();

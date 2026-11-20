@@ -13,6 +13,7 @@
 #include "Snowglobe.h"
 #include "Radio.h"
 #include "Settings.h"
+#include "SettingsUi.h"
 #include "Seaside.h"
 #include "Study.h"
 #include "Theme.h"
@@ -29,7 +30,7 @@ using namespace vfd;
 static Preferences prefs;
 
 static const Mode PAGES[] = { Mode::Clock, Mode::Radio, Mode::Weather, Mode::Timer, Mode::Study, Mode::Hourglass,
-                              Mode::Aquarium, Mode::Snow, Mode::Fire, Mode::Sea, Mode::Wave, Mode::Lava };
+                              Mode::Aquarium, Mode::Snow, Mode::Fire, Mode::Sea, Mode::Wave, Mode::Lava, Mode::Settings };
 static constexpr int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
 
 static const char *const WEEKDAYS_TR[] = { "PAZ", "PZT", "SAL", "ÇAR", "PER", "CUM", "CMT" };
@@ -721,7 +722,7 @@ static void drawWeather()
   } else {
     // long name ("PARTLY CLOUDY") takes the line; humidity and wind go under it
     text(cond, 20, 126, 2, LIT_INK);
-    if (w.valid) text((hum + "  " + String(w.wind) + L(" KM/H", " KM/SA")).c_str(), 20, 150, 2, DIM_INK);
+    if (w.valid) text((hum + "  " + String(w.wind) + (settings::fahrenheit() ? " MPH" : L(" KM/H", " KM/SA"))).c_str(), 20, 150, 2, DIM_INK);
   }
 
   drawSky(s, day);
@@ -814,9 +815,41 @@ void Gadget_Begin(uint16_t *canvas, I2cMasterBus *bus, void (*amp)(bool))
   Motion_Begin(bus);
 }
 
+// Pages the auto page setting turns through: the ones that only show something.
+static bool ambient(Mode m)
+{
+  return m == Mode::Clock || m == Mode::Weather || m == Mode::Aquarium || m == Mode::Snow || m == Mode::Fire ||
+         m == Mode::Sea || m == Mode::Wave || m == Mode::Lava;
+}
+
+static uint32_t last_touch_ms = 0, last_cycle_ms = 0;
+
+static void autoPage()
+{
+  int minutes = SettingsUi_CycleMin();
+  if (!minutes || ringing || !ambient(state.mode)) return;
+  uint32_t per = minutes * 60000UL;
+  if (millis() - last_touch_ms < per || millis() - last_cycle_ms < per) return;
+  last_cycle_ms = millis();
+  int idx = 0;
+  for (int i = 0; i < PAGE_COUNT; i++) {
+    if (PAGES[i] == state.mode) idx = i;
+  }
+  for (int k = 1; k < PAGE_COUNT; k++) {
+    Mode m = PAGES[(idx + k) % PAGE_COUNT];
+    if (ambient(m)) {
+      state.mode = m;
+      state.dirty = true;
+      return;
+    }
+  }
+}
+
 void Gadget_Tick(const DateTime &now)
 {
   settings::tick();
+  SettingsUi_Tick();
+  autoPage();
   int day = now.year * 400 + now.month * 32 + now.day;
   if (alarm_on && !ringing && now.hour == alarm_h && now.minute == alarm_m && fired_day != day) {
     fired_day = day;
@@ -841,7 +874,7 @@ bool Gadget_Draws(Mode m)
 {
   return m == Mode::Clock || m == Mode::Radio || m == Mode::Weather || m == Mode::Aquarium || m == Mode::Snow || m == Mode::Timer ||
          m == Mode::Fire || m == Mode::Sea || m == Mode::Study || m == Mode::Wave || m == Mode::Lava ||
-         m == Mode::Hourglass;
+         m == Mode::Hourglass || m == Mode::Settings;
 }
 
 void Gadget_Render(const DateTime &now)
@@ -865,6 +898,7 @@ void Gadget_Render(const DateTime &now)
     case Mode::Wave: Wave_Draw(hhmm(now).c_str()); break;
     case Mode::Lava: Lava_Draw(""); break;
     case Mode::Hourglass: Hourglass_Draw(""); break;
+    case Mode::Settings: SettingsUi_Draw(); break;
     default: break;
   }
   // volume bar over the other pages while it changes (the radio page has it in its title line)
@@ -892,6 +926,7 @@ uint32_t Gadget_FrameMs(Mode m)
     case Mode::Lava:
     case Mode::Hourglass: return 50;
     case Mode::Timer: return phase == Phase::Running || phase == Phase::Done ? 60 : 400;
+    case Mode::Settings: return SettingsUi_Busy() ? 150 : 1000;
     default: return 0;
   }
 }
@@ -977,6 +1012,7 @@ static void tapTimer(int x, int y)
 
 void Gadget_Gesture(Gesture g, int x, int y)
 {
+  last_touch_ms = millis();
   if (ringing) {
     stopAlarm();
     return;
@@ -989,8 +1025,20 @@ void Gadget_Gesture(Gesture g, int x, int y)
   switch (g) {
     case Gesture::SwipeLeft: goPage(1); return;
     case Gesture::SwipeRight: goPage(-1); return;
-    case Gesture::SwipeUp: changeVolume(Radio_Volume() < 20 ? 5 : 10); return;
-    case Gesture::SwipeDown: changeVolume(Radio_Volume() <= 20 ? -5 : -10); return;
+    case Gesture::SwipeUp:  // on the settings page: walk the list (finger up = further down it)
+      if (state.mode == Mode::Settings) {
+        SettingsUi_Step(1);
+        break;
+      }
+      changeVolume(Radio_Volume() < 20 ? 5 : 10);
+      return;
+    case Gesture::SwipeDown:
+      if (state.mode == Mode::Settings) {
+        SettingsUi_Step(-1);
+        break;
+      }
+      changeVolume(Radio_Volume() <= 20 ? -5 : -10);
+      return;
     case Gesture::LongPress:
       if (state.mode == Mode::Clock) {
         alarm_on = !alarm_on;
@@ -1017,6 +1065,7 @@ void Gadget_Gesture(Gesture g, int x, int y)
         case Mode::Lava: Lava_Tap(); break;
         case Mode::Hourglass: Hourglass_Tap(); break;
         case Mode::Timer: tapTimer(x, y); break;
+        case Mode::Settings: SettingsUi_Tap(x, y); break;
         default:
           if (!Gadget_Draws(state.mode)) {  // message, info, image: back home
             state.mode = Mode::Clock;
@@ -1084,6 +1133,10 @@ String Gadget_Command(const String &name, const String &arg)
       theme::Id t = arg.length() ? theme::fromName(arg) : (theme::Id)((theme::current() + 1) % theme::COUNT);
       if (t < theme::COUNT) theme::set(t);
     }
+  } else if (name == "menu") {
+    // settings page at item N (help page after a dot: "8.3"), for screenshots
+    SettingsUi_Select(arg.toInt(), arg.indexOf('.') > 0 ? arg.substring(arg.indexOf('.') + 1).toInt() : 0);
+    state.mode = Mode::Settings;
   } else if (name == "sky") {
     // preview: Sky index (1 clear .. 9 storm), "n" after it for night; empty or -1 = the real sky
     sky_force = arg.length() ? constrain(arg.toInt(), -1, 9) : -1;

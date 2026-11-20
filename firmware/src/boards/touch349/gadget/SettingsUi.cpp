@@ -1,0 +1,455 @@
+#ifdef BOARD_TOUCH349
+
+#include "SettingsUi.h"
+#include <HTTPClient.h>
+#include <Preferences.h>
+#include <WiFi.h>
+#include "../../../core/Board.h"
+#include "../../../core/state.h"
+#include "Settings.h"
+#include "Theme.h"
+#include "Vfd.h"
+
+using namespace vfd;
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Items and texts
+// ---------------------------------------------------------------------------------------------------------------------
+
+enum Item : uint8_t { THEME, SCENES, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HELP, WIFI, ABOUT, ITEM_COUNT };
+
+struct ItemText {
+  const char *en, *tr;            // in the list
+  const char *what_en, *what_tr;  // above the value
+};
+
+static const ItemText ITEMS[ITEM_COUNT] = {
+  { "THEME", "TEMA", "LOOK OF EVERY PAGE", "TÜM SAYFALARIN GÖRÜNÜMÜ" },
+  { "SCENES", "SAHNELER", "SCENE COLORS", "SAHNE RENKLERİ" },
+  { "CLOCK", "SAAT", "CLOCK STYLE", "SAAT BİÇİMİ" },
+  { "UNITS", "BİRİM", "TEMPERATURE", "SICAKLIK" },
+  { "LANGUAGE", "DİL", "TEXT ON SCREEN", "EKRANDAKİ YAZILAR" },
+  { "BRIGHTNESS", "PARLAKLIK", "SCREEN LIGHT", "EKRAN IŞIĞI" },
+  { "CITY", "ŞEHİR", "WEATHER AND TIME ZONE", "HAVA DURUMU VE SAAT DİLİMİ" },
+  { "AUTO PAGE", "OTO SAYFA", "AMBIENT PAGES TURN BY THEMSELVES", "SAHNELER KENDİLİĞİNDEN DÖNER" },
+  { "HELP", "YARDIM", nullptr, nullptr },
+  { "WI-FI", "WI-FI", nullptr, nullptr },
+  { "ABOUT", "HAKKINDA", nullptr, nullptr },
+};
+
+// The tutorial, one screen per page of it. Lines fit the panel (33 glyphs at size 2).
+struct HelpPage {
+  const char *title_en, *title_tr;
+  const char *en[4], *tr[4];
+};
+
+static const HelpPage HELP_PAGES[] = {
+  { "GESTURES", "HAREKETLER",
+    { "SWIPE LEFT/RIGHT: NEXT PAGE", "SWIPE UP/DOWN: VOLUME", "TAP OR HOLD THINGS ON SCREEN", "SHAKE OR TILT THE BAR TOO" },
+    { "SAĞA/SOLA KAYDIR: SAYFA", "YUKARI/AŞAĞI KAYDIR: SES", "EKRANDAKİLERE DOKUN, BASILI TUT", "CİHAZI SALLA YA DA EĞ" } },
+  { "CLOCK", "SAAT",
+    { "TAP THE BELL: ALARM ON/OFF", "TAP ALARM HOURS: +1 HOUR", "TAP ALARM MINUTES: +5 MIN", "HOLD: ALARM ON/OFF" },
+    { "ZİLE DOKUN: ALARM AÇ/KAPA", "ALARM SAATİNE DOKUN: +1 SAAT", "DAKİKAYA DOKUN: +5 DAKİKA", "BASILI TUT: ALARM AÇ/KAPA" } },
+  { "RADIO", "RADYO",
+    { "TAP: PLAY / STOP", "TAP A GENRE: PLAY IT", "TAP IT AGAIN: NEXT STATION", "ADD STATIONS FROM YOUR PHONE" },
+    { "DOKUN: ÇAL / DURDUR", "TÜRE DOKUN: O TÜRÜ ÇAL", "TEKRAR DOKUN: SONRAKİ KANAL", "KANAL EKLEMEK: TELEFONDAN" } },
+  { "TIMERS", "SAYAÇLAR",
+    { "TAP: START / PAUSE", "HOLD: RESET", "TIMER KEYS: ADD MINUTES", "HOURGLASS: TILT TO POUR" },
+    { "DOKUN: BAŞLAT / DURAKLAT", "BASILI TUT: SIFIRLA", "SAYAÇ TUŞLARI: DAKİKA EKLE", "KUM SAATİ: EĞ, KUM AKSIN" } },
+  { "SCENES", "SAHNELER",
+    { "FISH TANK: TAP TO FEED", "FIREPLACE: TAP, CAT WAKES", "LIGHTHOUSE: TAP, BIG WAVE", "LAVA LAMP: TAP, NEW COLORS" },
+    { "AKVARYUM: DOKUN, YEM AT", "ŞÖMİNE: DOKUN, KEDİ UYANSIN", "FENER: DOKUN, BÜYÜK DALGA", "LAV LAMBASI: DOKUN, YENİ RENK" } },
+  { "MORE SCENES", "DAHA FAZLA",
+    { "SNOW: TAP OR SHAKE TO STIR", "SHIP: TAP THE WATER", "TILT: WATER AND SAND MOVE", "KNOCK THE DESK: RIPPLES" },
+    { "KAR: DOKUN YA DA SALLA", "GEMİ: SUYA DOKUN", "EĞ: SU VE KUM AKAR", "MASAYA VUR: SU DALGALANIR" } },
+  { "BUTTONS", "TUŞLAR",
+    { "BOOT: BRIGHTNESS", "HOLD BOOT 5 S: NEW WI-FI", "PWR: SCREEN ON/OFF", "" },
+    { "BOOT: PARLAKLIK", "BOOT 5 SN BASILI: YENİ WI-FI", "PWR: EKRAN AÇ/KAPA", "" } },
+};
+static constexpr int HELP_COUNT = sizeof(HELP_PAGES) / sizeof(HELP_PAGES[0]);
+
+// Cities for the list, west to east, so stepping through them walks the time zones.
+struct City {
+  const char *name;
+  float lat, lon;
+};
+
+static const City CITIES[] = {
+  { "Honolulu", 21.31f, -157.86f },     { "Anchorage", 61.22f, -149.90f },   { "Vancouver", 49.28f, -123.12f },
+  { "San Francisco", 37.77f, -122.42f }, { "Seattle", 47.61f, -122.33f },     { "Los Angeles", 34.05f, -118.24f },
+  { "Phoenix", 33.45f, -112.07f },      { "Denver", 39.74f, -104.99f },      { "Mexico City", 19.43f, -99.13f },
+  { "Dallas", 32.78f, -96.80f },        { "Houston", 29.76f, -95.37f },      { "Chicago", 41.88f, -87.63f },
+  { "Miami", 25.76f, -80.19f },         { "Toronto", 43.65f, -79.38f },      { "Lima", -12.05f, -77.04f },
+  { "Bogota", 4.71f, -74.07f },         { "New York", 40.71f, -74.01f },     { "Boston", 42.36f, -71.06f },
+  { "Santiago", -33.45f, -70.67f },     { "Buenos Aires", -34.60f, -58.38f }, { "Sao Paulo", -23.55f, -46.63f },
+  { "Rio de Janeiro", -22.91f, -43.17f }, { "Reykjavik", 64.15f, -21.94f },  { "Lisbon", 38.72f, -9.14f },
+  { "Dublin", 53.35f, -6.26f },         { "Madrid", 40.42f, -3.70f },        { "London", 51.51f, -0.13f },
+  { "Paris", 48.86f, 2.35f },           { "Lagos", 6.52f, 3.38f },           { "Brussels", 50.85f, 4.35f },
+  { "Amsterdam", 52.37f, 4.90f },       { "Rome", 41.90f, 12.50f },          { "Berlin", 52.52f, 13.40f },
+  { "Vienna", 48.21f, 16.37f },         { "Stockholm", 59.33f, 18.07f },     { "Warsaw", 52.23f, 21.01f },
+  { "Athens", 37.98f, 23.73f },         { "Helsinki", 60.17f, 24.94f },      { "Johannesburg", -26.20f, 28.05f },
+  { "Istanbul", 41.01f, 28.98f },       { "Kyiv", 50.45f, 30.52f },          { "Cairo", 30.04f, 31.24f },
+  { "Ankara", 39.93f, 32.86f },         { "Nairobi", -1.29f, 36.82f },       { "Moscow", 55.76f, 37.62f },
+  { "Riyadh", 24.71f, 46.68f },         { "Tehran", 35.69f, 51.39f },        { "Dubai", 25.20f, 55.27f },
+  { "Karachi", 24.86f, 67.01f },        { "Mumbai", 19.08f, 72.88f },        { "Delhi", 28.61f, 77.21f },
+  { "Bangalore", 12.97f, 77.59f },      { "Dhaka", 23.81f, 90.41f },         { "Bangkok", 13.76f, 100.50f },
+  { "Singapore", 1.35f, 103.82f },      { "Jakarta", -6.21f, 106.85f },      { "Hong Kong", 22.32f, 114.17f },
+  { "Perth", -31.95f, 115.86f },        { "Beijing", 39.90f, 116.41f },      { "Manila", 14.60f, 120.98f },
+  { "Shanghai", 31.23f, 121.47f },      { "Taipei", 25.03f, 121.57f },       { "Seoul", 37.57f, 126.98f },
+  { "Tokyo", 35.68f, 139.69f },         { "Melbourne", -37.81f, 144.96f },   { "Sydney", -33.87f, 151.21f },
+  { "Auckland", -36.85f, 174.76f },
+};
+static constexpr int CITY_COUNT = sizeof(CITIES) / sizeof(CITIES[0]);
+
+static const uint8_t CYCLES[] = { 0, 1, 5, 15 };  // auto page, minutes
+
+// ---------------------------------------------------------------------------------------------------------------------
+// State
+// ---------------------------------------------------------------------------------------------------------------------
+
+static Preferences prefs;
+static bool prefs_open = false;
+static int sel = 0;       // selected item
+static int help_page = 0;
+static int cycle_min = -1;  // -1 = not read yet
+
+static int city_idx = -1;          // city picked from the list, -1 = the saved one
+static uint32_t city_save_at = 0;  // when to save it (stepping stopped), 0 = nothing pending
+
+enum class Look : uint8_t { Idle, Running, Found, Failed };
+static volatile Look look = Look::Idle;
+static uint32_t look_done_ms = 0;
+static bool look_saved = false;
+static String look_city;
+static float look_lat = 0, look_lon = 0;
+static constexpr uint32_t NOTE_MS = 4000;  // "found" / "not found" stays this long
+
+static void openPrefs()
+{
+  if (prefs_open) return;
+  prefs.begin("ui", false);
+  prefs_open = true;
+}
+
+int SettingsUi_CycleMin()
+{
+  if (cycle_min < 0) {
+    openPrefs();
+    cycle_min = prefs.getUChar("cycle", 0);
+  }
+  return cycle_min;
+}
+
+static void apply(const String &lines)
+{
+  String err;
+  if (!settings::apply(lines, err)) Serial.printf("settings: %s\n", err.c_str());
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// City: from the list, or found by the IP address (ip-api.com, plain HTTP, no key)
+// ---------------------------------------------------------------------------------------------------------------------
+
+static bool jsonText(const String &b, const char *key, String &out)
+{
+  String k = String("\"") + key + "\":\"";
+  int i = b.indexOf(k);
+  if (i < 0) return false;
+  i += k.length();
+  int j = b.indexOf('"', i);
+  if (j < 0) return false;
+  out = b.substring(i, j);
+  return out.length() > 0;
+}
+
+static bool jsonNumber(const String &b, const char *key, float &out)
+{
+  String k = String("\"") + key + "\":";
+  int i = b.indexOf(k);
+  if (i < 0) return false;
+  out = b.substring(i + k.length()).toFloat();
+  return true;
+}
+
+static void lookupTask(void *)
+{
+  bool ok = false;
+  HTTPClient http;
+  http.setTimeout(6000);
+  if (http.begin("http://ip-api.com/json/?fields=status,city,lat,lon")) {
+    if (http.GET() == 200) {
+      String b = http.getString();
+      ok = b.indexOf("\"success\"") >= 0 && jsonText(b, "city", look_city) && jsonNumber(b, "lat", look_lat) &&
+           jsonNumber(b, "lon", look_lon);
+    }
+    http.end();
+  }
+  look_saved = false;
+  look_done_ms = millis();
+  look = ok ? Look::Found : Look::Failed;
+  state.dirty = true;
+  vTaskDelete(nullptr);
+}
+
+static void startLookup()
+{
+  if (look == Look::Running) return;
+  if (WiFi.status() != WL_CONNECTED) {
+    look = Look::Failed;
+    look_done_ms = millis();
+    return;
+  }
+  city_save_at = 0;
+  city_idx = -1;
+  look = Look::Running;
+  if (xTaskCreatePinnedToCore(lookupTask, "iplookup", 6144, nullptr, 1, nullptr, 0) != pdPASS) look = Look::Failed;
+}
+
+static int nearestCity()
+{
+  String cur = settings::city();
+  for (int i = 0; i < CITY_COUNT; i++) {
+    if (cur.equalsIgnoreCase(CITIES[i].name)) return i;
+  }
+  float lon = settings::lon(), lat = settings::lat(), best = 1e9;
+  int bi = 0;
+  for (int i = 0; i < CITY_COUNT; i++) {
+    float d = fabsf(CITIES[i].lon - lon) + 0.5f * fabsf(CITIES[i].lat - lat);
+    if (d < best) best = d, bi = i;
+  }
+  return bi;
+}
+
+static String cityLine(const char *name, float lat, float lon)
+{
+  return String("city=") + name + "\nlat=" + String(lat, 4) + "\nlon=" + String(lon, 4) + "\n";
+}
+
+void SettingsUi_Tick()
+{
+  if (city_save_at && (int32_t)(millis() - city_save_at) >= 0) {
+    city_save_at = 0;
+    const City &c = CITIES[city_idx];
+    apply(cityLine(c.name, c.lat, c.lon));
+    city_idx = -1;
+  }
+  if (look == Look::Found && !look_saved) {
+    look_saved = true;
+    apply(cityLine(look_city.c_str(), look_lat, look_lon));
+  }
+}
+
+bool SettingsUi_Busy()
+{
+  return look == Look::Running || ((look == Look::Found || look == Look::Failed) && millis() - look_done_ms < NOTE_MS + 200);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Changing values
+// ---------------------------------------------------------------------------------------------------------------------
+
+static void change(int dir)
+{
+  switch (sel) {
+    case THEME: theme::set((theme::Id)((theme::current() + dir + theme::COUNT) % theme::COUNT)); break;
+    case SCENES: theme::setNaturalScenes(!theme::naturalScenes()); break;
+    case CLOCK: apply(settings::h24() ? "h24=0\n" : "h24=1\n"); break;
+    case UNITS: apply(settings::fahrenheit() ? "unit=c\n" : "unit=f\n"); break;
+    case LANG: apply(settings::tr() ? "lang=en\n" : "lang=tr\n"); break;
+    case BRIGHT: {
+      int b = board().brightness();
+      if (b < 0) break;
+      int to = dir > 0 ? (b / 10 + 1) * 10 : ((b + 9) / 10 - 1) * 10;
+      board().setBrightness(constrain(to, 5, 100));
+      break;
+    }
+    case CITY:
+      if (city_idx < 0) city_idx = nearestCity();
+      city_idx = (city_idx + dir + CITY_COUNT) % CITY_COUNT;
+      city_save_at = millis() + 1500;  // save (and fetch the weather) once the stepping stops
+      look = Look::Idle;
+      break;
+    case CYCLE: {
+      int n = sizeof(CYCLES), i = 0;
+      while (i < n && CYCLES[i] != SettingsUi_CycleMin()) i++;
+      cycle_min = CYCLES[(i + dir + n) % n];
+      openPrefs();
+      prefs.putUChar("cycle", cycle_min);
+      break;
+    }
+    case HELP: help_page = (help_page + dir + HELP_COUNT) % HELP_COUNT; break;
+    default: return;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Drawing
+// ---------------------------------------------------------------------------------------------------------------------
+
+static constexpr int LIST_X = 16, ROW_Y = 19, ROW_H = 30, ROWS = 5;
+static constexpr int DIV_X = 206;               // line between list and panel
+static constexpr int PX0 = 226, PX1 = 626;      // the panel
+static constexpr int ZONE_L = 300, ZONE_R = 552;  // tap zones: back left of this, next right of that
+static constexpr int VALUE_Y = 58;
+
+static const char *const ARROW[] = { "...#", "..##", ".###", "####", ".###", "..##", "...#" };
+
+static int listTop() { return constrain(sel - ROWS / 2, 0, ITEM_COUNT - ROWS); }
+
+static void drawList()
+{
+  int top = listTop();
+  for (int r = 0; r < ROWS; r++) {
+    int i = top + r, y = ROW_Y + r * ROW_H;
+    const char *name = L(ITEMS[i].en, ITEMS[i].tr);
+    if (i == sel) {
+      sprite(ARROW, 7, LIST_X, y, 2, HOT, true);
+      text(name, LIST_X + 18, y, 2, LIT_INK);
+    } else {
+      text(name, LIST_X + 18, y, 2, DIM_INK);
+    }
+  }
+  // where the window is in the list
+  rect(DIV_X, 12, 1, H - 24, GHOST);
+  int th = (H - 24) * ROWS / ITEM_COUNT, ty = 12 + (H - 24) * top / ITEM_COUNT;
+  rect(DIV_X - 1, ty, 3, th, DIM);
+}
+
+// A line of text centered in the panel at the biggest size that fits between the arrows.
+static void centered(const char *s, int y, int max_p, const Ink &ink)
+{
+  int room = ZONE_R - ZONE_L + 40;
+  int p = max_p;
+  while (p > 2 && textWidth(s, p) > room) p--;
+  int w = textWidth(s, p);
+  text(s, (PX0 + PX1 - w) / 2, y + (4 - p) * 4, p, ink);
+}
+
+// A title and up to four lines; the first line bright when it is the answer (network name, version).
+static void drawLines(const char *title, const char *const *lines, int n, bool first_lit, const char *corner = nullptr)
+{
+  text(title, PX0, 14, 2, HOT_INK);
+  if (corner) text(corner, PX1 - textWidth(corner, 2), 14, 2, DIM_INK);
+  for (int i = 0; i < n; i++) {
+    if (lines[i] && *lines[i]) text(lines[i], PX0, 46 + i * 28, 2, i == 0 && first_lit ? LIT_INK : DIM_INK);
+  }
+}
+
+static void drawValue()
+{
+  const ItemText &it = ITEMS[sel];
+  text(L(it.what_en, it.what_tr), PX0, 14, 2, DIM_INK);
+  sprite(ARROW, 7, PX0, VALUE_Y + 3, 3, HOT);
+  sprite(ARROW, 7, PX1 - 12, VALUE_Y + 3, 3, HOT, true);
+
+  String value, note;
+  switch (sel) {
+    case THEME: value = theme::def().name; break;
+    case SCENES:
+      value = theme::naturalScenes() ? L("NATURAL", "DOĞAL") : L("THEMED", "TEMAYA GÖRE");
+      note = theme::naturalScenes() ? L("SCENES KEEP THEIR OWN COLORS", "SAHNELER KENDİ RENGİNDE")
+                                    : L("SCENES IN THE THEME'S COLORS", "SAHNELER TEMANIN RENGİNDE");
+      break;
+    case CLOCK: value = settings::h24() ? L("24 HOUR", "24 SAAT") : L("12 HOUR", "12 SAAT"); break;
+    case UNITS:
+      value = settings::fahrenheit() ? "°F" : "°C";
+      note = settings::fahrenheit() ? "FAHRENHEIT" : L("CELSIUS", "SANTİGRAT");
+      break;
+    case LANG: value = settings::tr() ? "TÜRKÇE" : "ENGLISH"; break;
+    case BRIGHT: {
+      int b = board().brightness();
+      value = b < 0 ? String("-") : String(b) + "%";
+      break;
+    }
+    case CITY:
+      value = city_idx >= 0 ? CITIES[city_idx].name : settings::city().c_str();
+      if (look == Look::Running) note = L("LOOKING UP...", "ARANIYOR...");
+      else if (look == Look::Found && millis() - look_done_ms < NOTE_MS) note = L("FOUND BY YOUR IP", "IP İLE BULUNDU");
+      else if (look == Look::Failed && millis() - look_done_ms < NOTE_MS) note = L("NOT FOUND, TRY THE LIST", "BULUNAMADI, LİSTEDEN SEÇ");
+      else note = L("TAP THE NAME: FIND ME BY IP", "İSME DOKUN: IP İLE BUL");
+      break;
+    case CYCLE: {
+      int m = SettingsUi_CycleMin();
+      value = m ? String(m) + L(" MIN", " DK") : String(L("OFF", "KAPALI"));
+      break;
+    }
+    default: break;
+  }
+  centered(value.c_str(), VALUE_Y, 4, LIT_INK);
+
+  if (sel == BRIGHT && board().brightness() >= 0) {
+    int b = board().brightness(), x0 = (PX0 + PX1) / 2 - 119;
+    for (int i = 0; i < 20; i++) {
+      bool on = b >= (i + 1) * 5;
+      rect(x0 + i * 12, 120, 8, 14, on ? LIT : GHOST);
+    }
+  } else if (note.length()) {
+    int w = textWidth(note.c_str(), 2);
+    text(note.c_str(), (PX0 + PX1 - w) / 2, 124, 2, look == Look::Running ? HOT_INK : DIM_INK);
+  }
+}
+
+void SettingsUi_Draw()
+{
+  clear();
+  drawList();
+  clip(PX0 - 4, 0, W, H);
+  if (sel == HELP) {
+    const HelpPage &h = HELP_PAGES[help_page];
+    char corner[8];
+    snprintf(corner, sizeof(corner), "%d/%d", help_page + 1, HELP_COUNT);
+    drawLines(L(h.title_en, h.title_tr), settings::tr() ? h.tr : h.en, 4, false, corner);
+  } else if (sel == WIFI) {
+    String l[4];
+    bool up = WiFi.status() == WL_CONNECTED;
+    l[0] = up ? WiFi.SSID() : String(L("NOT CONNECTED", "BAĞLI DEĞİL"));
+    l[1] = up ? "IP " + WiFi.localIP().toString() : String();
+    l[2] = up ? String(L("SIGNAL ", "SİNYAL ")) + WiFi.RSSI() + " DBM" : String();
+    l[3] = L("HOLD BOOT 5 S: NEW WI-FI", "BOOT 5 SN BASILI: YENİ WI-FI");
+    const char *p[4] = { l[0].c_str(), l[1].c_str(), l[2].c_str(), l[3].c_str() };
+    drawLines(L("NETWORK", "AĞ"), p, 4, true);
+  } else if (sel == ABOUT) {
+    String host = state.name + ".local/settings";
+    const char *p[4] = { "PHOSPHOR " FW_VERSION, L("MORE ON YOUR PHONE:", "TELEFONDAN DAHA FAZLASI:"), host.c_str(),
+                         "github.com/melihkoray/phosphor" };
+    drawLines(L("ABOUT", "HAKKINDA"), p, 4, true);
+  } else {
+    drawValue();
+  }
+  noClip();
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Touch
+// ---------------------------------------------------------------------------------------------------------------------
+
+void SettingsUi_Step(int dir)
+{
+  sel = constrain(sel + dir, 0, ITEM_COUNT - 1);
+}
+
+void SettingsUi_Select(int item, int page)
+{
+  sel = constrain(item, 0, ITEM_COUNT - 1);
+  help_page = constrain(page, 0, HELP_COUNT - 1);
+}
+
+void SettingsUi_Tap(int x, int y)
+{
+  if (x < DIV_X + 8) {
+    int r = constrain((y - ROW_Y + ROW_H / 4) / ROW_H, 0, ROWS - 1);
+    sel = listTop() + r;
+    return;
+  }
+  if (sel == WIFI || sel == ABOUT) return;
+  if (sel == HELP) {
+    change(x < (PX0 + PX1) / 2 ? -1 : 1);
+    return;
+  }
+  if (x < ZONE_L) change(-1);
+  else if (x > ZONE_R) change(1);
+  else if (sel == CITY) startLookup();
+  else change(1);
+}
+
+#endif

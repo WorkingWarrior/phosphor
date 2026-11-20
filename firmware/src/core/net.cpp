@@ -131,7 +131,7 @@ $('info').textContent=`${s.ip} · ${s.temp_c.toFixed(1)}° · ${Math.round(s.hum
 static void sendStatus()
 {
   char json[640];
-  static const char *MODE_NAMES[] = { "clock", "info", "message", "image", "aquarium", "aquarium-night", "radio", "weather", "timer", "snow", "fire", "sea", "study", "wave", "lava", "hourglass" };
+  static const char *MODE_NAMES[] = { "clock", "info", "message", "image", "aquarium", "aquarium-night", "radio", "weather", "timer", "snow", "fire", "sea", "study", "wave", "lava", "hourglass", "settings" };
   const char *mode = MODE_NAMES[(int)state.mode];
   snprintf(json, sizeof(json),
            "{\"name\":\"%s\",\"fw\":\"%s\",\"ip\":\"%s\",\"rssi\":%d,\"mode\":\"%s\","
@@ -270,7 +270,7 @@ static void setupRoutes()
 
   // Any page by name (see MODE_NAMES); the board's own pages included.
   server.on("/page", HTTP_POST, []() {
-    static const char *NAMES[] = { "clock", "info", "message", "image", "aquarium", "aquarium-night", "radio", "weather", "timer", "snow", "fire", "sea", "study", "wave", "lava", "hourglass" };
+    static const char *NAMES[] = { "clock", "info", "message", "image", "aquarium", "aquarium-night", "radio", "weather", "timer", "snow", "fire", "sea", "study", "wave", "lava", "hourglass", "settings" };
     String name = server.arg("name");
     for (int i = 0; i < (int)(sizeof(NAMES) / sizeof(NAMES[0])); i++) {
       if (name == NAMES[i]) {

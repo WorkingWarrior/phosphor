@@ -12,7 +12,8 @@ static String weatherUrl()
   return "http://api.open-meteo.com/v1/forecast?latitude=" + String(settings::lat(), 4) +
          "&longitude=" + String(settings::lon(), 4) +
          "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day"
-         "&daily=weather_code,temperature_2m_max&timezone=auto&forecast_days=4";
+         "&daily=weather_code,temperature_2m_max&timezone=auto&forecast_days=4" +
+         (settings::fahrenheit() ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : "");
 }
 #define REFRESH_MS (20 * 60 * 1000UL)
 #define RETRY_MS (60 * 1000UL)
