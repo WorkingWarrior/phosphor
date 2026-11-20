@@ -37,7 +37,7 @@ that tilts with the board, a lava lamp and an hourglass you turn over.
    password); a setup page opens. If it does not, or the browser shows normal websites, turn off mobile data and type
    `http://192.168.4.1` in the browser (if you see a menu, tap **Configure WiFi**). Tap your
    home Wi-Fi (2.4 GHz), type its password, scroll down to **Device name** (prefilled as `phosphor-1a2b`, change it to
-   something short like `desk` if you like) and tap **Save**. **Write the name down: you need it in the next step and
+   something short like **`desk`**: this is the name you type in the next step) and tap **Save**. **Write the name down: you need it in the next step and
    the board does not show it anywhere.**
 3. With the phone back on your home Wi-Fi (mobile data on again), open `http://<device name>.local/settings` with the
    name from step 2, for example `http://desk.local/settings`. If the phone cannot open `.local` addresses
