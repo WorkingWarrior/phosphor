@@ -897,9 +897,7 @@ static void goPage(int dir)
   for (int i = 0; i < PAGE_COUNT; i++) {
     if (PAGES[i] == state.mode) idx = i;
   }
-  for (int n = 0; n < PAGE_COUNT; n++) {
-    idx = (idx + dir + PAGE_COUNT) % PAGE_COUNT;
-  }
+  idx = (idx + dir + PAGE_COUNT) % PAGE_COUNT;
   state.mode = PAGES[idx];
   state.mode_until_ms = 0;
   state.dirty = true;
