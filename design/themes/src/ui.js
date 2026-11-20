@@ -1,7 +1,7 @@
 // Review page: every theme's screens on canvases, variant switch, palette roles, font sheet and a picks summary.
 (function () {
   const { PH, PHT } = window;
-  const LABEL = { clock: 'Saat', alarm: 'Alarm çalıyor', radio: 'Radyo', scene: 'Sahne: deniz feneri', settings: 'Ayarlar' };
+  const LABEL = { world: 'Arka plan (arayüzsüz)', clock: 'Saat', alarm: 'Alarm çalıyor', radio: 'Radyo', weather: 'Hava durumu', scene: 'Sahne: deniz feneri', settings: 'Ayarlar' };
   const state = { lang: 'en', anim: true, variant: {}, note: {} };
   try { Object.assign(state, JSON.parse(localStorage.getItem('phosphor-themes') || '{}')); } catch (e) { /* private mode */ }
   const save = () => { try { localStorage.setItem('phosphor-themes', JSON.stringify({ variant: state.variant, note: state.note })); } catch (e) { /* ignore */ } };
@@ -80,7 +80,7 @@
     // picks row
     const pick = $('div', { class: 'pick' }, [$('strong', { text: name })]);
     const sel = $('div', { class: 'seg' });
-    for (const k of keys) {
+    if (keys.length > 1) for (const k of keys) {
       const b = $('button', { 'aria-pressed': String((state.variant[th.key] || 'a') === k), text: k.toUpperCase() });
       b.onclick = () => sec.querySelector(`.thead button[data-v="${k}"]`)?.click() || (state.variant[th.key] = k);
       sel.append(b);
@@ -98,7 +98,8 @@
     });
     document.getElementById('out').value = PHT.THEMES.map((th, i) => {
       const v = state.variant[th.key] || 'a', n = state.note[th.key];
-      return `${PHT.THEME_NAMES[i]}: ${v.toUpperCase()} (${th.variants[v].label})${n ? ' · not: ' + n : ''}`;
+      const one = Object.keys(th.variants).length === 1;
+      return `${PHT.THEME_NAMES[i]}: ${one ? '' : v.toUpperCase() + ' '}(${th.variants[v].label})${n ? ' · not: ' + n : ''}`;
     }).join('\n');
   }
   summary();

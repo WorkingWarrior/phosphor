@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(DIR, '../..');
-const SRC = ['fonts.js', 'engine.js', 'themes.js'].map((f) => fs.readFileSync(path.join(DIR, 'src', f), 'utf8'));
+const SRC = ['fonts.js', 'engine.js', 'art.js', 'themes.js', 'retro.js'].map((f) => fs.readFileSync(path.join(DIR, 'src', f), 'utf8'));
 const UI = fs.readFileSync(path.join(DIR, 'src', 'ui.js'), 'utf8');
 
 // the VFD theme draws with the firmware's own 5x7 font
@@ -20,7 +20,7 @@ const ctx = { VFD_GLYPHS, console };
 ctx.globalThis = ctx;
 vm.createContext(ctx);
 for (const s of SRC) vm.runInContext(s, ctx);
-const { PH, PHT, FONTS, FONT_BASE } = ctx;
+const { PH, PHT, FONTS, FONT_BASE, ART } = ctx;
 
 // ---- PNG
 const CRC = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
@@ -49,6 +49,7 @@ const scale2 = (rgba, w, h) => {
 const PNG_DIR = path.join(DIR, 'png');
 fs.rmSync(PNG_DIR, { recursive: true, force: true });
 fs.mkdirSync(path.join(PNG_DIR, '2x'), { recursive: true });
+fs.mkdirSync(path.join(PNG_DIR, 'art'), { recursive: true });
 const written = [];
 function save(name, fb) {
   const rgba = fb.rgba(new Uint8Array(640 * 172 * 4));
@@ -74,6 +75,38 @@ for (const th of PHT.THEMES) {
   }
 }
 for (const f of Object.values(FONTS)) f.glyphs = Object.assign({}, f.glyphs);
+
+// ---- the painted worlds at their native 320x86 (firmware px:: layer), and a palette audit of every frame
+const ALLOWED = {
+  ega: new Set([0x000000, 0x0000AA, 0x00AA00, 0x00AAAA, 0xAA0000, 0xAA00AA, 0xAA5500, 0xAAAAAA, 0x555555, 0x5555FF, 0x55FF55, 0x55FFFF, 0xFF5555, 0xFF55FF, 0xFFFF55, 0xFFFFFF]),
+  c64: new Set([0x000000, 0xFFFFFF, 0x68372B, 0x70A4B2, 0x6F3D86, 0x588D43, 0x352879, 0xB8C76F, 0x6F4F25, 0x433900, 0x9A6759, 0x444444, 0x6C6C6C, 0x9AD284, 0x6C5EB5, 0x959595]),
+};
+const is12 = (c) => [16, 8, 0].every((s) => ((c >> s) & 255) % 17 === 0);
+const audit = {};
+for (const th of PHT.THEMES) {
+  if (!th.paint) continue;
+  for (const [v, V] of Object.entries(th.variants)) {
+    const px = new ART.Px();
+    th.paint(px, 0, V);
+    const rgba = new Uint8Array(320 * 86 * 4);
+    px.d.forEach((c, i) => { rgba[i * 4] = (c >> 16) & 255; rgba[i * 4 + 1] = (c >> 8) & 255; rgba[i * 4 + 2] = c & 255; rgba[i * 4 + 3] = 255; });
+    const tag = th.key + (v === 'a' ? '' : '-' + v);
+    fs.writeFileSync(path.join(PNG_DIR, 'art', tag + '-world.png'), png(320, 86, rgba));
+    // every screen of this variant: which colors does it use, and are they all the machine's own?
+    const ok = th.key === 'cga' ? new Set([V.k, V.c, V.m, V.w]) : ALLOWED[th.key];
+    const worldColors = new Set(px.d);
+    const bad = new Set();
+    for (const sc of PHT.SCREENS) {
+      if (!th[sc] || sc === 'scene') continue;
+      const fb = PHT.render(new PH.Fb(), th.key, v, sc, 0, 'en');
+      for (const c of fb.d) {
+        const cc = c & 0xffffff;
+        if (ok ? !ok.has(cc) : !is12(cc)) bad.add(sc + ':' + PH.toHex(cc));
+      }
+    }
+    audit[tag] = { worldColors: worldColors.size, rule: ok ? `${ok.size} machine colors` : '12-bit (#RGB) colors only', violations: [...bad].slice(0, 12), violationCount: bad.size };
+  }
+}
 
 // ---- palettes.json
 const hx = (c) => PH.toHex(PH.from565(PH.to565(c)));
@@ -101,12 +134,11 @@ for (const th of PHT.THEMES) {
   }
   palettes.themes[th.key] = t;
 }
-palettes.themes.amiga.copper = {
-  digits: ['#F60', '#F70', '#F80', '#F90', '#FA0', '#FB2', '#FC4', '#FD6', '#FE8', '#FFA', '#FFC', '#FFE', '#FFF', '#EFF', '#DEF', '#BDF', '#ACF', '#9BF', '#8AF', '#79E', '#68D'],
-  vu: ['#05A', '#06B', '#08C', '#0AD', '#2CE', '#6DE', '#AEE', '#FFF', '#FD8', '#F80'],
-  sky: ['#001', '#002', '#012', '#013', '#023', '#024', '#134', '#135', '#245', '#356', '#467', '#578', '#879', '#A89'],
-  note: '12-bit colors, one per scanline band (copper list); expand #RGB to #RRGGBB',
-};
+{
+  const cp = PHT.THEMES.find((t) => t.key === 'amiga').copper, h12 = (c) => '#' + [16, 8, 0].map((s) => (((c >> s) & 255) / 17).toString(16).toUpperCase()).join('');
+  palettes.themes.amiga.copper = Object.fromEntries(Object.entries(cp).map(([k, v]) => [k, Array.isArray(v) ? v.map(h12) : v]));
+}
+palettes.audit = audit;
 palettes.themes.c64.machine16 = { black: '#000000', white: '#FFFFFF', red: '#68372B', cyan: '#70A4B2', purple: '#6F3D86', green: '#588D43',
   blue: '#352879', yellow: '#B8C76F', orange: '#6F4F25', brown: '#433900', lightRed: '#9A6759', darkGrey: '#444444', grey: '#6C6C6C',
   lightGreen: '#9AD284', lightBlue: '#6C5EB5', lightGrey: '#959595' };
@@ -129,5 +161,6 @@ const tpl = fs.readFileSync(path.join(DIR, 'src', 'page.html'), 'utf8');
 const script = `window.VFD_GLYPHS=${JSON.stringify(VFD_GLYPHS)};\n` + SRC.join('\n') + '\n' + UI;
 fs.writeFileSync(path.join(DIR, 'mockups.html'), tpl.replace('/*SCRIPT*/', () => script.replace(/<\/script/g, '<\\/script')));
 
-console.log(`${written.length} screens -> png/ (+2x), palettes.json, fonts.json, mockups.html`);
+console.log(`${written.length} screens -> png/ (+2x, art/), palettes.json, fonts.json, mockups.html`);
+for (const [k, a] of Object.entries(audit)) console.log(`  ${k}: ${a.worldColors} colors in world, ${a.violationCount ? a.violationCount + ' off-palette: ' + a.violations.join(' ') : 'palette ok'}`);
 if (missing.size) console.log('missing glyphs:', [...missing].join(' '));
