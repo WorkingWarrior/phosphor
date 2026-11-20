@@ -33,8 +33,8 @@ esp-web-install-button button[slot=activate] {
   <p class="lead">A retro VFD-style desk gadget for the Waveshare ESP32-S3-Touch-LCD-3.49: clock, weather, internet radio, focus timer and pixel scenes.</p>
 
   <div class="warn">
-    <b>This erases the board.</b> Whatever runs on it now, including the Waveshare factory demo, is replaced and is not
-    kept. Phosphor does not back it up and cannot restore it.
+    <b>This replaces what the board runs now.</b> Whatever is on it, including the Waveshare factory demo, is not kept.
+    Phosphor does not back it up and cannot restore it.
   </div>
 
   <esp-web-install-button manifest="manifest.json">
@@ -49,9 +49,12 @@ esp-web-install-button button[slot=activate] {
     <li>Press <b>Install Phosphor</b>. Chrome lists serial ports: pick <b>USB JTAG/serial debug unit</b>. Next to it you see
       <code>cu.usbmodem…</code> on a Mac, <code>COM3</code> or similar on Windows, <code>ttyACM0</code> on Linux. Ignore
       Bluetooth and other entries. Not sure which one? Unplug the board, look at the list, plug it back in: the new entry is the board.
-      Say yes to erasing, then wait for <b>Installation complete</b> (about a minute) and close the installer window with <b>Next</b> or the &times;.</li>
-    <li>After the restart the screen shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code>. Join it from your phone
-      and pick your home Wi-Fi. The form also has a device name, filled in as <code>phosphor-1a2b</code> (the same four characters as the setup Wi-Fi); keep it or type your own, for example <code>desk</code>.</li>
+      On a first install tick <b>Erase device</b>, confirm, wait for <b>Installation complete</b> (about a minute) and
+      close the installer window with <b>Next</b> or the &times;.</li>
+    <li>After the restart the screen shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code> and a QR code. Join it from
+      your phone (no password). If no setup page opens, browse to <code>192.168.4.1</code>. Tap <b>Configure WiFi</b>, pick
+      your home Wi-Fi, enter its password and a device name, then <b>Save</b>. The name field starts as
+      <code>phosphor-1a2b</code> (the same four characters as the setup Wi-Fi); <code>desk</code> is easier to type.</li>
     <li>On the phone open <code>http://desk.local/settings</code> (with your own name) to set your city, language and radio
       stations. Some Android
       phones cannot open <code>.local</code> addresses: use the board's IP address from your router's device list instead.</li>
