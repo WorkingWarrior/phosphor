@@ -16,7 +16,8 @@ main { max-width: 640px; margin: 0 auto; padding: 48px 16px 80px; }
 h1 { font: 600 14px/1 ui-monospace, Menlo, monospace; letter-spacing: .2em; color: var(--lit); text-transform: uppercase; margin: 0 0 18px; }
 .lead { font-size: 22px; line-height: 1.35; margin: 0 0 28px; }
 h2 { font: 600 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 36px 0 12px; }
-ol { padding-left: 20px; margin: 0; } li { margin: 6px 0; }
+ol { padding-left: 20px; margin: 0; } li { margin: 6px 0; } ol ol { margin-top: 4px; }
+dt { font-weight: 600; margin: 18px 0 4px; } dd { margin: 0; color: var(--text); }
 .warn { border: 1px solid var(--hot); border-radius: 10px; padding: 14px 16px; margin: 0 0 24px; }
 .warn b { color: var(--hot); }
 code { font: 14px ui-monospace, Menlo, monospace; color: var(--lit); }
@@ -46,21 +47,54 @@ esp-web-install-button button[slot=activate] {
   <h2>Steps</h2>
   <ol>
     <li>Connect the board to the computer with a USB-C data cable.</li>
-    <li>Press <b>Install Phosphor</b>. Chrome lists serial ports: pick <b>USB JTAG/serial debug unit</b>. Next to it you see
-      <code>cu.usbmodem…</code> on a Mac, <code>COM3</code> or similar on Windows, <code>ttyACM0</code> on Linux. Ignore
-      Bluetooth and other entries. Not sure which one? Unplug the board, look at the list, plug it back in: the new entry is the board.
-      On a first install tick <b>Erase device</b>, confirm, wait for <b>Installation complete</b> (about a minute) and
-      close the installer window with <b>Next</b> or the &times;.</li>
-    <li>After the restart the screen shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code> and a QR code. Join it from
-      your phone (no password). If no setup page opens, browse to <code>192.168.4.1</code>. Tap <b>Configure WiFi</b>, pick
-      your home Wi-Fi, enter its password and a device name, then <b>Save</b>. The name field starts as
-      <code>phosphor-1a2b</code> (the same four characters as the setup Wi-Fi); <code>desk</code> is easier to type.</li>
-    <li>On the phone open <code>http://desk.local/settings</code> (with your own name) to set your city, language and radio
-      stations. Some Android
-      phones cannot open <code>.local</code> addresses: use the board's IP address from your router's device list instead.</li>
+    <li>Press <b>Install Phosphor</b>. Chrome lists serial ports: pick <b>USB JTAG/serial debug unit</b>
+      (<code>cu.usbmodem…</code> on a Mac, <code>COM3</code> or similar on Windows, <code>ttyACM0</code> on Linux).
+      On a first install tick <b>Erase device</b>, confirm, and wait for <b>Installation complete</b> (about a minute).
+      Close the installer window with <b>Next</b> or the &times;.</li>
+    <li>The board restarts and shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code> and a QR code. On your phone,
+      join that Wi-Fi (no password). A setup page opens; if it does not, browse to <code>192.168.4.1</code>.</li>
+    <li>On the setup page (if you see a menu first, tap <b>Configure WiFi</b>):
+      <ol type="a">
+        <li>tap your home Wi-Fi in the list (2.4 GHz, see below),</li>
+        <li>type its password,</li>
+        <li>scroll down: under the password there is <b>Device name</b>, already filled in as <code>phosphor-1a2b</code>.
+          Keep it or change it to something short like <code>desk</code>,</li>
+        <li>tap <b>Save</b>. The board joins your Wi-Fi and shows the clock.</li>
+      </ol></li>
+    <li>With the phone back on your home Wi-Fi, open <code>http://desk.local/settings</code> (use your device name) to set
+      your city, language and radio stations.</li>
   </ol>
 
-  <p class="small" style="margin-top:36px">If no USB JTAG/serial entry appears, try another cable (some only charge), or hold BOOT while plugging it in. Source, issues and license (GPL-3.0): <a href="https://github.com/melihkoray/phosphor">github.com/melihkoray/phosphor</a>. Made by <a href="https://melihkoray.com">Melih Koray</a>.</p>
+  <h2>Troubleshooting</h2>
+  <dl>
+    <dt>No "USB JTAG/serial debug unit" in the port list</dt>
+    <dd>Try another cable (many only charge) or another USB port. Still nothing: hold <b>BOOT</b> on the back while you
+      plug the cable in, then try again. Not sure which entry is the board? Unplug it, look at the list, plug it back in:
+      the new entry is the board.</dd>
+
+    <dt>The board does not join my Wi-Fi</dt>
+    <dd>The ESP32 only works with <b>2.4 GHz</b> Wi-Fi. If your router has a separate 5 GHz network (often named
+      "…-5G"), pick the other one. Check the password too: phones often capitalise the first letter.</dd>
+
+    <dt>The setup Wi-Fi or setup page is gone</dt>
+    <dd>Hold <b>BOOT</b> on the back for 5 seconds. The board forgets the saved Wi-Fi and shows
+      <code>Phosphor-Setup-…</code> again, until you finish the setup. (When a saved Wi-Fi fails, the board also opens the
+      setup by itself after a restart, but only for 3 minutes.)</dd>
+
+    <dt>The setup page does not open on the phone</dt>
+    <dd>Browse to <code>192.168.4.1</code> while joined to <code>Phosphor-Setup-…</code>. If the phone keeps leaving that
+      network because it "has no internet", turn off mobile data for a moment.</dd>
+
+    <dt><code>desk.local</code> does not open</dt>
+    <dd>The phone must be on the same Wi-Fi as the board. Some Android phones cannot open <code>.local</code> addresses:
+      use a computer, or the board's IP address from your router's list of connected devices
+      (<code>http://192.168.x.x/settings</code>).</dd>
+
+    <dt>A radio station does not play</dt>
+    <dd>Use <b>Test</b> on the settings page first. MP3 and AAC streams are tested; some others may not play.</dd>
+  </dl>
+
+  <p class="small" style="margin-top:36px">Source, issues and license (GPL-3.0): <a href="https://github.com/melihkoray/phosphor">github.com/melihkoray/phosphor</a>. Made by <a href="https://melihkoray.com">Melih Koray</a>.</p>
 </main>
 </body>
 </html>

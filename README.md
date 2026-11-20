@@ -33,11 +33,11 @@ that tilts with the board, a lava lamp and an hourglass you turn over.
 1. Open the [installer page](https://melihkoray.github.io/phosphor/), connect the board with a USB-C data cable, press
    **Install Phosphor** and pick **USB JTAG/serial debug unit** from the port list (`cu.usbmodem…` on a Mac, `COMx` on
    Windows, `ttyACM0` on Linux). Not sure? Unplug the board and plug it back in: the entry that comes back is the board.
-2. After the restart the screen shows a Wi-Fi name like `Phosphor-Setup-1A2B` and a QR code. Join it from your phone
-   (no password). If no setup page opens by itself, browse to `192.168.4.1`. Tap **Configure WiFi**, pick your home
-   Wi-Fi, enter its password and a device name (the field starts as `phosphor-1a2b`, the same four characters as the
-   setup Wi-Fi; `desk` is easier to type), then **Save**. The board restarts and joins your Wi-Fi.
-3. Open `http://desk.local/settings` (with your device's name) on the phone. If the phone cannot open `.local` addresses
+2. The board restarts and shows a Wi-Fi name like `Phosphor-Setup-1A2B` and a QR code. Join it from your phone (no
+   password); a setup page opens (if not, browse to `192.168.4.1`; if you see a menu, tap **Configure WiFi**). Tap your
+   home Wi-Fi (2.4 GHz), type its password, scroll down to **Device name** (prefilled as `phosphor-1a2b`, change it to
+   something short like `desk` if you like) and tap **Save**.
+3. With the phone back on your home Wi-Fi, open `http://desk.local/settings` (use your device name). If the phone cannot open `.local` addresses
    (some Android phones), use the board's IP address from your router's device list. There you set:
    - **City:** search by name; weather and the time zone follow it.
    - **Language:** English or Turkish screen texts.
@@ -52,6 +52,20 @@ Settings are stored on the board and survive restarts and updates (a reinstall w
 own buttons. Hold on the clock to switch the alarm on or off, hold on a timer to reset it. Back buttons: PWR turns the
 screen off and on (hold 3 s on battery to power off), BOOT changes brightness (hold 5 s to forget Wi-Fi and open the
 setup again), RESET restarts.
+
+## Troubleshooting
+
+- **No "USB JTAG/serial debug unit" in the port list:** try another cable (many only charge) or USB port. Still
+  nothing: hold BOOT while plugging the cable in.
+- **The board does not join your Wi-Fi:** the ESP32 only works with 2.4 GHz. Pick the non-5G network if your router has
+  two. Check the password's capital letters.
+- **The setup Wi-Fi or page is gone:** hold BOOT for 5 seconds. The board forgets the saved Wi-Fi and opens the setup
+  again until you finish it. (After a restart with a failing saved Wi-Fi it opens by itself, but only for 3 minutes.)
+- **The setup page does not open:** browse to `192.168.4.1` while joined to `Phosphor-Setup-…`; turn off mobile data if
+  the phone keeps leaving a network "without internet".
+- **`desk.local` does not open:** be on the same Wi-Fi as the board. Some Android phones cannot open `.local`: use a
+  computer, or the board's IP from your router's device list (`GET /status` also shows it).
+- **A station does not play:** use Test on the settings page. MP3 and AAC streams are tested.
 
 ## Building it yourself
 
