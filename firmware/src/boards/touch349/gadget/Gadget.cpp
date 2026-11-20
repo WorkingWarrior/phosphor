@@ -15,6 +15,7 @@
 #include "Settings.h"
 #include "Seaside.h"
 #include "Study.h"
+#include "Theme.h"
 #include "Vfd.h"
 #include "Wave.h"
 #include "Weather.h"
@@ -794,7 +795,10 @@ void Gadget_Begin(uint16_t *canvas, I2cMasterBus *bus, void (*amp)(bool))
   vfd::begin(canvas);
   settings::begin();
   prefs.begin("gadget", false);
-  px::setTheme((px::Theme)prefs.getUChar("theme", 2));
+  px::begin();
+  int old_theme = prefs.isKey("theme") ? prefs.getUChar("theme", 2) : -1;  // pre-1.1 scene colors, migrated once
+  theme::begin(old_theme);
+  if (old_theme >= 0) prefs.remove("theme");
   alarm_on = prefs.getBool("al_on", false);
   alarm_h = prefs.getUChar("al_h", 7);
   alarm_m = prefs.getUChar("al_m", 30);
@@ -869,6 +873,7 @@ void Gadget_Render(const DateTime &now)
     frame(140, 62, 360, 46, DIM);
     drawVolumeBar(158, 78);
   }
+  theme::decorate();
 }
 
 uint32_t Gadget_FrameMs(Mode m)
@@ -1072,10 +1077,13 @@ String Gadget_Command(const String &name, const String &arg)
       eggSet(arg.toInt());  // seconds
     }
   } else if (name == "theme") {
-    // pixel scenes' colors: natural | ega | vfd (or 0..2); empty = next
-    int t = arg == "natural" ? 0 : arg == "ega" ? 1 : arg == "vfd" ? 2 : arg.length() ? arg.toInt() : ((int)px::theme() + 1) % 3;
-    px::setTheme((px::Theme)t);
-    prefs.putUChar("theme", (uint8_t)px::theme());
+    // the whole look: vfd | cga | ega | c64 | amiga (or 0..4), empty = next; "natural" / "themed" = scene colors
+    if (arg == "natural" || arg == "themed") {
+      theme::setNaturalScenes(arg == "natural");
+    } else {
+      theme::Id t = arg.length() ? theme::fromName(arg) : (theme::Id)((theme::current() + 1) % theme::COUNT);
+      if (t < theme::COUNT) theme::set(t);
+    }
   } else if (name == "sky") {
     // preview: Sky index (1 clear .. 9 storm), "n" after it for night; empty or -1 = the real sky
     sky_force = arg.length() ? constrain(arg.toInt(), -1, 9) : -1;
@@ -1090,11 +1098,11 @@ String Gadget_Command(const String &name, const String &arg)
   title.replace("\"", "'");
   float ax, ay, az;
   Motion_Raw(ax, ay, az);
-  char json[480];
+  char json[560];
   snprintf(json, sizeof(json),
-           "{\"radio\":\"%s\",\"station\":%d,\"station_name\":\"%s\",\"title\":\"%s\",\"volume\":%d,"
+           "{\"theme\":\"%s\",\"natural_scenes\":%s,\"radio\":\"%s\",\"station\":%d,\"station_name\":\"%s\",\"title\":\"%s\",\"volume\":%d,"
            "\"alarm\":\"%02d:%02d\",\"alarm_on\":%s,\"ringing\":%s,\"timer\":\"%s\",\"timer_state\":%d,\"accel\":[%.2f,%.2f,%.2f]}",
-           RS[(int)Radio_State()], Radio_Station(), settings::station(Radio_Station()).name.c_str(), title.c_str(), Radio_Volume(), alarm_h,
+           theme::def().key, theme::naturalScenes() ? "true" : "false", RS[(int)Radio_State()], Radio_Station(), settings::station(Radio_Station()).name.c_str(), title.c_str(), Radio_Volume(), alarm_h,
            alarm_m, alarm_on ? "true" : "false", ringing ? "true" : "false", mss((eggLeftMs() + 999) / 1000).c_str(), (int)phase, ax, ay, az);
   return json;
 }

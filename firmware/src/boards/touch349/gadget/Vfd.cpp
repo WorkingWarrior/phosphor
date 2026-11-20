@@ -5,8 +5,23 @@
 
 namespace vfd {
 
+uint16_t BG = 0x0041, GHOST = 0x0904, FAINT = 0x0082, HALO = 0x0248, LIT = 0x77BC, DIM = 0x44B1, HOT = 0xFA16,
+         HOTH = 0x6888, KELP = 0x4D72;
+Ink LIT_INK = { LIT, HALO };
+Ink HOT_INK = { HOT, HOTH };
+Ink DIM_INK = { DIM };
+Ink GHOST_INK = { GHOST };
+
 static uint16_t *buf = nullptr;
 static int cx0 = 0, cy0 = 0, cx1 = W, cy1 = H;
+static Style cur_style;
+
+void setStyle(const Style &s)
+{
+  cur_style = s;
+  if (!cur_style.font) cur_style.font = &VFD_FONT;
+}
+const Style &style() { return cur_style; }
 
 void begin(uint16_t *canvas) { buf = canvas; }
 uint16_t *canvas() { return buf; }
@@ -103,41 +118,53 @@ static Resolved resolve(uint32_t cp)
   return { cp, 0, 0 };
 }
 
-static const uint8_t *glyphRows(uint32_t cp)
+static const uint8_t *vfdRows(uint32_t cp)
 {
   for (int i = 0; i < VFD_GLYPH_COUNT; i++) {
     if (VFD_GLYPHS[i].cp == cp) {
       return VFD_GLYPHS[i].rows;
     }
   }
-  static const uint8_t blank[7] = { 0 };
-  return cp == ' ' ? blank : glyphRows('?');
+  return nullptr;
+}
+
+const Font VFD_FONT = { 5, 7, 6, 0, vfdRows };
+
+static const uint8_t *glyphRows(const Font &f, uint32_t cp)
+{
+  static const uint8_t blank[16] = { 0 };
+  if (cp == ' ') return blank;
+  const uint8_t *r = f.rows(cp);
+  if (!r) r = f.rows('?');
+  return r ? r : blank;
 }
 
 // Calls dot(x, y) for every lit cell of the string.
 template <typename F>
 static int forEachDot(const char *s, int x, int y, int p, F dot)
 {
+  const Font &f = *cur_style.font;
   int cx = x;
   while (*s) {
     Resolved r = resolve(nextCodepoint(s));
-    const uint8_t *rows = glyphRows(r.base);
-    for (int row = 0; row < 7; row++) {
-      for (int col = 0; col < 5; col++) {
-        if (rows[row] & (0x10 >> col)) {
+    const uint8_t *rows = glyphRows(f, r.base);
+    for (int row = 0; row < f.h; row++) {
+      for (int col = 0; col < f.w; col++) {
+        if (rows[row] & (1 << (f.w - 1 - col))) {
           dot(cx + col * p, y + row * p);
         }
       }
     }
     for (int col = 0; col < 5; col++) {
+      int ax = cx + (col + f.accent_dx) * p;
       if (r.top & (0x10 >> col)) {
-        dot(cx + col * p, y - 2 * p);
+        dot(ax, y - 2 * p);
       }
       if (r.bot & (0x10 >> col)) {
-        dot(cx + col * p, y + 8 * p);
+        dot(ax, y + (f.h + 1) * p);
       }
     }
-    cx += 6 * p;
+    cx += f.adv * p;
   }
   return cx;
 }
@@ -154,23 +181,28 @@ int glyphCount(const char *s)
 
 int textWidth(const char *s, int p)
 {
+  const Font &f = *cur_style.font;
   int n = glyphCount(s);
-  return n ? n * 6 * p - p : 0;
+  return n ? (n * f.adv - (f.adv - f.w)) * p : 0;
 }
 
 int text(const char *s, int x, int y, int p, int d, const Ink &ink)
 {
-  if (ink.ghost != NONE) {
+  const Font &f = *cur_style.font;
+  if (!cur_style.dots) {
+    d = p;
+  }
+  if (ink.ghost != NONE && cur_style.ghosts) {
     int n = glyphCount(s);
     for (int g = 0; g < n; g++) {
-      for (int row = 0; row < 7; row++) {
-        for (int col = 0; col < 5; col++) {
-          rect(x + g * 6 * p + col * p, y + row * p, d, d, ink.ghost);
+      for (int row = 0; row < f.h; row++) {
+        for (int col = 0; col < f.w; col++) {
+          rect(x + g * f.adv * p + col * p, y + row * p, d, d, ink.ghost);
         }
       }
     }
   }
-  if (ink.h != NONE) {
+  if (ink.h != NONE && cur_style.glow) {
     forEachDot(s, x, y, p, [&](int px, int py) { rect(px - 1, py - 1, d + 2, d + 2, ink.h); });
   }
   return forEachDot(s, x, y, p, [&](int px, int py) { rect(px, py, d, d, ink.c); });
@@ -227,7 +259,7 @@ int seg(const char *s, int x, int y, int w, int h, int t, int gap, const Ink &in
   for (; *s; s++) {
     if (*s == ':') {
       int y1 = y + (h * 3 + 5) / 10, y2 = y + (h * 65 + 50) / 100;
-      if (ink.h != NONE) {
+      if (ink.h != NONE && cur_style.glow) {
         rect(cx - 2, y1 - 2, t + 4, t + 4, ink.h);
         rect(cx - 2, y2 - 2, t + 4, t + 4, ink.h);
       }
@@ -240,11 +272,11 @@ int seg(const char *s, int x, int y, int w, int h, int t, int gap, const Ink &in
     segBoxes(cx, y, w, h, t, b);
     uint8_t lit = segMask(*s);
     for (int i = 0; i < 7; i++) {
-      if (!(lit & (1 << i)) && ink.ghost != NONE) {
+      if (!(lit & (1 << i)) && ink.ghost != NONE && cur_style.ghosts) {
         segShape(b[i], 0, ink.ghost);
       }
     }
-    if (ink.h != NONE) {
+    if (ink.h != NONE && cur_style.glow) {
       for (int i = 0; i < 7; i++) {
         if (lit & (1 << i)) {
           segShape(b[i], 2, ink.h);

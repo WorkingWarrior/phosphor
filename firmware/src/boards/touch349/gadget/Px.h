@@ -31,7 +31,9 @@ enum : uint8_t {
 };
 
 extern const uint16_t PALETTE[COLORS];
-extern uint8_t buf[H][W];
+extern uint8_t (*buf)[W];  // H rows, in PSRAM (begin() allocates it; internal RAM is the scarce kind)
+
+void begin();
 
 void clear(uint8_t c);
 inline void set(int x, int y, uint8_t c)
@@ -48,10 +50,12 @@ void sprite(const char *const *rows, int n, int x, int y, const char *key, const
 // Puts the scene on the canvas (2x2 per pixel), through the current theme.
 void present();
 
-// Themes recolor every scene at present(): Natural = the palette above; Ega = the 16 EGA colors with a checker dither
-// between two of them where no single one fits (Sierra-era look); Vfd = the gadget's own cyan and magenta, cool colors
-// to cyan, warm ones to magenta, by brightness.
-enum class Theme : uint8_t { Natural, Ega, Vfd, COUNT };
+// Themes recolor every scene at present(), as if the scene were loaded on that machine: Natural = the palette above;
+// Ega = the 16 EGA colors with a checker dither between two of them where no single one fits (Sierra-era look); Vfd =
+// the gadget's own cyan and magenta, cool colors to cyan, warm ones to magenta, by brightness; C64 = the 16 colors of
+// the home computer with its double-wide pixels; Cga = black, cyan, magenta and white, dithered; Amiga = every color
+// rounded to 12 bits (4 per channel).
+enum class Theme : uint8_t { Natural, Ega, Vfd, C64, Cga, Amiga, COUNT };
 void setTheme(Theme t);
 Theme theme();
 const char *themeName(Theme t);

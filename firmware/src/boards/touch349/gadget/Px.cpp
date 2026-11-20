@@ -20,9 +20,21 @@ const uint16_t PALETTE[COLORS] = {
   rgb(240, 212, 64), rgb(40, 96, 226), rgb(22, 40, 120), rgb(140, 72, 206), rgb(250, 124, 30),
 };
 
-uint8_t buf[H][W];
+uint8_t (*buf)[W] = nullptr;
 
-void clear(uint8_t c) { memset(buf, c, sizeof(buf)); }
+void begin()
+{
+  if (buf) return;
+  buf = (uint8_t (*)[W])ps_malloc(H * W);
+  if (!buf) buf = (uint8_t (*)[W])malloc(H * W);
+  memset(buf, 0, H * W);
+}
+
+void clear(uint8_t c)
+{
+  if (!buf) begin();
+  memset(buf, c, H * W);
+}
 
 void rect(int x, int y, int w, int h, uint8_t c)
 {
@@ -122,6 +134,38 @@ static void buildPairs()
     }
     return;
   }
+  if (cur == Theme::C64) {
+    // the measured colors of the 1980s home computer (the "Pepto" palette)
+    static const uint16_t C64[16] = { rgb(0, 0, 0),       rgb(255, 255, 255), rgb(104, 55, 43),   rgb(112, 164, 178),
+                                      rgb(111, 61, 134),  rgb(88, 141, 67),   rgb(53, 40, 121),   rgb(184, 199, 111),
+                                      rgb(111, 79, 37),   rgb(67, 57, 0),     rgb(154, 103, 89),  rgb(68, 68, 68),
+                                      rgb(108, 108, 108), rgb(154, 210, 132), rgb(108, 94, 181),  rgb(149, 149, 149) };
+    Rgb set[16];
+    for (int i = 0; i < 16; i++) set[i] = unpack(C64[i]);
+    for (int i = 0; i < COLORS; i++) bestPair(unpack(PALETTE[i]), set, C64, 16, pair_a[i], pair_b[i]);
+    return;
+  }
+  if (cur == Theme::Cga) {
+    // palette 1, high intensity
+    static const uint16_t CGA[4] = { rgb(0, 0, 0), rgb(85, 255, 255), rgb(255, 85, 255), rgb(255, 255, 255) };
+    Rgb set[4];
+    for (int i = 0; i < 4; i++) set[i] = unpack(CGA[i]);
+    for (int i = 0; i < COLORS; i++) {
+      Rgb c = unpack(PALETTE[i]);
+      float g = c.r * 0.3f + c.g * 0.59f + c.b * 0.11f;
+      auto boost = [&](float v) { return constrain((g + (v - g) * 1.6f) * 1.3f, 0.0f, 255.0f); };
+      bestPair({ boost(c.r), boost(c.g), boost(c.b) }, set, CGA, 4, pair_a[i], pair_b[i]);
+    }
+    return;
+  }
+  if (cur == Theme::Amiga) {
+    for (int i = 0; i < COLORS; i++) {
+      Rgb c = unpack(PALETTE[i]);
+      auto q = [](float v) { return (int)((int)(v + 8) / 17) * 17; };
+      pair_a[i] = pair_b[i] = rgb(min(255, q(c.r)), min(255, q(c.g)), min(255, q(c.b)));
+    }
+    return;
+  }
   // Vfd: two ramps, the colors of the clock and radio pages
   static const uint16_t CY[] = { rgb(0, 8, 8),     rgb(6, 28, 34),   rgb(10, 60, 70),
                                  rgb(30, 120, 130), rgb(70, 190, 190), rgb(118, 244, 226), rgb(210, 255, 248) };
@@ -157,8 +201,8 @@ void setTheme(Theme t)
 Theme theme() { return cur; }
 const char *themeName(Theme t)
 {
-  static const char *N[] = { "natural", "ega", "vfd" };
-  return N[(int)t < 3 ? (int)t : 0];
+  static const char *N[] = { "natural", "ega", "vfd", "c64", "cga", "amiga" };
+  return N[(int)t < (int)Theme::COUNT ? (int)t : 0];
 }
 uint16_t ink(uint8_t c)
 {
@@ -169,13 +213,15 @@ uint16_t ink(uint8_t c)
 void present()
 {
   if (!pairs_ready) setTheme(cur);
+  if (!buf) begin();
   uint16_t *cv = vfd::canvas();
+  int wide = cur == Theme::C64 ? ~1 : ~0;  // C64 multicolor: every pixel twice as wide
   for (int y = 0; y < H; y++) {
     uint16_t *r0 = cv + (2 * y) * vfd::W, *r1 = r0 + vfd::W;
     const uint8_t *src = buf[y];
     for (int x = 0; x < W; x++) {
-      uint8_t i = src[x];
-      uint16_t c = ((x ^ y) & 1) ? pair_b[i] : pair_a[i];
+      uint8_t i = src[x & wide];
+      uint16_t c = (((x & wide) ^ y) & 1) ? pair_b[i] : pair_a[i];
       r0[2 * x] = r0[2 * x + 1] = r1[2 * x] = r1[2 * x + 1] = c;
     }
   }
