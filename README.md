@@ -34,10 +34,13 @@ that tilts with the board, a lava lamp and an hourglass you turn over.
    **Install Phosphor** and pick **USB JTAG/serial debug unit** from the port list (`cu.usbmodem…` on a Mac, `COMx` on
    Windows, `ttyACM0` on Linux). Not sure? Unplug the board and plug it back in: the entry that comes back is the board.
 2. The board restarts and shows a Wi-Fi name like `Phosphor-Setup-1A2B` and a QR code. Join it from your phone (no
-   password); a setup page opens (if not, browse to `192.168.4.1`; if you see a menu, tap **Configure WiFi**). Tap your
+   password); a setup page opens. If it does not, or the browser shows normal websites, turn off mobile data and type
+   `http://192.168.4.1` in the browser (if you see a menu, tap **Configure WiFi**). Tap your
    home Wi-Fi (2.4 GHz), type its password, scroll down to **Device name** (prefilled as `phosphor-1a2b`, change it to
-   something short like `desk` if you like) and tap **Save**.
-3. With the phone back on your home Wi-Fi, open `http://desk.local/settings` (use your device name). If the phone cannot open `.local` addresses
+   something short like `desk` if you like) and tap **Save**. **Write the name down: you need it in the next step and
+   the board does not show it anywhere.**
+3. With the phone back on your home Wi-Fi (mobile data on again), open `http://<device name>.local/settings` with the
+   name from step 2, for example `http://desk.local/settings`. If the phone cannot open `.local` addresses
    (some Android phones), use the board's IP address from your router's device list. There you set:
    - **City:** search by name; weather and the time zone follow it.
    - **Language:** English or Turkish screen texts.
@@ -57,12 +60,14 @@ setup again), RESET restarts.
 
 - **No "USB JTAG/serial debug unit" in the port list:** try another cable (many only charge) or USB port. Still
   nothing: hold BOOT while plugging the cable in.
-- **The board does not join your Wi-Fi:** the ESP32 only works with 2.4 GHz. Pick the non-5G network if your router has
-  two. Check the password's capital letters.
+- **The board does not join your Wi-Fi:** most often a mistyped password (phones capitalise the first letter); hold
+  BOOT for 5 seconds and try again. The ESP32 also only works with 2.4 GHz: pick the non-5G network if there are two.
 - **The setup Wi-Fi or page is gone:** hold BOOT for 5 seconds. The board forgets the saved Wi-Fi and opens the setup
   again until you finish it. (After a restart with a failing saved Wi-Fi it opens by itself, but only for 3 minutes.)
-- **The setup page does not open:** browse to `192.168.4.1` while joined to `Phosphor-Setup-…`; turn off mobile data if
-  the phone keeps leaving a network "without internet".
+- **The setup page does not open, or the browser shows normal websites:** the phone is on mobile data. Turn it off,
+  stay joined to `Phosphor-Setup-…` ("no internet" is normal) and type `http://192.168.4.1` in the browser.
+- **Forgot the device name:** look in your router's list of connected devices, or hold BOOT for 5 seconds and set up
+  the Wi-Fi again.
 - **`desk.local` does not open:** be on the same Wi-Fi as the board. Some Android phones cannot open `.local`: use a
   computer, or the board's IP from your router's device list (`GET /status` also shows it).
 - **A station does not play:** use Test on the settings page. MP3 and AAC streams are tested.

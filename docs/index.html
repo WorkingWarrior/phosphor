@@ -52,17 +52,23 @@ esp-web-install-button button[slot=activate] {
       On a first install tick <b>Erase device</b>, confirm, and wait for <b>Installation complete</b> (about a minute).
       Close the installer window with <b>Next</b> or the &times;.</li>
     <li>The board restarts and shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code> and a QR code. On your phone,
-      join that Wi-Fi (no password). A setup page opens; if it does not, browse to <code>192.168.4.1</code>.</li>
+      join that Wi-Fi (no password). A setup page opens by itself. If it does not, or your browser shows normal websites,
+      the phone is still using mobile data: <b>turn off mobile data</b>, open Safari (or any browser) and type
+      <code>http://192.168.4.1</code> in the address bar.</li>
     <li>On the setup page (if you see a menu first, tap <b>Configure WiFi</b>):
       <ol type="a">
         <li>tap your home Wi-Fi in the list (2.4 GHz, see below),</li>
         <li>type its password,</li>
         <li>scroll down: under the password there is <b>Device name</b>, already filled in as <code>phosphor-1a2b</code>.
-          Keep it or change it to something short like <code>desk</code>,</li>
-        <li>tap <b>Save</b>. The board joins your Wi-Fi and shows the clock.</li>
+          Keep it or change it to something short like <code>desk</code>.
+          <div class="warn" style="margin:10px 0"><b>Write this name down.</b> You need it in the next step to reach
+          the settings, and the board does not show it anywhere else.</div></li>
+        <li>tap <b>Save</b>. The board joins your Wi-Fi and shows the clock. Turn mobile data back on.</li>
       </ol></li>
-    <li>With the phone back on your home Wi-Fi, open <code>http://desk.local/settings</code> (use your device name) to set
-      your city, language and radio stations.</li>
+    <li>With the phone back on your home Wi-Fi, open <code>http://&lt;your device name&gt;.local/settings</code> with the
+      name from step 4. Named it <code>desk</code>? Then it is <code>http://desk.local/settings</code>; kept the default?
+      Something like <code>http://phosphor-1a2b.local/settings</code>. There you set your city, language and radio
+      stations.</li>
   </ol>
 
   <h2>Troubleshooting</h2>
@@ -73,17 +79,23 @@ esp-web-install-button button[slot=activate] {
       the new entry is the board.</dd>
 
     <dt>The board does not join my Wi-Fi</dt>
-    <dd>The ESP32 only works with <b>2.4 GHz</b> Wi-Fi. If your router has a separate 5 GHz network (often named
-      "…-5G"), pick the other one. Check the password too: phones often capitalise the first letter.</dd>
+    <dd>Most often a mistyped password: phones capitalise the first letter. Hold <b>BOOT</b> for 5 seconds and try again.
+      The ESP32 also only works with <b>2.4 GHz</b> Wi-Fi: if your router has a separate 5 GHz network (often named
+      "…-5G"), pick the other one.</dd>
 
     <dt>The setup Wi-Fi or setup page is gone</dt>
     <dd>Hold <b>BOOT</b> on the back for 5 seconds. The board forgets the saved Wi-Fi and shows
       <code>Phosphor-Setup-…</code> again, until you finish the setup. (When a saved Wi-Fi fails, the board also opens the
       setup by itself after a restart, but only for 3 minutes.)</dd>
 
-    <dt>The setup page does not open on the phone</dt>
-    <dd>Browse to <code>192.168.4.1</code> while joined to <code>Phosphor-Setup-…</code>. If the phone keeps leaving that
-      network because it "has no internet", turn off mobile data for a moment.</dd>
+    <dt>The setup page does not open, or the browser shows normal websites</dt>
+    <dd>The phone is using mobile data instead of the board's Wi-Fi. Turn off mobile data, check you are joined to
+      <code>Phosphor-Setup-…</code> ("no internet" there is normal), then type <code>http://192.168.4.1</code> in the
+      browser's address bar (with <code>http://</code>, or the browser searches for it).</dd>
+
+    <dt>I forgot the device name</dt>
+    <dd>Open your router's list of connected devices: the board shows up under its name (and its IP address works too:
+      <code>http://192.168.x.x/settings</code>). Or hold <b>BOOT</b> for 5 seconds and set up the Wi-Fi again.</dd>
 
     <dt><code>desk.local</code> does not open</dt>
     <dd>The phone must be on the same Wi-Fi as the board. Some Android phones cannot open <code>.local</code> addresses:
