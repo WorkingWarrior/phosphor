@@ -95,3 +95,5 @@ vendored in `libraries/`), [U8g2](https://github.com/olikraus/u8g2) (BSD-2-Claus
 [WiFiManager](https://github.com/tzapu/WiFiManager) (MIT), [SensorLib](https://github.com/lewisxhe/SensorLib) (MIT),
 the Espressif AXS15231B display and touch drivers (Apache-2.0) and
 [ESP Web Tools](https://esphome.github.io/esp-web-tools/) for the installer. Not affiliated with Waveshare.
+
+Made by [Melih Koray](https://melihkoray.com).
