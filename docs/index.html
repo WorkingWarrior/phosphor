@@ -46,12 +46,17 @@ esp-web-install-button button[slot=activate] {
   <h2>Steps</h2>
   <ol>
     <li>Connect the board to the computer with a USB-C data cable.</li>
-    <li>Press <b>Install Phosphor</b>, pick the board's serial port, confirm.</li>
-    <li>After the restart the screen shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code>. Join it from your phone and pick your home Wi-Fi.</li>
-    <li>Open <code>http://&lt;device name&gt;.local/settings</code> on the phone to set your city, language and radio stations.</li>
+    <li>Press <b>Install Phosphor</b>. Chrome lists serial ports: pick <b>USB JTAG/serial debug unit</b>. Next to it you see
+      <code>cu.usbmodem…</code> on a Mac, <code>COM3</code> or similar on Windows, <code>ttyACM0</code> on Linux. Ignore
+      Bluetooth and other entries. Not sure which one? Unplug the board, look at the list, plug it back in: the new entry is the board.</li>
+    <li>After the restart the screen shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code>. Join it from your phone
+      and pick your home Wi-Fi. The form also has a device name, filled in as <code>phosphor-1a2b</code> (the same four characters as the setup Wi-Fi); keep it or type your own, for example <code>desk</code>.</li>
+    <li>On the phone open <code>http://desk.local/settings</code> (with your own name) to set your city, language and radio
+      stations. Some Android
+      phones cannot open <code>.local</code> addresses: use the board's IP address from your router's device list instead.</li>
   </ol>
 
-  <p class="small" style="margin-top:36px">If the port does not show up, hold BOOT while plugging the cable in. Source, issues and license (GPL-3.0): see the GitHub repository.</p>
+  <p class="small" style="margin-top:36px">If no USB JTAG/serial entry appears, try another cable (some only charge), or hold BOOT while plugging it in. Source, issues and license (GPL-3.0): see the GitHub repository.</p>
 </main>
 </body>
 </html>

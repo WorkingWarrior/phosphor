@@ -31,10 +31,13 @@ that tilts with the board, a lava lamp and an hourglass you turn over.
 ## Setup
 
 1. Open the [installer page](https://melihkoray.github.io/phosphor/), connect the board with a USB-C data cable, press
-   **Install Phosphor**.
+   **Install Phosphor** and pick **USB JTAG/serial debug unit** from the port list (`cu.usbmodem…` on a Mac, `COMx` on
+   Windows, `ttyACM0` on Linux). Not sure? Unplug the board and plug it back in: the entry that comes back is the board.
 2. After the restart the screen shows a Wi-Fi name like `Phosphor-Setup-1A2B`. Join it from your phone, pick your home
-   Wi-Fi and give the device a name (for example `desk`).
-3. Open `http://desk.local/settings` on the phone. There you set:
+   Wi-Fi and give the device a name (for example `desk`). The name field starts as `phosphor-1a2b`, with the same
+   four characters as the setup Wi-Fi.
+3. Open `http://desk.local/settings` (with your device's name) on the phone. If the phone cannot open `.local` addresses
+   (some Android phones), use the board's IP address from your router's device list. There you set:
    - **City:** search by name; weather and the time zone follow it.
    - **Language:** English or Turkish screen texts.
    - **Clock:** 12 or 24 hour.
