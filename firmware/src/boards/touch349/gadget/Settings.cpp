@@ -1,0 +1,202 @@
+#ifdef BOARD_TOUCH349
+
+#include "Settings.h"
+#include <LittleFS.h>
+#include "Stations.h"
+#include "../../../core/net.h"
+
+namespace settings {
+
+static const char *PATH = "/settings.txt";
+
+struct Values {
+  String city = "Istanbul";
+  float lat = 41.01f, lon = 28.98f;
+  bool tr = false;
+  bool h24 = true;
+  int focus = 25, short_b = 5, long_b = 15;
+  RadioGroup groups[MAX_GROUPS];
+  int n_groups = 0;
+  RadioStation stations[MAX_STATIONS];
+  int n_stations = 0;
+};
+
+static Values cur;
+static bool fs_ok = false;
+static uint32_t ver = 1;
+static volatile int pending_off = 0x7fffffff;
+static int applied_off = 0x7fffffff;
+
+static void defaults(Values &v)
+{
+  v = Values();
+  v.n_groups = DEFAULT_GROUP_COUNT;
+  for (int i = 0; i < v.n_groups; i++) v.groups[i] = { DEFAULT_GROUPS[i].key, DEFAULT_GROUPS[i].name };
+  v.n_stations = min(DEFAULT_STATION_COUNT, MAX_STATIONS);
+  for (int i = 0; i < v.n_stations; i++)
+    v.stations[i] = { DEFAULT_STATIONS[i].genre, DEFAULT_STATIONS[i].name, DEFAULT_STATIONS[i].url };
+}
+
+static String clean(String s, int max_len)
+{
+  s.replace("\r", "");
+  s.replace("\n", " ");
+  s.replace("|", "/");
+  s.trim();
+  if ((int)s.length() > max_len) s = s.substring(0, max_len);
+  return s;
+}
+
+static String serialize(const Values &v)
+{
+  String out;
+  out.reserve(256 + v.n_stations * 96);
+  out += "city=" + v.city + "\n";
+  out += "lat=" + String(v.lat, 4) + "\n";
+  out += "lon=" + String(v.lon, 4) + "\n";
+  out += String("lang=") + (v.tr ? "tr" : "en") + "\n";
+  out += String("h24=") + (v.h24 ? "1" : "0") + "\n";
+  out += "focus=" + String(v.focus) + "\n";
+  out += "short=" + String(v.short_b) + "\n";
+  out += "long=" + String(v.long_b) + "\n";
+  for (int i = 0; i < v.n_groups; i++) out += "group=" + v.groups[i].key + "|" + v.groups[i].name + "\n";
+  for (int i = 0; i < v.n_stations; i++)
+    out += "station=" + String(v.stations[i].group) + "|" + v.stations[i].name + "|" + v.stations[i].url + "\n";
+  return out;
+}
+
+// Parses the file format into v. Unknown keys are skipped; groups and stations replace the lists when present.
+static bool parse(const String &body, Values &v, String &err)
+{
+  bool any_group = false, any_station = false;
+  int start = 0;
+  while (start < (int)body.length()) {
+    int end = body.indexOf('\n', start);
+    if (end < 0) end = body.length();
+    String line = body.substring(start, end);
+    start = end + 1;
+    line.replace("\r", "");
+    int eq = line.indexOf('=');
+    if (eq <= 0) continue;
+    String k = line.substring(0, eq), val = line.substring(eq + 1);
+    k.trim();
+    if (k == "city") v.city = clean(val, 48);
+    else if (k == "lat") v.lat = val.toFloat();
+    else if (k == "lon") v.lon = val.toFloat();
+    else if (k == "lang") v.tr = val.startsWith("tr");
+    else if (k == "h24") v.h24 = val.toInt() != 0;
+    else if (k == "focus") v.focus = val.toInt();
+    else if (k == "short") v.short_b = val.toInt();
+    else if (k == "long") v.long_b = val.toInt();
+    else if (k == "group") {
+      if (!any_group) v.n_groups = 0, any_group = true;
+      if (v.n_groups >= MAX_GROUPS) { err = "at most 7 radio groups"; return false; }
+      int bar = val.indexOf('|');
+      String key = clean(bar < 0 ? val : val.substring(0, bar), 6), name = clean(bar < 0 ? val : val.substring(bar + 1), 16);
+      if (!key.length()) { err = "a radio group has no label"; return false; }
+      v.groups[v.n_groups++] = { key, name.length() ? name : key };
+    } else if (k == "station") {
+      if (!any_station) v.n_stations = 0, any_station = true;
+      if (v.n_stations >= MAX_STATIONS) { err = "at most 60 stations"; return false; }
+      int b1 = val.indexOf('|'), b2 = b1 < 0 ? -1 : val.indexOf('|', b1 + 1);
+      if (b2 < 0) { err = "station line needs group|name|url"; return false; }
+      int g = val.substring(0, b1).toInt();
+      String name = clean(val.substring(b1 + 1, b2), 16), url = clean(val.substring(b2 + 1), 240);
+      if (!url.startsWith("http://") && !url.startsWith("https://")) { err = "station URL must start with http"; return false; }
+      v.stations[v.n_stations++] = { (uint8_t)max(g, 0), name.length() ? name : String("STATION"), url };
+    }
+  }
+  if (v.lat < -90 || v.lat > 90 || v.lon < -180 || v.lon > 180) { err = "latitude/longitude out of range"; return false; }
+  v.focus = constrain(v.focus, 1, 180);
+  v.short_b = constrain(v.short_b, 1, 60);
+  v.long_b = constrain(v.long_b, 1, 120);
+  if (v.n_groups < 1) { err = "need at least one radio group"; return false; }
+  if (v.n_stations < 1) { err = "need at least one station"; return false; }
+  for (int i = 0; i < v.n_stations; i++)
+    if (v.stations[i].group >= v.n_groups) { err = "station '" + v.stations[i].name + "' points at a missing group"; return false; }
+  return true;
+}
+
+static bool save(const Values &v)
+{
+  if (!fs_ok) return false;
+  File f = LittleFS.open("/settings.tmp", "w");
+  if (!f) return false;
+  String s = serialize(v);
+  bool ok = f.print(s) == s.length();
+  f.close();
+  if (!ok) return false;
+  LittleFS.remove(PATH);
+  return LittleFS.rename("/settings.tmp", PATH);
+}
+
+void begin()
+{
+  defaults(cur);
+  // the board's 9 MB data partition is labelled "ffat"; LittleFS formats it on first use
+  fs_ok = LittleFS.begin(true, "/fs", 5, "ffat");
+  if (!fs_ok) {
+    Serial.println("settings: no file system, using defaults");
+    return;
+  }
+  File f = LittleFS.open(PATH, "r");
+  if (!f) return;
+  String body = f.readString();
+  f.close();
+  Values v;
+  defaults(v);
+  String err;
+  if (parse(body, v, err)) cur = v;
+  else Serial.printf("settings: bad file (%s), using defaults\n", err.c_str());
+}
+
+String text() { return serialize(cur); }
+
+bool apply(const String &body, String &err)
+{
+  Values v = cur;
+  if (!parse(body, v, err)) return false;
+  bool moved = fabsf(v.lat - cur.lat) > 0.0001f || fabsf(v.lon - cur.lon) > 0.0001f;
+  cur = v;
+  if (!save(cur)) {
+    err = "could not write the settings file";
+    return false;
+  }
+  if (moved) applied_off = 0x7fffffff;  // new city: take the next offset the weather reports
+  ver++;
+  return true;
+}
+
+uint32_t version() { return ver; }
+bool tr() { return cur.tr; }
+bool h24() { return cur.h24; }
+String city() { return cur.city; }
+float lat() { return cur.lat; }
+float lon() { return cur.lon; }
+int focusMin() { return cur.focus; }
+int shortMin() { return cur.short_b; }
+int longMin() { return cur.long_b; }
+int groupCount() { return cur.n_groups; }
+const RadioGroup &group(int i) { return cur.groups[constrain(i, 0, cur.n_groups - 1)]; }
+int stationCount() { return cur.n_stations; }
+const RadioStation &station(int i) { return cur.stations[constrain(i, 0, cur.n_stations - 1)]; }
+
+void setUtcOffset(int seconds) { pending_off = seconds; }
+
+void tick()
+{
+  int off = pending_off;
+  if (off == 0x7fffffff || off == applied_off) return;
+  applied_off = off;
+  // POSIX TZ counts the other way: UTC+3 is "<+03>-3", UTC+5:30 is "<+0530>-5:30"
+  int a = abs(off) / 60, h = a / 60, m = a % 60;
+  char tz[32];
+  const char *sign = off >= 0 ? "+" : "-", *posix_sign = off >= 0 ? "-" : "";
+  if (m) snprintf(tz, sizeof(tz), "<%s%02d%02d>%s%d:%02d", sign, h, m, posix_sign, h, m);
+  else snprintf(tz, sizeof(tz), "<%s%02d>%s%d", sign, h, posix_sign, h);
+  Net_SetTimezone(tz);
+}
+
+}  // namespace settings
+
+#endif

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phosphor installer</title>
+<meta name="description" content="Install Phosphor on a Waveshare ESP32-S3-Touch-LCD-3.49 from the browser.">
+<script type="module" src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"></script>
+<style>
+:root {
+  --bg: #07100f; --panel: #0d1a19; --line: #1c302e; --text: #cfe9e5; --dim: #7fa29d; --lit: #6ff3e0; --hot: #ff3ea5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 640px; margin: 0 auto; padding: 48px 16px 80px; }
+h1 { font: 600 14px/1 ui-monospace, Menlo, monospace; letter-spacing: .2em; color: var(--lit); text-transform: uppercase; margin: 0 0 18px; }
+.lead { font-size: 22px; line-height: 1.35; margin: 0 0 28px; }
+h2 { font: 600 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 36px 0 12px; }
+ol { padding-left: 20px; margin: 0; } li { margin: 6px 0; }
+.warn { border: 1px solid var(--hot); border-radius: 10px; padding: 14px 16px; margin: 0 0 24px; }
+.warn b { color: var(--hot); }
+code { font: 14px ui-monospace, Menlo, monospace; color: var(--lit); }
+a { color: var(--lit); }
+esp-web-install-button button[slot=activate] {
+  font: 600 16px system-ui, sans-serif; background: var(--lit); color: #04201c; border: 0; border-radius: 10px; padding: 14px 22px; cursor: pointer;
+}
+.small { color: var(--dim); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Phosphor</h1>
+  <p class="lead">A retro VFD-style desk gadget for the Waveshare ESP32-S3-Touch-LCD-3.49: clock, weather, internet radio, focus timer and pixel scenes.</p>
+
+  <div class="warn">
+    <b>This erases the board.</b> Whatever runs on it now, including the Waveshare factory demo, is replaced and is not
+    kept. Phosphor does not back it up and cannot restore it.
+  </div>
+
+  <esp-web-install-button manifest="manifest.json">
+    <button slot="activate">Install Phosphor</button>
+    <span slot="unsupported">This browser cannot talk to USB devices. Use Chrome or Edge on a computer.</span>
+    <span slot="not-allowed">The installer needs a secure page (https).</span>
+  </esp-web-install-button>
+
+  <h2>Steps</h2>
+  <ol>
+    <li>Connect the board to the computer with a USB-C data cable.</li>
+    <li>Press <b>Install Phosphor</b>, pick the board's serial port, confirm.</li>
+    <li>After the restart the screen shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code>. Join it from your phone and pick your home Wi-Fi.</li>
+    <li>Open <code>http://&lt;device name&gt;.local/settings</code> on the phone to set your city, language and radio stations.</li>
+  </ol>
+
+  <p class="small" style="margin-top:36px">If the port does not show up, hold BOOT while plugging the cable in. Source, issues and license (GPL-3.0): see the GitHub repository.</p>
+</main>
+</body>
+</html>
