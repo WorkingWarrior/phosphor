@@ -2,6 +2,9 @@ name: Build
 
 # Every push builds the firmware. A push to main also publishes the web installer (GitHub Pages) with that build;
 # a tag like v1.2.0 also attaches the binaries to a GitHub release.
+# The version string is the tag name on a tag build, else `git describe`. It goes into the firmware (-DFW_VERSION, which the
+# device reports over Improv Serial) and into the installer manifest, and the two must match for the installer to tell
+# "same version" from "update".
 on:
   push:
     branches: [main]
@@ -19,8 +22,23 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # all tags, for git describe
+
+      - name: Version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            version="$GITHUB_REF_NAME"
+          else
+            version="$(git describe --tags --always)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Version: $version"
 
       - uses: arduino/setup-arduino-cli@v2
 
@@ -31,6 +49,8 @@ jobs:
 
       - name: Build
         run: ./build.sh
+        env:
+          PHOSPHOR_VERSION: ${{ steps.version.outputs.version }}
 
       - name: Collect the flash parts
         run: |
@@ -63,7 +83,9 @@ jobs:
           name: firmware
           path: docs/firmware
       - name: Stamp the version into the manifest
-        run: sed -i "s/__VERSION__/${GITHUB_SHA::7}/" docs/manifest.json
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: sed -i "s|__VERSION__|${VERSION}|" docs/manifest.json
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
