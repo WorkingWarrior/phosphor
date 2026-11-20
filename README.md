@@ -3,7 +3,7 @@
 A retro VFD-style desk gadget for the **Waveshare ESP32-S3-Touch-LCD-3.49** (640×172 bar display). Clock, weather,
 internet radio, focus timer and a set of slow pixel scenes, all drawn to look like an old vacuum-fluorescent display.
 
-![Aquarium](media/aquarium.gif)
+![Phosphor in the hand: tilting the board tilts the sea under the liner](media/hero.gif)
 
 **[Install from the browser →](https://melihkoray.github.io/phosphor/)** (Chrome or Edge, USB cable, no tools needed)
 
@@ -26,7 +26,7 @@ that tilts with the board, a lava lamp and an hourglass you turn over.
 
 | ![Snow](media/snow.gif) | ![Fireplace](media/fire.gif) |
 |---|---|
-| ![Seaside](media/sea.gif) | ![Liner](media/wave.gif) |
+| ![Seaside](media/sea.gif) | ![Aquarium](media/aquarium.gif) |
 
 ## Setup
 
