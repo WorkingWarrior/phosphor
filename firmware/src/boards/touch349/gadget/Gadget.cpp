@@ -1050,6 +1050,8 @@ void Gadget_Gesture(Gesture g, int x, int y)
         Study_Reset();
       } else if (state.mode == Mode::Hourglass) {
         Hourglass_Reset();
+      } else if (state.mode == Mode::Snow) {
+        Snowglobe_Hold();
       }
       break;
     case Gesture::Tap:
@@ -1137,6 +1139,12 @@ String Gadget_Command(const String &name, const String &arg)
     // settings page at item N (help page after a dot: "8.3"), for screenshots
     SettingsUi_Select(arg.toInt(), arg.indexOf('.') > 0 ? arg.substring(arg.indexOf('.') + 1).toInt() : 0);
     state.mode = Mode::Settings;
+  } else if (name == "snow") {
+    // snow page: "globe" toggles the snow globe; "auto" | "on" | "off" = holiday lights; "sleigh" | "star" = now
+    if (arg == "globe") Snowglobe_Hold();
+    else if (arg == "sleigh" || arg == "star") Snowglobe_Show(arg.c_str());
+    else if (arg == "auto" || arg == "on" || arg == "off") SettingsUi_SetHolidays(arg == "auto" ? 0 : arg == "on" ? 1 : 2);
+    state.mode = Mode::Snow;
   } else if (name == "sky") {
     // preview: Sky index (1 clear .. 9 storm), "n" after it for night; empty or -1 = the real sky
     sky_force = arg.length() ? constrain(arg.toInt(), -1, 9) : -1;

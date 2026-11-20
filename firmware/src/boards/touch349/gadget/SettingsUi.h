@@ -16,3 +16,7 @@ void SettingsUi_Tick();         // main loop: saves a city picked from the list 
 
 // Auto page: minutes between the ambient pages, 0 = off.
 int SettingsUi_CycleMin();
+
+// Holiday lights on the snow page: by the date (Dec 1 - Jan 6), always or never.
+bool SettingsUi_Holidays();
+void SettingsUi_SetHolidays(int mode);  // 0 = by date, 1 = always, 2 = never

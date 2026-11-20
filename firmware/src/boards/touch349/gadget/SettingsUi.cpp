@@ -16,7 +16,7 @@ using namespace vfd;
 // Items and texts
 // ---------------------------------------------------------------------------------------------------------------------
 
-enum Item : uint8_t { THEME, SCENES, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HELP, WIFI, ABOUT, ITEM_COUNT };
+enum Item : uint8_t { THEME, SCENES, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HOLIDAYS, HELP, WIFI, ABOUT, ITEM_COUNT };
 
 struct ItemText {
   const char *en, *tr;            // in the list
@@ -32,6 +32,7 @@ static const ItemText ITEMS[ITEM_COUNT] = {
   { "BRIGHTNESS", "PARLAKLIK", "SCREEN LIGHT", "EKRAN IŞIĞI" },
   { "CITY", "ŞEHİR", "WEATHER AND TIME ZONE", "HAVA DURUMU VE SAAT DİLİMİ" },
   { "AUTO PAGE", "OTO SAYFA", "AMBIENT PAGES TURN BY THEMSELVES", "SAHNELER KENDİLİĞİNDEN DÖNER" },
+  { "HOLIDAYS", "YILBAŞI", "WINTER LIGHTS ON THE SNOW PAGE", "KAR SAYFASINDA YILBAŞI IŞIKLARI" },
   { "HELP", "YARDIM", nullptr, nullptr },
   { "WI-FI", "WI-FI", nullptr, nullptr },
   { "ABOUT", "HAKKINDA", nullptr, nullptr },
@@ -60,8 +61,8 @@ static const HelpPage HELP_PAGES[] = {
     { "FISH TANK: TAP TO FEED", "FIREPLACE: TAP, CAT WAKES", "LIGHTHOUSE: TAP, BIG WAVE", "LAVA LAMP: TAP, NEW COLORS" },
     { "AKVARYUM: DOKUN, YEM AT", "ŞÖMİNE: DOKUN, KEDİ UYANSIN", "FENER: DOKUN, BÜYÜK DALGA", "LAV LAMBASI: DOKUN, YENİ RENK" } },
   { "MORE SCENES", "DAHA FAZLA",
-    { "SNOW: TAP OR SHAKE TO STIR", "SHIP: TAP THE WATER", "TILT: WATER AND SAND MOVE", "KNOCK THE DESK: RIPPLES" },
-    { "KAR: DOKUN YA DA SALLA", "GEMİ: SUYA DOKUN", "EĞ: SU VE KUM AKAR", "MASAYA VUR: SU DALGALANIR" } },
+    { "SNOW: TAP OR SHAKE TO STIR", "SNOW: HOLD FOR THE GLOBE", "SHIP: TAP THE WATER", "TILT: WATER AND SAND MOVE" },
+    { "KAR: DOKUN YA DA SALLA", "KAR: BASILI TUT, KAR KÜRESİ", "GEMİ: SUYA DOKUN", "EĞ: SU VE KUM AKAR" } },
   { "BUTTONS", "TUŞLAR",
     { "BOOT: BRIGHTNESS", "HOLD BOOT 5 S: NEW WI-FI", "PWR: SCREEN ON/OFF", "" },
     { "BOOT: PARLAKLIK", "BOOT 5 SN BASILI: YENİ WI-FI", "PWR: EKRAN AÇ/KAPA", "" } },
@@ -112,6 +113,7 @@ static bool prefs_open = false;
 static int sel = 0;       // selected item
 static int help_page = 0;
 static int cycle_min = -1;  // -1 = not read yet
+static int xmas = -1;       // holidays: 0 = by the date, 1 = always, 2 = never; -1 = not read yet
 
 static int city_idx = -1;          // city picked from the list, -1 = the saved one
 static uint32_t city_save_at = 0;  // when to save it (stepping stopped), 0 = nothing pending
@@ -138,6 +140,33 @@ int SettingsUi_CycleMin()
     cycle_min = prefs.getUChar("cycle", 0);
   }
   return cycle_min;
+}
+
+static int xmasMode()
+{
+  if (xmas < 0) {
+    openPrefs();
+    xmas = prefs.getUChar("xmas", 0);
+  }
+  return xmas;
+}
+
+void SettingsUi_SetHolidays(int mode)
+{
+  xmas = constrain(mode, 0, 2);
+  openPrefs();
+  prefs.putUChar("xmas", xmas);
+}
+
+bool SettingsUi_Holidays()
+{
+  int m = xmasMode();
+  if (m) return m == 1;
+  time_t t = time(nullptr);
+  if (t < 1700000000) return false;  // clock not set yet
+  struct tm tm;
+  localtime_r(&t, &tm);
+  return tm.tm_mon == 11 || (tm.tm_mon == 0 && tm.tm_mday <= 6);  // Dec 1 - Jan 6
 }
 
 static void apply(const String &lines)
@@ -277,6 +306,7 @@ static void change(int dir)
       prefs.putUChar("cycle", cycle_min);
       break;
     }
+    case HOLIDAYS: SettingsUi_SetHolidays((xmasMode() + dir + 3) % 3); break;
     case HELP: help_page = (help_page + dir + HELP_COUNT) % HELP_COUNT; break;
     default: return;
   }
@@ -371,6 +401,12 @@ static void drawValue()
     case CYCLE: {
       int m = SettingsUi_CycleMin();
       value = m ? String(m) + L(" MIN", " DK") : String(L("OFF", "KAPALI"));
+      break;
+    }
+    case HOLIDAYS: {
+      static const char *const EN[] = { "BY DATE", "ALWAYS", "OFF" }, *const TR[] = { "TARİHE GÖRE", "HEP AÇIK", "KAPALI" };
+      value = L(EN[xmasMode()], TR[xmasMode()]);
+      if (xmasMode() == 0) note = L("DEC 1 - JAN 6", "1 ARALIK - 6 OCAK");
       break;
     }
     default: break;
