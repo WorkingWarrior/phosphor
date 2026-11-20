@@ -26,12 +26,31 @@ esp-web-install-button button[slot=activate] {
   font: 600 16px system-ui, sans-serif; background: var(--lit); color: #04201c; border: 0; border-radius: 10px; padding: 14px 22px; cursor: pointer;
 }
 .small { color: var(--dim); font-size: 14px; }
+.star { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: 0 0 28px; }
+.star-btn {
+  display: inline-flex; align-items: center; gap: 12px; font: 600 19px system-ui, sans-serif; color: var(--lit);
+  text-decoration: none; background: var(--panel); border: 2px solid var(--lit); border-radius: 12px; padding: 15px 24px;
+  transition: background .15s ease-out, color .15s ease-out;
+}
+.star-btn:hover, .star-btn:focus-visible { background: var(--lit); color: #04201c; }
+.star-btn svg { width: 24px; height: 24px; fill: currentColor; flex: none; }
+.star-count { font: 600 16px ui-monospace, Menlo, monospace; border-left: 1px solid currentColor; padding-left: 12px; }
+.star-note { flex: 1 1 200px; margin: 0; color: var(--dim); font-size: 14px; }
+.star.end { margin: 44px 0 0; padding-top: 28px; border-top: 1px solid var(--line); }
 </style>
 </head>
 <body>
 <main>
   <h1>Phosphor</h1>
   <p class="lead">A retro VFD-style desk gadget for the Waveshare ESP32-S3-Touch-LCD-3.49: clock, weather, internet radio, focus timer and pixel scenes.</p>
+
+  <div class="star">
+    <a class="star-btn" href="https://github.com/melihkoray/phosphor">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>
+      Star on GitHub<span class="star-count" data-stars hidden></span>
+    </a>
+    <p class="star-note">Phosphor is free and open source. A star helps other people find it.</p>
+  </div>
 
   <div class="warn">
     <b>This replaces what the board runs now.</b> Whatever is on it, including the Waveshare factory demo, is not kept.
@@ -107,7 +126,25 @@ esp-web-install-button button[slot=activate] {
     <dd>Use <b>Test</b> on the settings page first. MP3 and AAC streams are tested; some others may not play.</dd>
   </dl>
 
-  <p class="small" style="margin-top:36px">Source, issues and license (GPL-3.0): <a href="https://github.com/melihkoray/phosphor">github.com/melihkoray/phosphor</a>. Made by <a href="https://melihkoray.com">Melih Koray</a>.</p>
+  <div class="star end">
+    <a class="star-btn" href="https://github.com/melihkoray/phosphor">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>
+      Star on GitHub<span class="star-count" data-stars hidden></span>
+    </a>
+    <p class="star-note">Enjoying it on your desk? A star on GitHub is the easiest way to say thanks.</p>
+  </div>
+
+  <p class="small" style="margin-top:24px">Source, issues and license (GPL-3.0): <a href="https://github.com/melihkoray/phosphor">github.com/melihkoray/phosphor</a>. Made by <a href="https://melihkoray.com">Melih Koray</a>.</p>
 </main>
+<script>
+// Live star count from the GitHub API; the buttons work without it.
+fetch('https://api.github.com/repos/melihkoray/phosphor')
+  .then(r => r.ok ? r.json() : null)
+  .then(d => {
+    if (!d || typeof d.stargazers_count !== 'number') return;
+    document.querySelectorAll('[data-stars]').forEach(el => { el.textContent = d.stargazers_count; el.hidden = false; });
+  })
+  .catch(() => {});
+</script>
 </body>
 </html>
