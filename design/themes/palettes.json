@@ -1,0 +1,801 @@
+{
+  "generated": "design/themes/build.mjs",
+  "roleNotes": {
+    "BG": "screen background",
+    "GHOST": "unlit segments and dots, inactive labels",
+    "FAINT": "faintest marks (unlit sky matrix, tracks)",
+    "HALO": "glow around lit (VFD); edge, frame and shadow color in the flat themes",
+    "LIT": "main ink",
+    "DIM": "secondary text",
+    "HOT": "accent",
+    "HOTH": "glow around the accent; second accent in the flat themes",
+    "KELP": "battery and kelp green"
+  },
+  "themes": {
+    "vfd": {
+      "name": "VFD",
+      "font": "firmware VfdFont.h (5x7 dot matrix)",
+      "default": "a",
+      "variants": {
+        "a": {
+          "label": "Camgöbeği + magenta (bugünkü)",
+          "roles": {
+            "BG": {
+              "hex": "#000808",
+              "rgb565": "0x0041"
+            },
+            "GHOST": {
+              "hex": "#082021",
+              "rgb565": "0x0904"
+            },
+            "FAINT": {
+              "hex": "#001010",
+              "rgb565": "0x0082"
+            },
+            "HALO": {
+              "hex": "#004942",
+              "rgb565": "0x0248"
+            },
+            "LIT": {
+              "hex": "#73F7E6",
+              "rgb565": "0x77BC"
+            },
+            "DIM": {
+              "hex": "#42968C",
+              "rgb565": "0x44B1"
+            },
+            "HOT": {
+              "hex": "#FF41B5",
+              "rgb565": "0xFA16"
+            },
+            "HOTH": {
+              "hex": "#6B1042",
+              "rgb565": "0x6888"
+            },
+            "KELP": {
+              "hex": "#4AAE94",
+              "rgb565": "0x4D72"
+            }
+          },
+          "chrome": {
+            "BG": {
+              "hex": "#000808",
+              "rgb565": "0x0041"
+            },
+            "GHOST": {
+              "hex": "#082021",
+              "rgb565": "0x0904"
+            },
+            "FAINT": {
+              "hex": "#001010",
+              "rgb565": "0x0082"
+            },
+            "HALO": {
+              "hex": "#004942",
+              "rgb565": "0x0248"
+            },
+            "LIT": {
+              "hex": "#73F7E6",
+              "rgb565": "0x77BC"
+            },
+            "DIM": {
+              "hex": "#42968C",
+              "rgb565": "0x44B1"
+            },
+            "HOT": {
+              "hex": "#FF41B5",
+              "rgb565": "0xFA16"
+            },
+            "HOTH": {
+              "hex": "#6B1042",
+              "rgb565": "0x6888"
+            },
+            "KELP": {
+              "hex": "#4AAE94",
+              "rgb565": "0x4D72"
+            }
+          }
+        }
+      }
+    },
+    "cga": {
+      "name": "CGA",
+      "font": "fonts.json: cga",
+      "default": "a",
+      "variants": {
+        "a": {
+          "label": "Palet 1: camgöbeği, magenta, beyaz",
+          "roles": {
+            "BG": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "GHOST": {
+              "hex": "#104142",
+              "rgb565": "0x1208",
+              "dither": {
+                "a": "BG",
+                "b": "DIM",
+                "level": 0.25
+              },
+              "note": "drawn as an ordered dither of a and b; hex is the flat fallback"
+            },
+            "FAINT": {
+              "hex": "#082021",
+              "rgb565": "0x0904",
+              "dither": {
+                "a": "BG",
+                "b": "DIM",
+                "level": 0.125
+              },
+              "note": "drawn as an ordered dither of a and b; hex is the flat fallback"
+            },
+            "HALO": {
+              "hex": "#52FFFF",
+              "rgb565": "0x57FF"
+            },
+            "LIT": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "DIM": {
+              "hex": "#52FFFF",
+              "rgb565": "0x57FF"
+            },
+            "HOT": {
+              "hex": "#FF55FF",
+              "rgb565": "0xFABF"
+            },
+            "HOTH": {
+              "hex": "#FF55FF",
+              "rgb565": "0xFABF"
+            },
+            "KELP": {
+              "hex": "#52FFFF",
+              "rgb565": "0x57FF"
+            }
+          },
+          "chrome": {
+            "k": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "c": {
+              "hex": "#52FFFF",
+              "rgb565": "0x57FF"
+            },
+            "m": {
+              "hex": "#FF55FF",
+              "rgb565": "0xFABF"
+            },
+            "w": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            }
+          }
+        },
+        "b": {
+          "label": "Palet 0: yeşil, kırmızı, sarı",
+          "roles": {
+            "BG": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "GHOST": {
+              "hex": "#104110",
+              "rgb565": "0x1202",
+              "dither": {
+                "a": "BG",
+                "b": "DIM",
+                "level": 0.25
+              },
+              "note": "drawn as an ordered dither of a and b; hex is the flat fallback"
+            },
+            "FAINT": {
+              "hex": "#082008",
+              "rgb565": "0x0901",
+              "dither": {
+                "a": "BG",
+                "b": "DIM",
+                "level": 0.125
+              },
+              "note": "drawn as an ordered dither of a and b; hex is the flat fallback"
+            },
+            "HALO": {
+              "hex": "#52FF52",
+              "rgb565": "0x57EA"
+            },
+            "LIT": {
+              "hex": "#FFFF52",
+              "rgb565": "0xFFEA"
+            },
+            "DIM": {
+              "hex": "#52FF52",
+              "rgb565": "0x57EA"
+            },
+            "HOT": {
+              "hex": "#FF5552",
+              "rgb565": "0xFAAA"
+            },
+            "HOTH": {
+              "hex": "#FF5552",
+              "rgb565": "0xFAAA"
+            },
+            "KELP": {
+              "hex": "#52FF52",
+              "rgb565": "0x57EA"
+            }
+          },
+          "chrome": {
+            "k": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "c": {
+              "hex": "#52FF52",
+              "rgb565": "0x57EA"
+            },
+            "m": {
+              "hex": "#FF5552",
+              "rgb565": "0xFAAA"
+            },
+            "w": {
+              "hex": "#FFFF52",
+              "rgb565": "0xFFEA"
+            }
+          }
+        }
+      }
+    },
+    "ega": {
+      "name": "EGA",
+      "font": "fonts.json: ega",
+      "default": "a",
+      "variants": {
+        "a": {
+          "label": "Mavi masaüstü (DOS klasiği)",
+          "roles": {
+            "BG": {
+              "hex": "#0000AD",
+              "rgb565": "0x0015"
+            },
+            "GHOST": {
+              "hex": "#5255FF",
+              "rgb565": "0x52BF"
+            },
+            "FAINT": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "HALO": {
+              "hex": "#00AAAD",
+              "rgb565": "0x0555"
+            },
+            "LIT": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "DIM": {
+              "hex": "#ADAAAD",
+              "rgb565": "0xAD55"
+            },
+            "HOT": {
+              "hex": "#FFFF52",
+              "rgb565": "0xFFEA"
+            },
+            "HOTH": {
+              "hex": "#FF5552",
+              "rgb565": "0xFAAA"
+            },
+            "KELP": {
+              "hex": "#00AA00",
+              "rgb565": "0x0540"
+            }
+          },
+          "chrome": {
+            "win": {
+              "hex": "#0000AD",
+              "rgb565": "0x0015"
+            },
+            "desk0": {
+              "hex": "#0000AD",
+              "rgb565": "0x0015"
+            },
+            "desk1": {
+              "hex": "#ADAAAD",
+              "rgb565": "0xAD55"
+            },
+            "ghost": {
+              "hex": "#5255FF",
+              "rgb565": "0x52BF"
+            }
+          }
+        },
+        "b": {
+          "label": "Siyah masaüstü",
+          "roles": {
+            "BG": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "GHOST": {
+              "hex": "#525552",
+              "rgb565": "0x52AA"
+            },
+            "FAINT": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "HALO": {
+              "hex": "#00AAAD",
+              "rgb565": "0x0555"
+            },
+            "LIT": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "DIM": {
+              "hex": "#ADAAAD",
+              "rgb565": "0xAD55"
+            },
+            "HOT": {
+              "hex": "#FFFF52",
+              "rgb565": "0xFFEA"
+            },
+            "HOTH": {
+              "hex": "#FF5552",
+              "rgb565": "0xFAAA"
+            },
+            "KELP": {
+              "hex": "#00AA00",
+              "rgb565": "0x0540"
+            }
+          },
+          "chrome": {
+            "win": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "desk0": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "desk1": {
+              "hex": "#525552",
+              "rgb565": "0x52AA"
+            },
+            "ghost": {
+              "hex": "#525552",
+              "rgb565": "0x52AA"
+            }
+          }
+        }
+      },
+      "machine16": {
+        "black": "#000000",
+        "blue": "#0000AA",
+        "green": "#00AA00",
+        "cyan": "#00AAAA",
+        "red": "#AA0000",
+        "magenta": "#AA00AA",
+        "brown": "#AA5500",
+        "lightGrey": "#AAAAAA",
+        "darkGrey": "#555555",
+        "lightBlue": "#5555FF",
+        "lightGreen": "#55FF55",
+        "lightCyan": "#55FFFF",
+        "lightRed": "#FF5555",
+        "lightMagenta": "#FF55FF",
+        "yellow": "#FFFF55",
+        "white": "#FFFFFF"
+      }
+    },
+    "c64": {
+      "name": "C64-style",
+      "font": "fonts.json: c64",
+      "default": "a",
+      "variants": {
+        "a": {
+          "label": "Açılış mavisi",
+          "roles": {
+            "BG": {
+              "hex": "#31287B",
+              "rgb565": "0x314F"
+            },
+            "GHOST": {
+              "hex": "#424542",
+              "rgb565": "0x4228"
+            },
+            "FAINT": {
+              "hex": "#424542",
+              "rgb565": "0x4228"
+            },
+            "HALO": {
+              "hex": "#6B5DB5",
+              "rgb565": "0x6AF6"
+            },
+            "LIT": {
+              "hex": "#6B5DB5",
+              "rgb565": "0x6AF6"
+            },
+            "DIM": {
+              "hex": "#949694",
+              "rgb565": "0x94B2"
+            },
+            "HOT": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "HOTH": {
+              "hex": "#BDC66B",
+              "rgb565": "0xBE2D"
+            },
+            "KELP": {
+              "hex": "#5A8E42",
+              "rgb565": "0x5C68"
+            }
+          },
+          "chrome": {
+            "border": {
+              "hex": "#6B5DB5",
+              "rgb565": "0x6AF6"
+            },
+            "bg": {
+              "hex": "#31287B",
+              "rgb565": "0x314F"
+            },
+            "text": {
+              "hex": "#6B5DB5",
+              "rgb565": "0x6AF6"
+            },
+            "hi": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "acc": {
+              "hex": "#BDC66B",
+              "rgb565": "0xBE2D"
+            },
+            "dim": {
+              "hex": "#949694",
+              "rgb565": "0x94B2"
+            },
+            "ghost": {
+              "hex": "#424542",
+              "rgb565": "0x4228"
+            }
+          }
+        },
+        "b": {
+          "label": "Gece siyahı",
+          "roles": {
+            "BG": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "GHOST": {
+              "hex": "#424542",
+              "rgb565": "0x4228"
+            },
+            "FAINT": {
+              "hex": "#424542",
+              "rgb565": "0x4228"
+            },
+            "HALO": {
+              "hex": "#424542",
+              "rgb565": "0x4228"
+            },
+            "LIT": {
+              "hex": "#9CD284",
+              "rgb565": "0x9E90"
+            },
+            "DIM": {
+              "hex": "#5A8E42",
+              "rgb565": "0x5C68"
+            },
+            "HOT": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "HOTH": {
+              "hex": "#BDC66B",
+              "rgb565": "0xBE2D"
+            },
+            "KELP": {
+              "hex": "#5A8E42",
+              "rgb565": "0x5C68"
+            }
+          },
+          "chrome": {
+            "border": {
+              "hex": "#424542",
+              "rgb565": "0x4228"
+            },
+            "bg": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "text": {
+              "hex": "#9CD284",
+              "rgb565": "0x9E90"
+            },
+            "hi": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "acc": {
+              "hex": "#BDC66B",
+              "rgb565": "0xBE2D"
+            },
+            "dim": {
+              "hex": "#5A8E42",
+              "rgb565": "0x5C68"
+            },
+            "ghost": {
+              "hex": "#424542",
+              "rgb565": "0x4228"
+            }
+          }
+        }
+      },
+      "border": {
+        "top": 8,
+        "side": 16,
+        "color": "HALO role (C64 border)"
+      },
+      "machine16": {
+        "black": "#000000",
+        "white": "#FFFFFF",
+        "red": "#68372B",
+        "cyan": "#70A4B2",
+        "purple": "#6F3D86",
+        "green": "#588D43",
+        "blue": "#352879",
+        "yellow": "#B8C76F",
+        "orange": "#6F4F25",
+        "brown": "#433900",
+        "lightRed": "#9A6759",
+        "darkGrey": "#444444",
+        "grey": "#6C6C6C",
+        "lightGreen": "#9AD284",
+        "lightBlue": "#6C5EB5",
+        "lightGrey": "#959595"
+      }
+    },
+    "amiga": {
+      "name": "Amiga-style",
+      "font": "fonts.json: amiga",
+      "default": "a",
+      "variants": {
+        "a": {
+          "label": "1.x: mavi, beyaz, siyah, turuncu",
+          "roles": {
+            "BG": {
+              "hex": "#0055AD",
+              "rgb565": "0x02B5"
+            },
+            "GHOST": {
+              "hex": "#002863",
+              "rgb565": "0x014C",
+              "dither": {
+                "a": "BG",
+                "b": "DIM",
+                "level": 0.5
+              },
+              "note": "drawn as an ordered dither of a and b; hex is the flat fallback"
+            },
+            "FAINT": {
+              "hex": "#00418C",
+              "rgb565": "0x0211",
+              "dither": {
+                "a": "BG",
+                "b": "DIM",
+                "level": 0.25
+              },
+              "note": "drawn as an ordered dither of a and b; hex is the flat fallback"
+            },
+            "HALO": {
+              "hex": "#000021",
+              "rgb565": "0x0004"
+            },
+            "LIT": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "DIM": {
+              "hex": "#000021",
+              "rgb565": "0x0004"
+            },
+            "HOT": {
+              "hex": "#FF8A00",
+              "rgb565": "0xFC40"
+            },
+            "HOTH": {
+              "hex": "#FF8A00",
+              "rgb565": "0xFC40"
+            },
+            "KELP": {
+              "hex": "#FF8A00",
+              "rgb565": "0xFC40"
+            }
+          },
+          "chrome": {
+            "c0": {
+              "hex": "#0055AD",
+              "rgb565": "0x02B5"
+            },
+            "c1": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "c2": {
+              "hex": "#000021",
+              "rgb565": "0x0004"
+            },
+            "c3": {
+              "hex": "#FF8A00",
+              "rgb565": "0xFC40"
+            },
+            "paper": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "ink": {
+              "hex": "#000021",
+              "rgb565": "0x0004"
+            },
+            "shine": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "shadow": {
+              "hex": "#000021",
+              "rgb565": "0x0004"
+            }
+          }
+        },
+        "b": {
+          "label": "2.x: gri, siyah, beyaz, mavi",
+          "roles": {
+            "BG": {
+              "hex": "#ADAAAD",
+              "rgb565": "0xAD55"
+            },
+            "GHOST": {
+              "hex": "#525552",
+              "rgb565": "0x52AA",
+              "dither": {
+                "a": "BG",
+                "b": "DIM",
+                "level": 0.5
+              },
+              "note": "drawn as an ordered dither of a and b; hex is the flat fallback"
+            },
+            "FAINT": {
+              "hex": "#848284",
+              "rgb565": "0x8410",
+              "dither": {
+                "a": "BG",
+                "b": "DIM",
+                "level": 0.25
+              },
+              "note": "drawn as an ordered dither of a and b; hex is the flat fallback"
+            },
+            "HALO": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "LIT": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "DIM": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "HOT": {
+              "hex": "#638ABD",
+              "rgb565": "0x6457"
+            },
+            "HOTH": {
+              "hex": "#638ABD",
+              "rgb565": "0x6457"
+            },
+            "KELP": {
+              "hex": "#638ABD",
+              "rgb565": "0x6457"
+            }
+          },
+          "chrome": {
+            "c0": {
+              "hex": "#ADAAAD",
+              "rgb565": "0xAD55"
+            },
+            "c1": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "c2": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "c3": {
+              "hex": "#638ABD",
+              "rgb565": "0x6457"
+            },
+            "paper": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "ink": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            },
+            "shine": {
+              "hex": "#FFFFFF",
+              "rgb565": "0xFFFF"
+            },
+            "shadow": {
+              "hex": "#000000",
+              "rgb565": "0x0000"
+            }
+          }
+        }
+      },
+      "copper": {
+        "digits": [
+          "#F60",
+          "#F70",
+          "#F80",
+          "#F90",
+          "#FA0",
+          "#FB2",
+          "#FC4",
+          "#FD6",
+          "#FE8",
+          "#FFA",
+          "#FFC",
+          "#FFE",
+          "#FFF",
+          "#EFF",
+          "#DEF",
+          "#BDF",
+          "#ACF",
+          "#9BF",
+          "#8AF",
+          "#79E",
+          "#68D"
+        ],
+        "vu": [
+          "#05A",
+          "#06B",
+          "#08C",
+          "#0AD",
+          "#2CE",
+          "#6DE",
+          "#AEE",
+          "#FFF",
+          "#FD8",
+          "#F80"
+        ],
+        "sky": [
+          "#001",
+          "#002",
+          "#012",
+          "#013",
+          "#023",
+          "#024",
+          "#134",
+          "#135",
+          "#245",
+          "#356",
+          "#467",
+          "#578",
+          "#879",
+          "#A89"
+        ],
+        "note": "12-bit colors, one per scanline band (copper list); expand #RGB to #RRGGBB"
+      }
+    }
+  }
+}
