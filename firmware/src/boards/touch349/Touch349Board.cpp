@@ -46,7 +46,7 @@
 // Native panel is portrait: 172 wide, 640 tall. Rows go out in chunks of this many native rows.
 #define NATIVE_W 172
 #define NATIVE_H 640
-#define CHUNK_ROWS 64
+#define CHUNK_ROWS 32
 #define SPI_CLOCK_HZ (40 * 1000 * 1000)
 
 // The panel wants the high byte of each RGB565 pixel first.
@@ -88,8 +88,10 @@ void Touch349Board::begin()
   canvas_ = (uint16_t *)ps_calloc((size_t)WIDTH * HEIGHT, sizeof(uint16_t));
   scratch_ = (uint16_t *)ps_malloc((size_t)WIDTH * HEIGHT * sizeof(uint16_t));
   anim_ = (uint16_t *)ps_malloc((size_t)WIDTH * HEIGHT * sizeof(uint16_t));
-  dma_ = (uint16_t *)heap_caps_malloc(NATIVE_W * CHUNK_ROWS * sizeof(uint16_t), MALLOC_CAP_DMA);
-  if (!canvas_ || !scratch_ || !anim_ || !dma_) {
+  for (auto &buf : dma_) {
+    buf = (uint16_t *)heap_caps_malloc(NATIVE_W * CHUNK_ROWS * sizeof(uint16_t), MALLOC_CAP_DMA);
+  }
+  if (!canvas_ || !scratch_ || !anim_ || !dma_[0] || !dma_[1]) {
     Serial.println("touch349: out of memory for canvas");
     return;
   }
@@ -160,7 +162,8 @@ void Touch349Board::initTouch()
 
 void Touch349Board::initPanel()
 {
-  flush_done_ = xSemaphoreCreateBinary();
+  // Counts finished transfers; up to two chunks can be in flight (one per DMA buffer).
+  flush_done_ = xSemaphoreCreateCounting(2, 0);
 
   gpio_config_t rst = {};
   rst.mode = GPIO_MODE_OUTPUT;
@@ -337,6 +340,18 @@ static float easeOutQuart(float t)
 
 #define SQUEEZE_FRAMES 6
 #define SHRINK_FRAMES 4
+// The squeeze was timed with a 21 ms push; pushes are faster now, so animation frames are padded to keep its pace.
+#define ANIM_PUSH_MS 21
+
+void Touch349Board::pushAnim(const uint16_t *frame)
+{
+  uint32_t t0 = millis();
+  push(frame);
+  uint32_t spent = millis() - t0;
+  if (spent < ANIM_PUSH_MS) {
+    delay(ANIM_PUSH_MS - spent);
+  }
+}
 
 // Frame k of 0..SQUEEZE_FRAMES: the picture squeezed to a band of rows around the middle, heating toward ink as it
 // narrows (k = 0: untouched, last: a 2 px line).
@@ -369,12 +384,12 @@ void Touch349Board::collapse(const uint16_t *from)
 {
   for (int f = 1; f <= SQUEEZE_FRAMES; f++) {
     drawSqueeze(anim_, from, WIDTH, HEIGHT, easeOutQuart((float)f / SQUEEZE_FRAMES), BG, INK);
-    push(anim_);
+    pushAnim(anim_);
   }
   for (int f = 1; f <= SHRINK_FRAMES; f++) {
     float t = easeOutQuart((float)f / SHRINK_FRAMES);
     drawLine(anim_, WIDTH, HEIGHT, max(6, (int)lroundf(WIDTH * (1 - t))), BG, INK);
-    push(anim_);
+    pushAnim(anim_);
   }
 }
 
@@ -382,16 +397,16 @@ void Touch349Board::collapse(const uint16_t *from)
 void Touch349Board::unfold(const uint16_t *to)
 {
   drawLine(anim_, WIDTH, HEIGHT, 6, BG, INK);
-  push(anim_);
+  pushAnim(anim_);
   fadeBacklight(0, brightness_pct_, 60);
   for (int f = 1; f <= SHRINK_FRAMES; f++) {
     float t = easeOutQuart((float)f / SHRINK_FRAMES);
     drawLine(anim_, WIDTH, HEIGHT, max(6, (int)lroundf(WIDTH * t)), BG, INK);
-    push(anim_);
+    pushAnim(anim_);
   }
   for (int f = SQUEEZE_FRAMES - 1; f >= 1; f--) {
     drawSqueeze(anim_, to, WIDTH, HEIGHT, 1 - easeOutQuart(1 - (float)f / SQUEEZE_FRAMES), BG, INK);
-    push(anim_);
+    pushAnim(anim_);
   }
 }
 
@@ -428,31 +443,44 @@ bool Touch349Board::snapshot(uint8_t *out)
 }
 
 // Landscape (x, y) maps to native (171 - y, x): the long edge of the bar runs down the native panel.
+// Two DMA buffers take turns: the next chunk is rotated into one while the other is still on its way to the panel,
+// so the rotation (about a third of the frame) hides behind the transfer.
 void Touch349Board::push(const uint16_t *landscape)
 {
   if (!panel_ || !landscape) {
     return;
   }
-  xSemaphoreGive(flush_done_);
-  for (int x0 = 0; x0 < WIDTH; x0 += CHUNK_ROWS) {
-    if (!waitFlush()) {
-      return;  // the previous chunk never finished: drop this frame, the next one starts clean
+  while (xSemaphoreTake(flush_done_, 0) == pdTRUE) {
+  }  // drop stale "done" counts from a frame that was cut short
+  int pending = 0;
+  for (int x0 = 0, n = 0; x0 < WIDTH; x0 += CHUNK_ROWS, n++) {
+    uint16_t *buf = dma_[n & 1];
+    if (pending == 2) {
+      if (!waitFlush()) {
+        return;  // a chunk never finished: drop this frame, the next one starts clean
+      }
+      pending--;  // the transfer that last used this buffer is done
     }
     // Read the source row by row (sequential in PSRAM) and scatter into the small internal buffer.
     for (int y = 0; y < HEIGHT; y++) {
       const uint16_t *src = landscape + y * WIDTH + x0;
-      uint16_t *dst = dma_ + (NATIVE_W - 1 - y);
+      uint16_t *dst = buf + (NATIVE_W - 1 - y);
       for (int i = 0; i < CHUNK_ROWS; i++) {
         uint16_t px = src[i];
         dst[i * NATIVE_W] = SWAP_BYTES ? __builtin_bswap16(px) : px;
       }
     }
-    esp_lcd_panel_draw_bitmap(panel_, 0, x0, NATIVE_W, x0 + CHUNK_ROWS, dma_);
+    esp_lcd_panel_draw_bitmap(panel_, 0, x0, NATIVE_W, x0 + CHUNK_ROWS, buf);
+    pending++;
   }
-  waitFlush();
+  while (pending-- > 0) {
+    if (!waitFlush()) {
+      return;
+    }
+  }
 }
 
-// A chunk is 22 KB over a 40 MHz quad bus: milliseconds. Waiting forever for a lost "done" would freeze the whole
+// A chunk is 11 KB over a 40 MHz quad bus: milliseconds. Waiting forever for a lost "done" would freeze the whole
 // board (HTTP included), so give up, and after repeated failures restart.
 bool Touch349Board::waitFlush()
 {

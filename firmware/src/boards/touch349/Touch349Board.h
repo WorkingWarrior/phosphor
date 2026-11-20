@@ -101,6 +101,7 @@ class Touch349Board : public Board {
   void drawLevelOverlay(const uint16_t *under);
   // Rotates a WIDTH x HEIGHT RGB565 image into the native panel and sends it.
   void push(const uint16_t *landscape);
+  void pushAnim(const uint16_t *frame);  // push at the squeeze animation's fixed pace
   // Waits for the panel to finish the chunk in flight; false on timeout.
   bool waitFlush();
   // Sends what the U8g2 pages drew.
@@ -112,7 +113,7 @@ class Touch349Board : public Board {
   i2c_master_dev_handle_t touch_ = nullptr;
   esp_lcd_panel_handle_t panel_ = nullptr;
   SemaphoreHandle_t flush_done_ = nullptr;
-  uint16_t *dma_ = nullptr;     // one chunk of native rows, internal RAM for DMA
+  uint16_t *dma_[2] = {};       // two chunks of native rows, internal RAM for DMA, used in turn
   uint16_t *canvas_ = nullptr;  // pages drawn on the board, PSRAM
   uint16_t *scratch_ = nullptr; // picture with the overlay on it, PSRAM
   uint16_t *anim_ = nullptr;    // transition frames, PSRAM
