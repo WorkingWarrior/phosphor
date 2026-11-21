@@ -303,14 +303,17 @@ static void drawSecondDot(int second)
 
 static void drawClock(const DateTime &now)
 {
-  if (theme::current() == theme::C64 || (theme::current() != theme::VFD && RetroWorld_Draw())) {
-    if (theme::current() == theme::C64) clear();
+  if (theme::current() != theme::VFD) {
+    if (theme::current() == theme::C64 || !RetroWorld_Draw()) clear();
     int wd = weekday(now.year, now.month, now.day);
     String date = String(now.day) + " " + monthName(now.month);
     ClockFace face = { hhmm(now), String(weekdayName(wd)) + " " + date,
                        String(weekdayName(wd, true)) + " " + String(now.day) + " " + monthTitle(now.month),
                        ringing ? String(L("WAKE UP!", "UYAN!")) : two(alarm_h) + ":" + two(alarm_m),
-                       alarm_on && (!ringing || blinkOn(300)), ringing, blinkOn(), state.batt_pct };
+                       alarm_on && (!ringing || blinkOn(300)), ringing, now.second % 2 == 0, state.batt_pct,
+                       String(weekdayName(wd, true)), String(weekdayName(wd)), date,
+                       settings::h24() ? "24H" : now.hour < 12 ? "AM" : "PM",
+                       two(alarm_h) + ":" + two(alarm_m), alarm_on, now.second };
     ClockFaces_Draw(face);
     return;
   }
@@ -365,12 +368,13 @@ static void drawRadio(const DateTime &now)
   gname.toUpperCase();
 
   if (theme::current() != theme::VFD) {
-    const char *picture = theme::current() == theme::C64 ? "radio_c64" :
-                          theme::current() == theme::AMIGA ? "radio_amiga" : "radio_atari";
-    if (!RetroPicture_Draw(picture) && !RetroWorld_Draw()) clear();
+    if (theme::current() == theme::AMIGA) {
+      if (!RetroPicture_Draw("radio_amiga") && !RetroWorld_Draw()) clear();
+    } else clear(theme::current() == theme::C64 ? px::rgb(53, 40, 121) : 0);
     RadioFaceData f;
     f.channel = "CH " + two(st + 1); f.genre = gname; f.station = s.name; f.time = hhmm(now);
-    f.playing = rs == RadioState::Playing; f.cursor = blinkOn();
+    f.playing = rs == RadioState::Playing; f.failed = rs == RadioState::Failed;
+    f.station_index = st; f.station_count = settings::stationCount();
     f.show_volume = volume_shown_ms && millis() - volume_shown_ms < VOLUME_SHOW_MS;
     f.volume = Radio_Volume(); f.volume_label = L("VOL", "SES");
     f.group = s.group; f.groups = settings::groupCount();
@@ -972,7 +976,7 @@ uint32_t Gadget_FrameMs(Mode m)
 {
   if (volume_shown_ms && millis() - volume_shown_ms < VOLUME_SHOW_MS + 100) return 100;
   switch (m) {
-    case Mode::Clock: return ringing ? 150 : 500;
+    case Mode::Clock: return theme::current() == theme::C64 ? 50 : ringing ? 150 : 500;
     case Mode::Radio: return 50;
     case Mode::Weather: return 60;
     case Mode::Aquarium: return 50;

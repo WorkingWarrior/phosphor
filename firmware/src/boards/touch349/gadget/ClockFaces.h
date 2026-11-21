@@ -7,6 +7,9 @@ struct ClockFace {
   bool alarm_lit, ringing;
   bool cursor;
   int battery;
+  String weekday, short_weekday, calendar_date, period, alarm_time;
+  bool alarm_on;
+  int second;
 };
 void ClockFaces_Draw(const ClockFace &face);
 
@@ -15,7 +18,8 @@ struct RadioFaceData {
   String channel, genre, station, line, time, volume_label;
   String genres[7];
   int group, groups, volume;
-  bool playing, show_volume, cursor;
+  bool playing, show_volume, failed;
+  int station_index, station_count;
 };
 struct WeatherFace {
   WeatherNow weather;
