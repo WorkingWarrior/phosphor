@@ -59,6 +59,7 @@ jobs:
           cp build/firmware.ino.partitions.bin out/partitions.bin
           cp "$(find ~/.arduino15/packages/esp32/hardware/esp32 -name boot_app0.bin | head -1)" out/boot_app0.bin
           cp build/firmware.ino.bin out/phosphor.bin
+          cp build/assets.bin out/assets.bin
           ls -l out
 
       - uses: actions/upload-artifact@v4

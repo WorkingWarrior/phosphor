@@ -259,10 +259,18 @@ void Audio::destroy_decoder() {
 std::unique_ptr<Decoder> Audio::createDecoder(const std::string& type) {
     destroy_decoder();
     if (type == "MP3") return std::make_unique<MP3Decoder>(*this);
+    // Phosphor: AUDIO_NO_FLAC / AUDIO_NO_OPUS / AUDIO_NO_VORBIS leave those decoders out of the image (the stations are
+    // MP3 and AAC); a stream in a left-out format then fails to start like any unknown codec.
+#ifndef AUDIO_NO_FLAC
     if (type == "FLAC") return std::make_unique<FlacDecoder>(*this);
+#endif
+#ifndef AUDIO_NO_OPUS
     if (type == "OPUS") return std::make_unique<OpusDecoder>(*this);
+#endif
     if (type == "AAC") return std::make_unique<AACDecoder>(*this);
+#ifndef AUDIO_NO_VORBIS
     if (type == "VORBIS") return std::make_unique<VorbisDecoder>(*this);
+#endif
     if (type == "WAV") return std::make_unique<WavDecoder>(*this);
     return nullptr;
 }

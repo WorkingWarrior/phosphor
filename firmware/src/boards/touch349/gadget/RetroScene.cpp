@@ -6,6 +6,7 @@
 #include "Px.h"
 #include "Theme.h"
 #include "Vfd.h"
+#include "../../../core/Assets.h"
 
 namespace art {
 struct Image {
@@ -16,7 +17,6 @@ struct Image {
   const uint8_t *rle;  // (count, color index) pairs, row by row
   uint32_t rle_len;
 };
-#include "RetroArtData.h"
 }  // namespace art
 
 using px::rgb;
@@ -35,7 +35,7 @@ namespace {
 struct Entry {
   RetroArt scene;
   theme::Id id;
-  const art::Image *img;
+  const char *art;  // name in the asset pack (assets/art/<name>.img, written by design/retro-proto/build_art.sh)
   int16_t p[12];
   uint16_t c[6];
 };
@@ -43,6 +43,9 @@ struct Entry {
 const Entry ENTRIES[] = {
 #include "RetroArtTable.h"
 };
+constexpr int ENTRY_COUNT = sizeof(ENTRIES) / sizeof(ENTRIES[0]);
+art::Image images[ENTRY_COUNT];  // filled from the pack on first use; w == 0 = not loaded
+inline const art::Image *imgOf(const Entry &e) { return &images[&e - ENTRIES]; }
 
 uint16_t *bg = nullptr;  // the decoded picture, 640 x 172 RGB565 (PSRAM)
 const art::Image *decoded = nullptr;
@@ -127,7 +130,7 @@ void ripple(const art::Image *img, int y0, int y1, float amp, float speed)
 
 void spawnFlake(Flake &f, const Entry &e, bool top)
 {
-  const art::Image *img = e.img;
+  const art::Image *img = imgOf(e);
   f.x = frand() * img->w;
   f.y = top ? -1 - frand() * 6 : frand() * img->h;
   f.near = frand() < 0.6f;
@@ -138,7 +141,7 @@ void spawnFlake(Flake &f, const Entry &e, bool top)
 
 void snowPainted(const Entry &e)
 {
-  const art::Image *img = e.img;
+  const art::Image *img = imgOf(e);
   const int16_t *p = e.p;
   float t = frame_no * 0.05f;
 
@@ -183,7 +186,7 @@ void snowPainted(const Entry &e)
 
 void firePainted(const Entry &e)
 {
-  const art::Image *img = e.img;
+  const art::Image *img = imgOf(e);
   const int16_t *p = e.p;
   // the room breathes with the fire: the lit surfaces around the hearth warm up and cool down
   float pulse = 0.5f + 0.3f * sinf(frame_no * 0.31f) + 0.2f * sinf(frame_no * 0.83f + 1) + burst * 0.4f;
@@ -223,7 +226,7 @@ void firePainted(const Entry &e)
 
 void seaPainted(const Entry &e)
 {
-  const art::Image *img = e.img;
+  const art::Image *img = imgOf(e);
   const int16_t *p = e.p;
   ripple(img, p[2], p[3], 1 + burst, 1.1f);
   ripple(img, p[4], p[5], 2 + burst * 2, 0.8f);
@@ -262,7 +265,7 @@ void seaPainted(const Entry &e)
 void tankUnder(const Entry &e)
 {
   const int16_t *p = e.p;
-  ripple(e.img, p[0], p[1], 1, 1.4f);
+  ripple(imgOf(e), p[0], p[1], 1, 1.4f);
   if (!e.c[0]) return;  // the picture has its own light shafts
   float t = frame_no * 0.05f;
   for (int r = 0; r < 4; r++) {  // light shafts drifting through the water
@@ -270,7 +273,7 @@ void tankUnder(const Entry &e)
     for (int y = p[1]; y < vfd::H - 20; y++) {
       int cx = lroundf(x0 + (y - p[1]) * 0.45f), w = 14 + r % 3 * 4;
       for (int x = cx; x < cx + w; x++) {
-        if ((unsigned)x >= vfd::W || ((x / e.img->sx + y / e.img->sy) & 1)) continue;
+        if ((unsigned)x >= vfd::W || ((x / imgOf(e)->sx + y / imgOf(e)->sy) & 1)) continue;
         uint16_t &c = cv()[y * vfd::W + x];
         c = mix(c, e.c[0], 40);
       }
@@ -278,10 +281,39 @@ void tankUnder(const Entry &e)
   }
 }
 
-const Entry *find(RetroArt scene)
+
+// An .img blob: u16 w, u16 h, u8 sx, u8 sy, u8 colors, u8 0, u32 rle bytes, then the RGB565 palette and the RLE.
+const art::Image *image(int i)
 {
-  for (auto &e : ENTRIES)
-    if (e.scene == scene && e.id == theme::current()) return &e;
+  art::Image &im = images[i];
+  if (im.w) return &im;
+  uint32_t size = 0;
+  const uint8_t *b = assets::find(ENTRIES[i].art, &size);
+  if (!b || size < 12) return nullptr;
+  uint32_t rle_len;
+  memcpy(&im.h, b + 2, 2);
+  memcpy(&rle_len, b + 8, 4);
+  im.sx = b[4];
+  im.sy = b[5];
+  im.ncolors = b[6];
+  if (12 + im.ncolors * 2 + rle_len > size || !im.sx || !im.sy) return nullptr;
+  im.pal = (const uint16_t *)(b + 12);
+  im.rle = b + 12 + im.ncolors * 2;
+  im.rle_len = rle_len;
+  memcpy(&im.w, b, 2);  // last: w != 0 marks it loaded
+  return &im;
+}
+
+const Entry *find(RetroArt scene, const art::Image **img)
+{
+  if (!assets::ok()) return nullptr;  // no pack: the scene draws itself the old way
+  for (int i = 0; i < ENTRY_COUNT; i++) {
+    const Entry &e = ENTRIES[i];
+    if (e.scene == scene && e.id == theme::current()) {
+      *img = image(i);
+      return *img ? &e : nullptr;
+    }
+  }
   return nullptr;
 }
 
@@ -291,9 +323,10 @@ void RetroScene_Stir(float strength) { burst = max(burst, strength * 2.5f); }
 
 bool RetroScene_Begin(RetroArt scene)
 {
-  const Entry *e = find(scene);
+  const art::Image *img = nullptr;
+  const Entry *e = find(scene, &img);
   if (!e) return false;
-  if (decoded != e->img) decode(e->img);
+  if (decoded != img) decode(img);
   if (!bg) return false;
   if (cur != e) {
     cur = e;
@@ -318,7 +351,7 @@ void RetroScene_End(const char *corner_text)
 {
   if (!cur) return;
   const Entry &e = *cur;
-  if (actors) px::overlay(e.img->sx == 4);
+  if (actors) px::overlay(imgOf(e)->sx == 4);
   actors = false;
   switch (e.scene) {
     case RetroArt::Snow: snowPainted(e); break;

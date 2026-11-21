@@ -13,6 +13,7 @@
 //   POST /api/settings  the same text in the body (needs header X-Phosphor: 1); saved and applied at once
 //   POST /beep     f=Hz, ms=duration, vol=0-100: test tone on the speaker
 //   POST /update   multipart firmware .bin            (X-Token header)
+//   POST /assets   multipart asset pack (build/assets.bin), restarts (X-Token header)
 //   POST /name     name=phosphor-desk, restarts          (X-Token header)
 //   POST /wifi-reset  forget Wi-Fi, restarts to setup (X-Token header)
 
@@ -25,6 +26,7 @@
 #include <esp_mac.h>
 #include "net.h"
 #include "Board.h"
+#include "Assets.h"
 #include "Audio.h"
 #include "Improv.h"
 #include "Watchdog.h"
@@ -47,6 +49,7 @@ static uint32_t time_synced_ms = 0;
 static uint32_t last_retry_ms = 0;
 
 static bool ota_authorized = false;
+static bool assets_ok = false;  // the asset pack upload so far
 static uint8_t *upload_buf = nullptr;
 static size_t upload_len = 0;
 static bool upload_overflow = false;
@@ -358,6 +361,37 @@ static void setupRoutes()
         Update.write(up.buf, up.currentSize);
       } else if (up.status == UPLOAD_FILE_END && ota_authorized) {
         Update.end(true);
+      }
+    });
+
+  server.on(
+    "/assets", HTTP_POST,
+    []() {
+      if (!ota_authorized) {
+        server.send(401, "text/plain", "unauthorized\n");
+        return;
+      }
+      if (!assets_ok) {
+        server.send(500, "text/plain", "asset pack not written (no assets partition, or the pack is invalid)\n");
+        state.dirty = true;
+        return;
+      }
+      restartSoon("OK, restarting\n");
+    },
+    []() {
+      HTTPUpload &up = server.upload();
+      if (up.status == UPLOAD_FILE_START) {
+        ota_authorized = authorized();
+        assets_ok = false;
+        if (ota_authorized) {
+          board().showNotice("Updating", "Installing pictures...");
+          assets_ok = assets::writeBegin();
+        }
+      } else if (up.status == UPLOAD_FILE_WRITE && ota_authorized) {
+        Watchdog_Feed();
+        if (assets_ok) assets_ok = assets::write(up.buf, up.currentSize);
+      } else if (up.status == UPLOAD_FILE_END && ota_authorized) {
+        assets_ok = assets_ok && assets::writeEnd();
       }
     });
 

@@ -12,6 +12,9 @@
 # Libraries U8g2, WiFiManager and SensorLib are installed from the Library Manager; ESP32-audioI2S is vendored in libraries/.
 # Besides the app image, build/phosphor-full.bin is written: bootloader + partitions + boot_app0 + app merged into one
 # file that is flashed at offset 0x0 (for web installers or `esptool write_flash 0x0 build/phosphor-full.bin`).
+# The flash layout is firmware/partitions.csv (it overrides the scheme in FQBN): 4.5 MB app slots and an "assets"
+# partition at 0x910000 for build/assets.bin, the asset pack tools/pack_assets.py makes from assets/ (scene pictures,
+# later fonts). A USB upload writes both; an OTA upload sends the app, then the pack to POST /assets.
 set -euo pipefail
 cd "$(cd "$(dirname "$0")" && pwd)"
 
@@ -19,6 +22,10 @@ TARGET="${1:-}"
 SKETCH="firmware"
 BUILD="build"
 FQBN="esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=app3M_fat9M_16MB,PSRAM=opi,CDCOnBoot=cdc"
+APP_MAX=4718592        # app0/app1 in firmware/partitions.csv (0x480000)
+ASSETS_OFFSET=0x910000 # the assets partition
+# The radio stations are MP3 and AAC; the other decoders of the vendored ESP32-audioI2S stay out of the image.
+DEFINES="-DBOARD_TOUCH349 -DAUDIO_NO_FLAC -DAUDIO_NO_OPUS -DAUDIO_NO_VORBIS"
 U8G2_VERSION="2.36.18"
 SENSORLIB_VERSION="0.3.1"
 WIFIMANAGER_VERSION="2.0.17"
@@ -31,8 +38,9 @@ arduino-cli lib install "U8g2@${U8G2_VERSION}" "WiFiManager@${WIFIMANAGER_VERSIO
 
 arduino-cli compile --fqbn "$FQBN" \
   --libraries libraries \
-  --build-property "compiler.c.extra_flags=-DBOARD_TOUCH349" \
-  --build-property "compiler.cpp.extra_flags=-DBOARD_TOUCH349 -DFW_VERSION=\"${VERSION}\"" \
+  --build-property "compiler.c.extra_flags=${DEFINES}" \
+  --build-property "compiler.cpp.extra_flags=${DEFINES} -DFW_VERSION=\"${VERSION}\"" \
+  --build-property "upload.maximum_size=${APP_MAX}" \
   --build-path "$BUILD" "$SKETCH"
 
 # The esp32 core already writes the merged image next to the app binary.
@@ -47,13 +55,18 @@ else
     0xe000 "$PLATFORM/tools/partitions/boot_app0.bin" \
     0x10000 "$BUILD/$SKETCH.ino.bin"
 fi
+python3 tools/pack_assets.py assets "$BUILD/assets.bin" "$VERSION"
 echo "Version: $VERSION"
-echo "Built: $BUILD/$SKETCH.ino.bin (app), $BUILD/phosphor-full.bin (full flash image, write at 0x0)"
+echo "Built: $BUILD/$SKETCH.ino.bin (app), $BUILD/phosphor-full.bin (full flash image, write at 0x0),"
+echo "       $BUILD/assets.bin (asset pack, write at $ASSETS_OFFSET)"
 
 [[ -z "$TARGET" ]] && exit 0
 
 if [[ "$TARGET" == /dev/* ]]; then
   arduino-cli upload --fqbn "$FQBN" --port "$TARGET" --input-dir "$BUILD" "$SKETCH"
+  ESPTOOL="$(command -v esptool || command -v esptool.py || true)"
+  [[ -z "$ESPTOOL" ]] && { echo "esptool not found: the asset pack was not written (pip install esptool)"; exit 1; }
+  "$ESPTOOL" --chip esp32s3 --port "$TARGET" write_flash "$ASSETS_OFFSET" "$BUILD/assets.bin"
 else
   TOKEN=""
   [[ -f "$SKETCH/secrets.h" ]] && TOKEN="$(sed -n 's/^#define OTA_TOKEN "\(.*\)"/\1/p' "$SKETCH/secrets.h")"
@@ -63,6 +76,11 @@ else
   fi
   echo "OTA upload to $TARGET ..."
   curl -4 -fsS --max-time 120 -H "X-Token: $TOKEN" -F "firmware=@$BUILD/$SKETCH.ino.bin" "http://$TARGET/update"
+  echo
+  # then the asset pack, once the new firmware is up (a device still on the old partition table has no room for it)
+  for _ in $(seq 1 30); do sleep 2; curl -4 -fsS --max-time 3 "http://$TARGET/status" >/dev/null 2>&1 && break; done
+  curl -4 -fsS --max-time 120 -H "X-Token: $TOKEN" -F "assets=@$BUILD/assets.bin" "http://$TARGET/assets" ||
+    echo "Asset pack not sent (old partition table? flash once over USB); scenes fall back to the plain drawing."
   echo
 fi
 echo "Uploaded to $TARGET"

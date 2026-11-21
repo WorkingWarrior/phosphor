@@ -1,0 +1,13 @@
+# Phosphor flash layout (16 MB), from v1.1. Before v1.1 the board used the core's app3M_fat9M_16MB: two 3 MB app slots
+# and a 9.9 MB LittleFS at 0x610000. Now the app slots are 4.5 MB, the pictures and fonts live in "assets" (a read-only
+# pack written by the installer, see tools/pack_assets.py) and "ffat" keeps only what the device writes (settings).
+# nvs stays where it was, so Wi-Fi, theme and brightness survive the change; settings.txt is carried over once from the
+# old LittleFS (Settings.cpp).
+# Name,   Type, SubType,  Offset,   Size
+nvs,      data, nvs,      0x9000,   0x5000,
+otadata,  data, ota,      0xe000,   0x2000,
+app0,     app,  ota_0,    0x10000,  0x480000,
+app1,     app,  ota_1,    0x490000, 0x480000,
+assets,   data, 0x40,     0x910000, 0x600000,
+ffat,     data, fat,      0xF10000, 0xE0000,
+coredump, data, coredump, 0xFF0000, 0x10000,

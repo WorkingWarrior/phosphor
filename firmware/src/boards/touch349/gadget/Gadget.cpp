@@ -2,6 +2,7 @@
 
 #include "Gadget.h"
 #include <Preferences.h>
+#include "../../../core/Assets.h"
 #include "../../../core/net.h"
 #include "../../../core/state.h"
 #include "Fireplace.h"
@@ -794,6 +795,7 @@ static void drawTimer()
 void Gadget_Begin(uint16_t *canvas, I2cMasterBus *bus, void (*amp)(bool))
 {
   vfd::begin(canvas);
+  assets::begin();
   settings::begin();
   prefs.begin("gadget", false);
   px::begin();

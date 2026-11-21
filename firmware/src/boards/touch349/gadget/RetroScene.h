@@ -1,10 +1,11 @@
 #pragma once
 
 // The v1.1 machine themes: a scene redrawn as that machine's game art (Amiga-style painted 32 colors, C64-style
-// multicolor and Atari 2600-style bands). The picture (RetroArtData.h, made by
+// multicolor and Atari 2600-style bands). The picture (assets/art/*.img in the asset pack, made by
 // design/retro-proto/build_art.sh) is the still part; what moves is drawn by code on top in the machine's own pixel
 // size and colors: snow, smoke, flames, a lighthouse beam, glints on the water. Scenes with actors (the aquarium's
-// fish) draw them into the Px layer between RetroScene_Begin and RetroScene_End.
+// fish) draw them into the Px layer between RetroScene_Begin and RetroScene_End. Without the asset pack (an old partition
+// table, or nothing written yet) RetroScene_Begin returns false and the scene draws itself the plain way.
 
 #include <Arduino.h>
 

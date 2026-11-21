@@ -1,5 +1,5 @@
 # Turns a generated scene into what that machine could have shown: its resolution, its palette and its limits,
-# then writes a preview PNG (640x172, as on the bar) and a C header for the firmware.
+# then writes a preview PNG (640x172, as on the bar) and an .img blob for the firmware's asset pack.
 #
 #   amiga  320x86, 2x2 px, 32 colors snapped to 12-bit (4096), ordered dither
 #   c64    160x86, 4x2 px (double-wide multicolor), the 16 C64 colors, checker dither, and per 4x8 cell only the
@@ -7,7 +7,11 @@
 #   atari  160x86, 4x2 px, Atari 2600 NTSC colors, no dither, at most 4 colors on each line (COLUBK, COLUPF, COLUP0, COLUP1)
 #   lcd    320x86, 2x2 px, flat printed inks (12 colors), no dither
 #
-# usage: python3 convert.py <machine> <in.png> <name> <out_dir> <header.h>
+# usage: python3 convert.py <machine> <in.png> <name> <out_dir> <out.img> [crop]
+#
+# .img (little endian): u16 w, u16 h, u8 sx, u8 sy, u8 colors, u8 0, u32 rle bytes, then colors x u16 RGB565 and the RLE
+# as (count, color index) byte pairs, row by row. RetroScene.cpp reads it.
+import struct
 import sys
 import numpy as np
 from PIL import Image
@@ -160,22 +164,17 @@ def rle(data):
 
 def main():
     global CROP
-    machine, path, name, out_dir, header = sys.argv[1:6]
+    machine, path, name, out_dir, blob = sys.argv[1:6]
     CROP = sys.argv[6] if len(sys.argv) > 6 else None
     idx, pal, w, h, sx, sy = convert(machine, path)
     rgb = pal[idx]
     Image.fromarray(rgb).resize((w * sx, h * sy), Image.NEAREST).save(f'{out_dir}/{name}.png')
     r565 = [((int(r) >> 3) << 11) | ((int(g) >> 2) << 5) | (int(b) >> 3) for r, g, b in pal]
     data = rle(idx.ravel().tolist())
-    with open(header, 'a') as f:
-        f.write(f'// {name}: {machine}, {w}x{h} at {sx}x{sy} px, {len(pal)} colors, {len(data)} bytes RLE\n')
-        f.write(f'static const uint16_t {name}_pal[] = {{' + ','.join(f'0x{c:04X}' for c in r565) + '};\n')
-        f.write(f'static const uint8_t {name}_rle[] = {{')
-        for k in range(0, len(data), 32):
-            f.write('\n  ' + ','.join(str(v) for v in data[k:k + 32]) + ',')
-        f.write('\n};\n')
-        f.write(f'static const art::Image {name} = {{ {w}, {h}, {sx}, {sy}, {len(pal)}, {name}_pal, {name}_rle, '
-                f'sizeof({name}_rle) }};\n\n')
+    with open(blob, 'wb') as f:
+        f.write(struct.pack('<HHBBBBI', w, h, sx, sy, len(pal), 0, len(data)))
+        f.write(struct.pack(f'<{len(r565)}H', *r565))
+        f.write(data)
     print(name, machine, f'{w}x{h}', len(pal), 'colors', len(data), 'bytes')
 
 

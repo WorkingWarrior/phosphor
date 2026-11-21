@@ -2,6 +2,9 @@
 
 #include "Settings.h"
 #include <LittleFS.h>
+#include <Preferences.h>
+#include <esp_littlefs.h>
+#include <esp_partition.h>
 #include "Stations.h"
 #include "../../../core/net.h"
 
@@ -133,11 +136,63 @@ static bool save(const Values &v)
   return LittleFS.rename("/settings.tmp", PATH);
 }
 
+// v1.1 moved "ffat" (partitions.csv). The first boot on the new table reads settings.txt from where the old 9.9 MB
+// LittleFS was (0x610000), read-only, before anything writes there; the installer leaves most of that flash as it was.
+// Done once (NVS flag); a file the old table never had, or one the installer overwrote, just leaves the defaults.
+static String rescueOldSettings()
+{
+  static const uint32_t OLD_ADDR = 0x610000, OLD_SIZE = 0x9E0000;
+  const esp_partition_t *now = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "ffat");
+  if (!now || now->address == OLD_ADDR) return "";  // still the old table: nothing moved yet
+  Preferences p;
+  p.begin("fsmove", false);
+  bool done = p.getBool("done", false);
+  p.putBool("done", true);
+  p.end();
+  if (done) return "";
+
+  esp_partition_t old = {};
+  old.flash_chip = now->flash_chip;
+  old.type = ESP_PARTITION_TYPE_DATA;
+  old.subtype = ESP_PARTITION_SUBTYPE_DATA_FAT;
+  old.address = OLD_ADDR;
+  old.size = OLD_SIZE;
+  old.erase_size = now->erase_size;
+  strcpy(old.label, "ffat_old");
+  old.readonly = true;
+
+  esp_vfs_littlefs_conf_t conf = {};
+  conf.base_path = "/old";
+  conf.partition = &old;
+  conf.format_if_mount_failed = false;
+  conf.read_only = true;
+  String body;
+  if (esp_vfs_littlefs_register(&conf) == ESP_OK) {
+    FILE *f = fopen("/old/settings.txt", "r");
+    if (f) {
+      char buf[256];
+      size_t n;
+      while ((n = fread(buf, 1, sizeof(buf), f)) > 0) body.concat(buf, n);
+      fclose(f);
+    }
+    esp_vfs_littlefs_unregister_partition(&old);
+  }
+  Serial.printf("settings: old file system %s\n", body.length() ? "found, carried over" : "not readable");
+  return body;
+}
+
 void begin()
 {
   defaults(cur);
-  // the board's 9 MB data partition is labelled "ffat"; LittleFS formats it on first use
+  String rescued = rescueOldSettings();  // before the new "ffat" is mounted (and maybe formatted)
   fs_ok = LittleFS.begin(true, "/fs", 5, "ffat");
+  if (fs_ok && rescued.length() && !LittleFS.exists(PATH)) {
+    File f = LittleFS.open(PATH, "w");
+    if (f) {
+      f.print(rescued);
+      f.close();
+    }
+  }
   if (!fs_ok) {
     Serial.println("settings: no file system, using defaults");
     return;
