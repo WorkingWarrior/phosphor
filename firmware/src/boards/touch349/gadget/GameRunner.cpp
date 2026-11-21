@@ -73,7 +73,13 @@ bool prefs_open = false;
 Rs rs = Rs::Ready;
 Ob obs[MAX_OBS];
 float dist = 0, speed = SPEED0, run_s = 0, y = 0, vy = 0, next_x = 0;
-bool on_ground = true, held = false, cut_pending = false, buffered = false, show_fps = false;
+bool on_ground = true, held = false, cut_pending = false, buffered = false;
+#ifdef PHOSPHOR_FRAME_DEBUG  // developer build flag (-DPHOSPHOR_FRAME_DEBUG): draws the frame times; off for everyone else
+bool show_fps = true;
+#else
+constexpr bool show_fps = false;
+#endif
+
 uint8_t pending_type = CRATE;
 uint32_t jump_ms = 0, cut_at = 0, buffer_until = 0, last_ms = 0, dead_ms = 0, score_hi = 0, score = 0, last_milestone = 0;
 bool new_hi = false;
@@ -486,7 +492,6 @@ void runnerTouch(bool down, int, int)
 bool runnerGesture(Gesture g, int, int)
 {
   if (g == Gesture::LongPress) {
-    if (rs != Rs::Run) show_fps = !show_fps;  // frame times, for testing
     return true;
   }
   // taps and up/down swipes (a sloppy tap) were already used as the touch edge; they must not reach the volume control
