@@ -16,14 +16,6 @@ static const Def DEFS[COUNT] = {
   { "vfd", "VFD",
     { 0x0041, 0x0904, 0x0082, 0x0248, 0x77BC, 0x44B1, 0xFA16, 0x6888, 0x4D72 },
     VFD_STYLE, px::Theme::Vfd, 0, 0 },
-  { "cga", "CGA",
-    { rgb(0, 0, 0), rgb(0, 85, 85), rgb(0, 42, 42), rgb(85, 255, 255), rgb(255, 255, 255), rgb(85, 255, 255),
-      rgb(255, 85, 255), rgb(255, 85, 255), rgb(85, 255, 255) },
-    FLAT, px::Theme::Cga, 0, 0 },
-  { "ega", "EGA",
-    { rgb(0, 0, 170), rgb(0, 0, 85), rgb(0, 0, 128), rgb(85, 85, 255), rgb(255, 255, 255), rgb(170, 170, 170),
-      rgb(255, 255, 85), rgb(255, 255, 85), rgb(0, 170, 0) },
-    FLAT, px::Theme::Ega, 0, 0 },
   { "c64", "C64-STYLE",
     { rgb(53, 40, 121), rgb(68, 68, 68), rgb(68, 68, 68), rgb(108, 94, 181), rgb(255, 255, 255), rgb(149, 149, 149),
       rgb(184, 199, 111), rgb(184, 199, 111), rgb(88, 141, 67) },
@@ -70,13 +62,20 @@ static void apply()
 void begin(int old_scene_pref)
 {
   prefs.begin("theme", false);
-  if (old_scene_pref >= 0 && !prefs.isKey("id")) {
-    // before 1.1 the only theme was the pixel scenes' colors: natural, ega or vfd
-    prefs.putUChar("id", old_scene_pref == 1 ? EGA : VFD);
+  if (old_scene_pref >= 0 && !prefs.isKey("key") && !prefs.isKey("id")) {
+    // before 1.1 the only theme was the pixel scenes' colors: natural, ega or vfd (EGA is now part of VFD)
+    prefs.putString("key", "vfd");
     prefs.putBool("natural", old_scene_pref == 0);
   }
-  uint8_t id = prefs.getUChar("id", VFD);
-  cur = id < COUNT ? (Id)id : VFD;
+  if (!prefs.isKey("key") && prefs.isKey("id")) {
+    // 1.1 betas kept the index of { vfd, cga, ega, c64, amiga }; CGA and EGA were folded into VFD
+    static const char *const OLD[] = { "vfd", "vfd", "vfd", "c64", "amiga" };
+    uint8_t id = prefs.getUChar("id", 0);
+    prefs.putString("key", id < 5 ? OLD[id] : "vfd");
+    prefs.remove("id");
+  }
+  Id id = fromName(prefs.getString("key", "vfd"));
+  cur = id < COUNT ? id : VFD;
   natural = prefs.getBool("natural", false);
   apply();
 }
@@ -85,7 +84,7 @@ void set(Id id)
 {
   if (id >= COUNT) return;
   cur = id;
-  prefs.putUChar("id", id);
+  prefs.putString("key", DEFS[id].key);  // by name, so the list can change without moving anyone's choice
   apply();
 }
 

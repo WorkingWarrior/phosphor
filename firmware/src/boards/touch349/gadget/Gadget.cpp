@@ -1111,7 +1111,7 @@ String Gadget_Command(const String &name, const String &arg)
       eggSet(arg.toInt());  // seconds
     }
   } else if (name == "theme") {
-    // the whole look: vfd | cga | ega | c64 | amiga (or 0..4), empty = next; "natural" / "themed" = scene colors
+    // the whole look: vfd | c64 | amiga | atari | lcd (or 0..4), empty = next; "natural" / "themed" = scene colors
     if (arg == "natural" || arg == "themed") {
       theme::setNaturalScenes(arg == "natural");
     } else {
