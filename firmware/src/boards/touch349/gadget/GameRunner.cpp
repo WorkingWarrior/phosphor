@@ -320,8 +320,8 @@ void drawProps(int z, int cell, const Scene &sn, bool vfd)
       }
       for (int k = 0; k < 3; k++) cactus(pmod(k * 250 + 90 - cell / 3, 750) - 60, GROUND_Y, sn.near_c);
       break;
-    case 2:  // a city: two rows of buildings, lit windows; a moon
-      if (sn.sun && !vfd) sunAt(120, 50, 16, sn.sun);
+    case 2:  // a city: two rows of buildings, lit windows; a moon (top right: the score fills the top left)
+      if (sn.sun && !vfd) sunAt(560, 40, 16, sn.sun);
       for (int k = 0; k < 8; k++) {
         int w = 30 + (k * 11) % 26;
         building(pmod(k * 118 - cell / 10, 944) - 80, GROUND_Y, w, 30 + (k * 29) % 46, sn.far_c, 0);
