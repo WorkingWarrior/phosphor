@@ -1,7 +1,7 @@
 #pragma once
 
 // QMI8658 motion sensor (accelerometer only) on the main I2C bus: where "down" is on the screen, shakes and knocks on
-// the desk. Read from the main loop (Motion_Update every frame or so).
+// the desk. Sampled at 1 kHz by its own task.
 
 #include <Arduino.h>
 #include "../../../hw/i2c_bsp.h"
@@ -17,3 +17,6 @@ void Motion_Raw(float &x, float &y, float &z);
 float Motion_Shake();
 // True once per knock (a short sharp tap on the desk or the case).
 bool Motion_TakeKnock();
+// Diagnostics for /status: knocks counted since boot, and the biggest jump off the baseline (g) in the last ~4 s.
+uint32_t Motion_KnockCount();
+float Motion_KnockPeak();
