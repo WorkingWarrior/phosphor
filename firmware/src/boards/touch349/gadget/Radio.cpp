@@ -474,7 +474,9 @@ void Radio_Begin(I2cMasterBus *i2c, void (*amp_fn)(bool))
     }
   };
   audio = new Audio();
-  audio->setAudioTaskCore(0);
+  // No setAudioTaskCore(0) here: the constructor already starts the audio task on core 0. The call stops and restarts it, and
+  // both tasks share one static TCB and stack, so a delete that was still pending when the new task was created corrupted
+  // the scheduler lists (IDLE0 stack canary / uxListRemove panic at boot, depending on layout and timing).
   if (!audio->setPinout(I2S_BCLK_PIN, I2S_LRC_PIN, I2S_DOUT_PIN, I2S_MCLK_PIN)) {
     Serial.println("radio: I2S pinout failed");
   }
