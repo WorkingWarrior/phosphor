@@ -18,6 +18,13 @@ bool RetroScene_Begin(RetroArt scene);
 void RetroScene_End(const char *corner_text);
 void RetroScene_Stir(float strength);  // 0..1, a tap or a shake: whirls the snow, flares the fire, roughens the sea
 
+// The current theme's picture entry for a scene: the places its effects go, in screen pixels (640 x 172), numbered as
+// the table in RetroScene.cpp says (Snow: window x0 y0 x1 y1; Fire: firebox x0 y0 x1 y1; Sea: lamp x y, sea y0 y1).
+// nullptr = this theme has no picture for it (or no asset pack).
+const int16_t *RetroScene_Params(RetroArt scene);
+// Snow picture: false = the cabin's window goes dark (lamp off), true = lit again.
+void RetroScene_WindowLit(bool lit);
+
 // Shares the scene background cache; false asks the clock to use its plain layout.
 bool RetroWorld_Draw();
 

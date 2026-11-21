@@ -54,6 +54,7 @@ const Entry *cur = nullptr;
 uint32_t frame_no = 0;
 float burst = 0;  // stir energy, decays
 bool actors = false;
+bool window_lit = true;
 
 struct Flake {
   float x, y, v;  // machine px, machine px per second
@@ -148,7 +149,13 @@ void snowPainted(const Entry &e)
 
   // the fire behind the window
   bool flick = ((frame_no / 3) % 7 == 0) || (hash32(frame_no / 2) % 23 == 0);
-  if (p[5] || flick) {
+  if (!window_lit) {  // the lamp is off: the glass goes the machine's night blue
+    uint16_t dark = e.id == theme::C64 ? rgb(53, 40, 121) : e.id == theme::AMIGA ? rgb(34, 34, 68) : rgb(24, 32, 96);
+    int y1 = p[3] + (e.id == theme::C64 ? 9 : 0);  // the C64 window's lower panes are below the measured box
+    for (int y = p[1]; y < y1; y++)
+      for (int x = p[0]; x < p[2]; x++)
+        if (lum(bg[y * vfd::W + x]) > p[4]) cv()[y * vfd::W + x] = dark;
+  } else if (p[5] || flick) {
     for (int y = p[1]; y < p[3]; y++)
       for (int x = p[0]; x < p[2]; x++)
         if (lum(bg[y * vfd::W + x]) > p[4]) cv()[y * vfd::W + x] = flick ? e.c[1] : e.c[0];
@@ -334,6 +341,16 @@ int RetroScene_Block() { return cur ? max(1, imgOf(*cur)->sx / 2) : 1; }
 
 void RetroScene_Stir(float strength) { burst = max(burst, strength * 2.5f); }
 
+void RetroScene_WindowLit(bool lit) { window_lit = lit; }
+
+const int16_t *RetroScene_Params(RetroArt scene)
+{
+  if (!assets::ok()) return nullptr;
+  for (int i = 0; i < ENTRY_COUNT; i++)
+    if (ENTRIES[i].scene == scene && ENTRIES[i].id == theme::current()) return ENTRIES[i].p;
+  return nullptr;
+}
+
 bool RetroScene_Begin(RetroArt scene)
 {
   const art::Image *img = nullptr;
@@ -364,12 +381,13 @@ void RetroScene_End(const char *corner_text)
 {
   if (!cur) return;
   const Entry &e = *cur;
+  if (e.scene == RetroArt::Sea) seaPainted(e);  // its ripples copy the picture back: actors go on after them
   if (actors) px::overlay(imgOf(e)->sx / 2, imgOf(e)->sy / 2);
   actors = false;
   switch (e.scene) {
     case RetroArt::Snow: snowPainted(e); break;
     case RetroArt::Fire: firePainted(e); break;
-    case RetroArt::Sea: seaPainted(e); break;
+    case RetroArt::Sea: break;
     case RetroArt::Aquarium: break;
     case RetroArt::World: break;
   }
