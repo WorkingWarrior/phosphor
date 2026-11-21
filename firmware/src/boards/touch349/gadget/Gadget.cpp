@@ -734,8 +734,6 @@ static void drawWeather()
     WeatherFace f;
     f.weather = w; f.day = sky_force >= 0 ? !sky_night : w.day; f.sky = sky_force >= 0 ? (Sky)sky_force : w.valid ? w.sky : Sky::Unknown;
     f.condition = f.sky != Sky::Unknown ? Weather_SkyName(f.sky) : L("WAIT", "BEKLE");
-    f.humidity = String(L("HUM ", "NEM ")) + (settings::tr() ? "%" + String(w.humidity) : String(w.humidity) + "%");
-    f.wind = String(L("WIND ", "RÜZGAR ")) + String(w.wind) + (settings::fahrenheit() ? " MPH" : L(" KM/H", " KM/SA"));
     for (int i = 0; i < 3; i++) f.days[i] = weekdayName(w.next[i].weekday);
     WeatherFaces_Draw(f);
     return;
@@ -800,19 +798,22 @@ static void drawTimer()
   if (digits.length() < 5) digits = " " + digits;
   if (theme::current() != theme::VFD) {
     TimerFace f;
-    f.digits = mss(left_s);
-    f.setting = String(L("TIMER  SET ", "SAYAÇ  AYAR ")) + mss(egg_set_s);
+    f.digits = digits;
+    f.title = L("TIMER", "SAYAÇ");
+    f.launch_ms = done ? millis() - egg_done_ms : 0;
+    f.setting = String(L("SET ", "AYAR ")) + mss(egg_set_s);
     f.running = running; f.paused = phase == Phase::Paused; f.done = done;
     f.visible = show && (!done || blinkOn(300));
     f.state = running ? L("RUNNING", "SAYIYOR") : f.paused ? L("PAUSED", "DURDU") :
               done ? L("TIME'S UP!", "SÜRE DOLDU!") : egg_set_s ? L("TAP: START", "DOKUN: BAŞLA") : L("PICK A TIME", "SÜRE SEÇ");
     int32_t total = max<int32_t>(1, egg_set_s * 1000);
-    f.progress = phase == Phase::Idle ? 0 : done ? 608 : constrain((int)(608 * (1 - (float)eggLeftMs()/total)),0,608);
+    f.progress = phase == Phase::Idle ? 0 : done ? 604 : constrain((int)(604 * (1 - (float)eggLeftMs()/total)),0,604);
     for (int i=0;i<5;i++) f.buttons[i] = (settings::tr() ? COUNT_LABELS_TR : COUNT_LABELS_EN)[i];
     if (TimerFaces_Draw(f)) return;
   }
   clear();
   seg(digits.c_str(), 20, 12, 70, 100, 12, 12, big);
+  Rocket_Draw(done, done ? millis() - egg_done_ms : 0);
 
   text(L("TIMER", "SAYAÇ"), 470, 16, 3, 2, LIT_INK);
   text((String(L("SET ", "AYAR ")) + mss(egg_set_s)).c_str(), 470, 50, 2, DIM_INK);
