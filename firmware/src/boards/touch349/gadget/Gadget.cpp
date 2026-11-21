@@ -1,6 +1,8 @@
 #ifdef BOARD_TOUCH349
 
 #include "Gadget.h"
+#include "ClockFaces.h"
+#include "RetroScene.h"
 #include <Preferences.h>
 #include "../../../core/Assets.h"
 #include "../../../core/net.h"
@@ -40,8 +42,20 @@ static const char *const WEEKDAYS_EN[] = { "SUN", "MON", "TUE", "WED", "THU", "F
 static const char *const MONTHS_TR[] = { "OCAK", "ŞUBAT", "MART", "NİSAN", "MAYIS", "HAZİRAN",
                                       "TEMMUZ", "AĞUSTOS", "EYLÜL", "EKİM", "KASIM", "ARALIK" };
 static const char *const MONTHS_EN[] = { "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" };
-static const char *weekdayName(int d) { return (settings::tr() ? WEEKDAYS_TR : WEEKDAYS_EN)[constrain(d, 0, 6)]; }
+static const char *const WEEKDAYS_LONG_TR[] = { "Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi" };
+static const char *const WEEKDAYS_LONG_EN[] = { "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday" };
+static const char *weekdayName(int d, bool long_name = false)
+{
+  d = constrain(d, 0, 6);
+  if (long_name) return (settings::tr() ? WEEKDAYS_LONG_TR : WEEKDAYS_LONG_EN)[d];
+  return (settings::tr() ? WEEKDAYS_TR : WEEKDAYS_EN)[d];
+}
 static const char *monthName(int m) { return (settings::tr() ? MONTHS_TR : MONTHS_EN)[constrain(m, 1, 12) - 1]; }
+// For the long date of the machine themes, whose fonts have lower case ("Saturday 21 Nov").
+static const char *const MONTHS_TITLE_TR[] = { "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+                                             "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık" };
+static const char *const MONTHS_TITLE_EN[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+static const char *monthTitle(int m) { return (settings::tr() ? MONTHS_TITLE_TR : MONTHS_TITLE_EN)[constrain(m, 1, 12) - 1]; }
 
 // Alarm
 static bool alarm_on = false;
@@ -305,6 +319,17 @@ static void drawRainbow()
 
 static void drawClock(const DateTime &now)
 {
+  if (theme::current() != theme::VFD && RetroWorld_Draw()) {
+    int wd = weekday(now.year, now.month, now.day);
+    String date = String(now.day) + " " + monthName(now.month);
+    ClockFace face = { hhmm(now), String(weekdayName(wd)) + " " + date,
+                       String(weekdayName(wd, true)) + " " + String(now.day) + " " + monthTitle(now.month),
+                       ringing ? String(L("WAKE UP!", "UYAN!")) : two(alarm_h) + ":" + two(alarm_m),
+                       alarm_on && (!ringing || blinkOn(300)), ringing, state.batt_pct };
+    ClockFaces_Draw(face);
+    if (theme::current() == theme::C64) drawRainbow();
+    return;
+  }
   clear();
   if (theme::current() == theme::C64) drawRainbow();
   String hm = hhmm(now);

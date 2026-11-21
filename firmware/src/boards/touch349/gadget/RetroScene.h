@@ -9,7 +9,7 @@
 
 #include <Arduino.h>
 
-enum class RetroArt : uint8_t { Snow, Aquarium, Fire, Sea };
+enum class RetroArt : uint8_t { Snow, Aquarium, Fire, Sea, World };
 
 // Picture and effects only. false = the current theme has no picture for this scene: draw the usual one.
 bool RetroScene_Draw(RetroArt scene, const char *corner_text);
@@ -17,3 +17,6 @@ bool RetroScene_Draw(RetroArt scene, const char *corner_text);
 bool RetroScene_Begin(RetroArt scene);
 void RetroScene_End(const char *corner_text);
 void RetroScene_Stir(float strength);  // 0..1, a tap or a shake: whirls the snow, flares the fire, roughens the sea
+
+// Shares the scene background cache; false asks the clock to use its plain layout.
+bool RetroWorld_Draw();

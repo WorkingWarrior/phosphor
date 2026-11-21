@@ -3,7 +3,7 @@
 # Previews land in out/.
 cd "$(dirname $0)"
 mkdir -p out ../../assets/art
-grep -v '^#' art.txt | while read name machine src crop; do
+grep -v '^#' art.txt | while read name machine src crop dither; do
   [ -z "$name" ] && continue
-  python3 convert.py $machine $src $name out ../../assets/art/$name.img $crop || exit 1
+  python3 convert.py $machine $src $name out ../../assets/art/$name.img ${crop:--} $dither || exit 1
 done

@@ -358,6 +358,7 @@ void RetroScene_End(const char *corner_text)
     case RetroArt::Fire: firePainted(e); break;
     case RetroArt::Sea: seaPainted(e); break;
     case RetroArt::Aquarium: break;
+    case RetroArt::World: break;
   }
   if (corner_text && *corner_text) {
     int w = vfd::textWidth(corner_text, 2);
@@ -370,6 +371,16 @@ bool RetroScene_Draw(RetroArt scene, const char *corner_text)
   if (!RetroScene_Begin(scene)) return false;
   actors = false;  // nothing on top
   RetroScene_End(corner_text);
+  return true;
+}
+
+bool RetroWorld_Draw()
+{
+  const art::Image *img = nullptr;
+  if (!find(RetroArt::World, &img)) return false;
+  if (decoded != img) decode(img);
+  if (!bg || decoded != img) return false;
+  memcpy(vfd::canvas(), bg, vfd::W * vfd::H * sizeof(uint16_t));
   return true;
 }
 

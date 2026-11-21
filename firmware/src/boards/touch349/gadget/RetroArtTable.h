@@ -17,4 +17,7 @@
 { RetroArt::Aquarium, theme::AMIGA,  "tank_amiga",         { 0, 10 },                                           { rgb(119, 187, 238) } },
 { RetroArt::Aquarium, theme::C64,    "tank_c64",           { 0, 8 },                                            { 0 } },
 { RetroArt::Aquarium, theme::ATARI,  "tank_atari",         { 0, 8 },                                            { 0 } },
+{ RetroArt::World, theme::AMIGA, "world_amiga", {}, {} },
+{ RetroArt::World, theme::C64, "world_c64", {}, {} },
+{ RetroArt::World, theme::ATARI, "world_atari", {}, {} },
 // clang-format on
