@@ -301,40 +301,43 @@ static void cassette()
   tape_last = now;
 
   cells.clear();
-  // shell, label stripe, window, the slanted bottom with its two holes
-  cells.rect(0, 8, CW, 1, 2);
-  cells.rect(0, 25, CW, 1, 2);
-  cells.rect(0, 8, 1, 18, 2);
-  cells.rect(CW - 1, 8, 1, 18, 2);
-  cells.rect(2, 10, 22, 2, 1);
-  cells.rect(4, 13, 18, 1, 2);
-  cells.rect(4, 21, 18, 1, 2);
-  cells.rect(4, 13, 1, 9, 2);
-  cells.rect(21, 13, 1, 9, 2);
-  cells.rect(7, 22, 12, 1, 2);
-  cells.set(6, 23, 2);
-  cells.set(19, 23, 2);
-  cells.set(9, 24, 1);
-  cells.set(16, 24, 1);
+  // shell, label stripe, window, the slanted bottom with its two holes; it sits high, the counter under it
+  const int T = 2;  // top row of the shell
+  cells.rect(0, T, CW, 1, 2);
+  cells.rect(0, T + 17, CW, 1, 2);
+  cells.rect(0, T, 1, 18, 2);
+  cells.rect(CW - 1, T, 1, 18, 2);
+  cells.rect(2, T + 2, 22, 2, 1);
+  cells.rect(4, T + 5, 18, 1, 2);
+  cells.rect(4, T + 13, 18, 1, 2);
+  cells.rect(4, T + 5, 1, 9, 2);
+  cells.rect(21, T + 5, 1, 9, 2);
+  cells.rect(7, T + 14, 12, 1, 2);
+  cells.set(6, T + 15, 2);
+  cells.set(19, T + 15, 2);
+  cells.set(9, T + 16, 1);
+  cells.set(16, T + 16, 1);
 
-  // tape moves from the left reel to the right one over 30 minutes, then starts again
+  // tape (accent color) moves from the left reel to the right one over 30 minutes, then starts again
   float p = (tape_ms % 1800000) / 1800000.0f;
   const float cx[2] = { 8, 17 }, pack[2] = { 1.8f + 1.7f * (1 - p), 1.8f + 1.7f * p };
-  int step = playing ? (tape_ms / 140) % 8 : 0;
+  const float cy = T + 9;
+  int step = playing ? (tape_ms / 420) % 8 : 0;  // a slow, steady turn
   for (int r = 0; r < 2; r++) {
-    cells.disc(cx[r] + 0.5f, 17.5f, pack[r], 2);
+    cells.disc(cx[r] + 0.5f, cy + 0.5f, pack[r], 3);
     for (int k = 0; k < 8; k++) {  // the hub: alternate dots chase round while it turns
       float a = k * PI / 4;
-      cells.set(cx[r] + cosf(a) * 1.4f, 17 + sinf(a) * 1.4f, (k + step) % 2 ? 1 : 0);
+      cells.set(cx[r] + cosf(a) * 1.4f, cy + sinf(a) * 1.4f, (k + step) % 2 ? 1 : 0);
     }
-    cells.set(cx[r], 17, 1);
+    cells.set(cx[r], cy, 1);
   }
+  cells.rect(9, (int)cy + 3, 8, 1, 3);  // the tape crossing the window between the reels
 
   // counter: minutes of tape played
   int n = (tape_ms / 60000) % 1000;
-  miniDigit(n / 100, 7, 27, 2);
-  miniDigit(n / 10 % 10, 11, 27, 2);
-  miniDigit(n % 10, 15, 27, 2);
+  miniDigit(n / 100, 7, T + 21, 2);
+  miniDigit(n / 10 % 10, 11, T + 21, 2);
+  miniDigit(n % 10, 15, T + 21, 2);
   drawCells();
 }
 
