@@ -20,6 +20,7 @@ struct Values {
   bool fahr = false;
   int focus = 25, short_b = 5, long_b = 15;
   int night = 0;  // night dim window, index into NIGHTS (0 = off)
+  String hide;    // comma list of hidden page keys
   RadioGroup groups[MAX_GROUPS];
   int n_groups = 0;
   RadioStation stations[MAX_STATIONS];
@@ -63,6 +64,7 @@ static String serialize(const Values &v)
   out += String("h24=") + (v.h24 ? "1" : "0") + "\n";
   out += String("unit=") + (v.fahr ? "f" : "c") + "\n";
   out += "night=" + String(v.night) + "\n";
+  out += "hide=" + v.hide + "\n";
   out += "focus=" + String(v.focus) + "\n";
   out += "short=" + String(v.short_b) + "\n";
   out += "long=" + String(v.long_b) + "\n";
@@ -94,6 +96,11 @@ static bool parse(const String &body, Values &v, String &err)
     else if (k == "h24") v.h24 = val.toInt() != 0;
     else if (k == "unit") v.fahr = val.startsWith("f");
     else if (k == "night") v.night = constrain(val.toInt(), 0, NIGHT_MODES - 1);
+    else if (k == "hide") {
+      val.trim();
+      val.toLowerCase();
+      v.hide = clean(val, 120);
+    }
     else if (k == "focus") v.focus = val.toInt();
     else if (k == "short") v.short_b = val.toInt();
     else if (k == "long") v.long_b = val.toInt();
@@ -243,6 +250,18 @@ bool nightWindow(int mode, int &start_min, int &end_min)
   return mode > 0;
 }
 String city() { return cur.city; }
+String hiddenPages() { return cur.hide; }
+bool pageHidden(const char *key)
+{
+  int n = strlen(key), i = 0;
+  while (i < (int)cur.hide.length()) {  // whole words of the comma list
+    int j = cur.hide.indexOf(',', i);
+    if (j < 0) j = cur.hide.length();
+    if (j - i == n && !strncmp(cur.hide.c_str() + i, key, n)) return true;
+    i = j + 1;
+  }
+  return false;
+}
 float lat() { return cur.lat; }
 float lon() { return cur.lon; }
 int focusMin() { return cur.focus; }

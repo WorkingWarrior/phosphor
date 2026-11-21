@@ -37,17 +37,39 @@ using namespace vfd;
 
 static Preferences prefs;
 
-static const Mode PAGES[] = { Mode::Clock, Mode::Radio, Mode::Weather, Mode::Timer, Mode::Study, Mode::Hourglass,
-                              Mode::Aquarium, Mode::Snow, Mode::Fire, Mode::Sea, Mode::Wave, Mode::Lava, Mode::Tools, Mode::Play,
-                              Mode::Settings };
+// The swipe ring, in order. The key is what "hide=" in the settings file and the web page use.
+struct PageInfo {
+  Mode mode;
+  const char *key, *en, *tr;
+  bool can_hide;
+};
+static const PageInfo PAGES[] = {
+  { Mode::Clock, "clock", "CLOCK", "SAAT", false },
+  { Mode::Radio, "radio", "RADIO", "RADYO", true },
+  { Mode::Weather, "weather", "WEATHER", "HAVA DURUMU", true },
+  { Mode::Timer, "timer", "TIMER", "SAYAÇ", true },
+  { Mode::Study, "study", "FOCUS", "ODAK", true },
+  { Mode::Hourglass, "hourglass", "HOURGLASS", "KUM SAATİ", true },
+  { Mode::Aquarium, "aquarium", "FISH TANK", "AKVARYUM", true },
+  { Mode::Snow, "snow", "SNOW", "KAR", true },
+  { Mode::Fire, "fire", "FIREPLACE", "ŞÖMİNE", true },
+  { Mode::Sea, "sea", "LIGHTHOUSE", "FENER", true },
+  { Mode::Wave, "wave", "SHIP", "GEMİ", true },
+  { Mode::Lava, "lava", "LAVA LAMP", "LAV LAMBASI", true },
+  { Mode::Tools, "tools", "TOOLS", "ARAÇLAR", true },
+  { Mode::Play, "play", "PLAY", "OYUN", true },
+  { Mode::Settings, "settings", "SETTINGS", "AYARLAR", false },
+};
 static constexpr int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
 
-// Whether the ring has the page: a menu page only while it lists apps.
-static bool pageInRing(Mode m)
+// Whether the ring has the page: a menu page only while it lists apps, and not one the settings hide.
+static bool pageInRing(int i)
 {
-  if (m == Mode::Play || m == Mode::Tools) return Apps_Count(m) > 0;
-  return true;
+  const PageInfo &p = PAGES[i];
+  if ((p.mode == Mode::Play || p.mode == Mode::Tools) && Apps_Count(p.mode) == 0) return false;
+  return !(p.can_hide && settings::pageHidden(p.key));
 }
+static bool pageListed(const PageInfo &p) { return (p.mode != Mode::Play && p.mode != Mode::Tools) || Apps_Count(p.mode) > 0; }
 
 static const char *const WEEKDAYS_TR[] = { "PAZ", "PZT", "SAL", "ÇAR", "PER", "CUM", "CMT" };
 static const char *const WEEKDAYS_EN[] = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
@@ -963,11 +985,12 @@ static void autoPage()
   last_cycle_ms = millis();
   int idx = 0;
   for (int i = 0; i < PAGE_COUNT; i++) {
-    if (PAGES[i] == state.mode) idx = i;
+    if (PAGES[i].mode == state.mode) idx = i;
   }
   for (int k = 1; k < PAGE_COUNT; k++) {
-    Mode m = PAGES[(idx + k) % PAGE_COUNT];
-    if (ambient(m)) {
+    int j = (idx + k) % PAGE_COUNT;
+    Mode m = PAGES[j].mode;
+    if (ambient(m) && pageInRing(j)) {
       state.mode = m;
       state.dirty = true;
       return;
@@ -1066,6 +1089,12 @@ void Gadget_Tick(const DateTime &now)
       Radio_Beep(1046, 140, 3, 90);
     }
   }
+  for (int i = 0; i < PAGE_COUNT; i++) {  // the page on screen was just hidden (web settings): back to the clock
+    if (PAGES[i].mode == state.mode && !pageInRing(i) && !ringing) {
+      state.mode = Mode::Clock;
+      state.dirty = true;
+    }
+  }
   timerTick();
   Apps_Tick();
   Study_Tick();
@@ -1155,13 +1184,12 @@ static void goPage(int dir)
 {
   int idx = 0;
   for (int i = 0; i < PAGE_COUNT; i++) {
-    if (PAGES[i] == state.mode) idx = i;
+    if (PAGES[i].mode == state.mode) idx = i;
   }
-  Mode next;
   do {
     idx = (idx + dir + PAGE_COUNT) % PAGE_COUNT;
-    next = PAGES[idx];
-  } while (!pageInRing(next));
+  } while (!pageInRing(idx));
+  Mode next = PAGES[idx].mode;
   state.mode = next;
   state.mode_until_ms = 0;
   state.dirty = true;
@@ -1442,6 +1470,57 @@ String Gadget_Command(const String &name, const String &arg)
            theme::def().key, theme::naturalScenes() ? "true" : "false", RS[(int)Radio_State()], Radio_Station(), settings::station(Radio_Station()).name.c_str(), title.c_str(), Radio_Volume(), alarm_h,
            alarm_m, alarm_on ? "true" : "false", ringing ? "true" : "false", mss((eggLeftMs() + 999) / 1000).c_str(), (int)phase, ax, ay, az, RadioFace_Status().c_str());
   return json;
+}
+
+// The i-th listed page (see Gadget.h) as an index into PAGES, -1 past the end.
+static int listedPage(int i)
+{
+  for (int k = 0; k < PAGE_COUNT; k++) {
+    if (pageListed(PAGES[k]) && i-- == 0) return k;
+  }
+  return -1;
+}
+
+int Gadget_PageCount()
+{
+  int n = 0;
+  for (int k = 0; k < PAGE_COUNT; k++) n += pageListed(PAGES[k]);
+  return n;
+}
+
+const char *Gadget_PageName(int i)
+{
+  int k = listedPage(i);
+  return k < 0 ? "" : L(PAGES[k].en, PAGES[k].tr);
+}
+
+bool Gadget_PageCanHide(int i)
+{
+  int k = listedPage(i);
+  return k >= 0 && PAGES[k].can_hide;
+}
+
+bool Gadget_PageShown(int i)
+{
+  int k = listedPage(i);
+  return k >= 0 && !(PAGES[k].can_hide && settings::pageHidden(PAGES[k].key));
+}
+
+void Gadget_PageSetShown(int i, bool shown)
+{
+  int k = listedPage(i);
+  if (k < 0 || !PAGES[k].can_hide) return;
+  String list;
+  for (int j = 0; j < PAGE_COUNT; j++) {
+    bool hidden = PAGES[j].can_hide && settings::pageHidden(PAGES[j].key);
+    if (j == k) hidden = !shown;
+    if (!hidden) continue;
+    if (list.length()) list += ",";
+    list += PAGES[j].key;
+  }
+  String err;
+  if (!settings::apply("hide=" + list + "\n", err)) Serial.printf("settings: %s\n", err.c_str());
+  state.dirty = true;
 }
 
 bool Gadget_ButtonPressed()

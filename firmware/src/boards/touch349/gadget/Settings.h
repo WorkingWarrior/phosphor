@@ -12,6 +12,7 @@
 //   h24=1                   24-hour clock
 //   unit=c                  c | f, temperatures (and wind in mph with f)
 //   focus=25  short=5  long=15   pomodoro minutes
+//   hide=radio,snow         pages left out of the swipe ring (clock and settings cannot be hidden)
 //   group=80S|80s           radio button label (up to 6 letters) | full genre name; order = button order
 //   station=0|Heart 80s|http://...   group index | name | stream URL (MP3 or AAC over HTTP/HTTPS)
 
@@ -47,6 +48,9 @@ constexpr int NIGHT_DIM_PCT = 15;
 int nightMode();
 bool nightWindow(int mode, int &start_min, int &end_min);  // false for "off"
 String city();
+// Pages hidden from the ring, by page key ("radio", "snow", ...), as the comma list of the file.
+bool pageHidden(const char *key);
+String hiddenPages();
 float lat();
 float lon();
 int focusMin();

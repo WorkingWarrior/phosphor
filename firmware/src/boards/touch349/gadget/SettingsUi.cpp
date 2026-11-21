@@ -7,6 +7,7 @@
 #include "../../../core/Board.h"
 #include "../../../core/state.h"
 #include "../../../core/UpdateCheck.h"
+#include "Gadget.h"
 #include "Settings.h"
 #include "Theme.h"
 #include "Vfd.h"
@@ -17,7 +18,7 @@ using namespace vfd;
 // Items and texts
 // ---------------------------------------------------------------------------------------------------------------------
 
-enum Item : uint8_t { THEME, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HOLIDAYS, NIGHT, HELP, WIFI, ABOUT, ITEM_COUNT };
+enum Item : uint8_t { THEME, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HOLIDAYS, NIGHT, PAGES, HELP, WIFI, ABOUT, ITEM_COUNT };
 
 struct ItemText {
   const char *en, *tr;            // in the list
@@ -34,6 +35,7 @@ static const ItemText ITEMS[ITEM_COUNT] = {
   { "AUTO PAGE", "OTO SAYFA", "AMBIENT PAGES TURN BY THEMSELVES", "SAHNELER KENDİLİĞİNDEN DÖNER" },
   { "HOLIDAYS", "YILBAŞI", "WINTER LIGHTS ON THE SNOW PAGE", "KAR SAYFASINDA YILBAŞI IŞIKLARI" },
   { "NIGHT DIM", "GECE KISMA", "SCREEN DIMS AT NIGHT", "EKRAN GECE KISILIR" },
+  { "PAGES", "SAYFALAR", "TAP THE NAME: SHOW OR HIDE", "İSME DOKUN: GÖSTER YA DA GİZLE" },
   { "HELP", "YARDIM", nullptr, nullptr },
   { "WI-FI", "WI-FI", nullptr, nullptr },
   { "ABOUT", "HAKKINDA", nullptr, nullptr },
@@ -113,6 +115,7 @@ static Preferences prefs;
 static bool prefs_open = false;
 static int sel = 0;       // selected item
 static int help_page = 0;
+static int page_sel = 1;  // PAGES item: the page the arrows picked (index in Gadget_Page*, 0 = the clock)
 static int cycle_min = -1;  // -1 = not read yet
 static int xmas = -1;       // holidays: 0 = by the date, 1 = always, 2 = never; -1 = not read yet
 
@@ -308,6 +311,7 @@ static void change(int dir)
     }
     case HOLIDAYS: SettingsUi_SetHolidays((xmasMode() + dir + 3) % 3); break;
     case NIGHT: apply((String("night=") + (settings::nightMode() + dir + settings::NIGHT_MODES) % settings::NIGHT_MODES + "\n").c_str()); break;
+    case PAGES: page_sel = (page_sel + dir + Gadget_PageCount()) % Gadget_PageCount(); break;
     case HELP: help_page = (help_page + dir + HELP_COUNT) % HELP_COUNT; break;
     default: return;
   }
@@ -374,6 +378,7 @@ static void drawValue()
   sprite(ARROW, 7, PX1 - 12, VALUE_Y + 3, 3, HOT, true);
 
   String value, note;
+  bool note_hot = false;
   switch (sel) {
     case THEME: value = theme::def().name; break;
     case CLOCK: value = settings::h24() ? L("24 HOUR", "24 SAAT") : L("12 HOUR", "12 SAAT"); break;
@@ -397,6 +402,14 @@ static void drawValue()
     case CYCLE: {
       int m = SettingsUi_CycleMin();
       value = m ? String(m) + L(" MIN", " DK") : String(L("OFF", "KAPALI"));
+      break;
+    }
+    case PAGES: {
+      page_sel = constrain(page_sel, 0, Gadget_PageCount() - 1);
+      value = Gadget_PageName(page_sel);
+      bool shown = Gadget_PageShown(page_sel);
+      note_hot = !shown;
+      note = !Gadget_PageCanHide(page_sel) ? L("ALWAYS SHOWN", "HEP GÖRÜNÜR") : shown ? L("SHOWN", "GÖRÜNÜR") : L("HIDDEN", "GİZLİ");
       break;
     }
     case HOLIDAYS: {
@@ -429,7 +442,7 @@ static void drawValue()
     }
   } else if (note.length()) {
     int w = textWidth(note.c_str(), 2);
-    text(note.c_str(), (PX0 + PX1 - w) / 2, 124, 2, look == Look::Running ? HOT_INK : DIM_INK);
+    text(note.c_str(), (PX0 + PX1 - w) / 2, 124, 2, look == Look::Running || note_hot ? HOT_INK : sel == PAGES ? LIT_INK : DIM_INK);
   }
 }
 
@@ -499,6 +512,7 @@ void SettingsUi_Tap(int x, int y)
   if (x < ZONE_L) change(-1);
   else if (x > ZONE_R) change(1);
   else if (sel == CITY) startLookup();
+  else if (sel == PAGES) Gadget_PageSetShown(page_sel, !Gadget_PageShown(page_sel));
   else change(1);
 }
 

@@ -54,6 +54,10 @@ button.warn:hover { border-color: var(--hot); color: var(--hot); }
 .station .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .station .name small { display: block; color: var(--dim); font-size: 12px; overflow: hidden; text-overflow: ellipsis; }
 .empty { color: var(--dim); font-size: 13px; padding: 6px 0; }
+.pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pages label { display: flex; gap: 8px; align-items: center; margin: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: var(--r); color: var(--text); cursor: pointer; }
+.pages label.off { color: var(--dim); }
+.pages input { accent-color: var(--lit); width: 18px; height: 18px; margin: 0; }
 .hint { color: var(--dim); font-size: 13px; margin: 8px 0 0; }
 .add { margin-top: 18px; padding: 14px; border: 1px dashed var(--ghost); border-radius: var(--r); }
 .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
@@ -91,6 +95,12 @@ button.warn:hover { border-color: var(--hot); color: var(--hot); }
       <div class="shrink"><label id="t-night">Night dim (screen at 15%)</label>
         <div class="seg" id="night"><button data-v="0">Off</button><button data-v="1">22:00-07:00</button><button data-v="2">23:00-07:00</button><button data-v="3">00:00-08:00</button></div></div>
     </div>
+  </section>
+
+  <section>
+    <h2 id="t-pages">Pages</h2>
+    <p class="hint" id="t-pages-hint" style="margin:0 0 12px">Pages you swipe through on the device. Untick the ones you do not want; the clock and this settings page always stay.</p>
+    <div class="pages" id="pages"></div>
   </section>
 
   <section>
@@ -139,11 +149,11 @@ button.warn:hover { border-color: var(--hot); color: var(--hot); }
 
 <script>
 const $ = s => document.querySelector(s);
-let S = { city: '', lat: 0, lon: 0, lang: 'en', h24: '1', unit: 'c', night: '0', focus: 25, short: 5, long: 15, groups: [], stations: [] };
+let S = { city: '', lat: 0, lon: 0, lang: 'en', h24: '1', unit: 'c', night: '0', hide: '', focus: 25, short: 5, long: 15, groups: [], stations: [] };
 
 const TR = {
   't-title': 'Ayarlar', 't-sub': 'Kaydet’e basınca cihazda hemen geçerli olur.', 't-loc': 'Konum', 't-now': 'Hava ve saat:',
-  't-disp': 'Ekran', 't-lang': 'Dil', 't-clock': 'Saat', 't-unit': 'Sıcaklık', 't-night': 'Gece kısma (ekran %15)', 't-pomo': 'Odak sayacı (dakika)', 't-focus': 'Odak',
+  't-disp': 'Ekran', 't-lang': 'Dil', 't-clock': 'Saat', 't-unit': 'Sıcaklık', 't-night': 'Gece kısma (ekran %15)', 't-pages': 'Sayfalar', 't-pages-hint': 'Cihazda kaydırarak gezdiğin sayfalar. İstemediklerinin işaretini kaldır; saat ve bu ayar sayfası hep kalır.', 't-pomo': 'Odak sayacı (dakika)', 't-focus': 'Odak',
   't-short': 'Kısa mola', 't-long': 'Uzun mola', 't-radio': 'Radyo',
   't-radio-hint': 'Her grup radyo ekranında bir buton (en çok 7). Aynı butona tekrar dokununca gruptaki sonraki istasyona geçer.',
   't-st-name': 'Ad (16 harf)', 't-into': 'Eklenecek grup', 't-codec': 'Cihaz sadece MP3 ve AAC yayınları çalar. ? işaretli istasyonlar biçimini bildirmiyor: önce deneyin.'
@@ -172,7 +182,7 @@ function parse(text) {
   return s;
 }
 function serialize() {
-  let t = `city=${S.city}\nlat=${S.lat}\nlon=${S.lon}\nlang=${S.lang}\nh24=${S.h24}\nunit=${S.unit}\nnight=${S.night || 0}\nfocus=${$('#focus').value}\nshort=${$('#short').value}\nlong=${$('#long').value}\n`;
+  let t = `city=${S.city}\nlat=${S.lat}\nlon=${S.lon}\nlang=${S.lang}\nh24=${S.h24}\nunit=${S.unit}\nnight=${S.night || 0}\nhide=${S.hide || ''}\nfocus=${$('#focus').value}\nshort=${$('#short').value}\nlong=${$('#long').value}\n`;
   S.groups.forEach(g => t += `group=${g.key}|${g.name}\n`);
   S.stations.forEach(s => t += `station=${s.g}|${s.name}|${s.url}\n`);
   return t;
@@ -203,6 +213,7 @@ function render() {
   seg('h24', String(S.h24), v => { S.h24 = v; render(); dirty(); });
   seg('unit', S.unit || 'c', v => { S.unit = v; render(); dirty(); });
   seg('night', String(S.night || '0'), v => { S.night = v; render(); dirty(); });
+  renderPages();
   texts();
   const box = $('#groups'); box.innerHTML = '';
   S.groups.forEach((g, gi) => {
@@ -231,6 +242,26 @@ function render() {
   });
   $('#add-group').disabled = S.groups.length >= 7;
   fillGroupSelect();
+}
+const PAGES = [['clock', 'Clock', 'Saat', 1], ['radio', 'Radio', 'Radyo'], ['weather', 'Weather', 'Hava durumu'], ['timer', 'Timer', 'Sayaç'],
+  ['study', 'Focus', 'Odak'], ['hourglass', 'Hourglass', 'Kum saati'], ['aquarium', 'Fish tank', 'Akvaryum'], ['snow', 'Snow', 'Kar'],
+  ['fire', 'Fireplace', 'Şömine'], ['sea', 'Lighthouse', 'Fener'], ['wave', 'Ship', 'Gemi'], ['lava', 'Lava lamp', 'Lav lambası'],
+  ['tools', 'Tools', 'Araçlar'], ['settings', 'Settings', 'Ayarlar', 1]];
+function renderPages() {
+  const hidden = new Set((S.hide || '').split(',').filter(Boolean)), box = $('#pages');
+  box.innerHTML = '';
+  PAGES.forEach(([key, en, tr, locked]) => {
+    const l = document.createElement('label'), c = document.createElement('input');
+    c.type = 'checkbox'; c.checked = locked || !hidden.has(key); c.disabled = !!locked;
+    l.className = c.checked ? '' : 'off';
+    c.onchange = () => {
+      c.checked ? hidden.delete(key) : hidden.add(key);
+      S.hide = PAGES.filter(p => hidden.has(p[0])).map(p => p[0]).join(',');
+      l.className = c.checked ? '' : 'off'; dirty();
+    };
+    l.append(c, S.lang === 'tr' ? tr : en);
+    box.appendChild(l);
+  });
 }
 function fillGroupSelect() {
   const sel = $('#st-group'), keep = sel.value;
