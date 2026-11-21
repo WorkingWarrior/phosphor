@@ -13,14 +13,14 @@ kural gereği "imkânsız an" hiç oluşmaz (Monte Carlo ile ölçüldü, aşağ
 
 ## Ekran yerleşimi (640x172, sabit segmentler)
 ```
-y 0-22   HUD: sol "GAME A"/"GAME B" · orta HI 123 · sağ skor 3 hane (7-seg) + 3 kaçırma ikonu (can simidi)
-y 24-68  uzak şerit (L0)   ┐  gemi sprite boyu: uzak ~22px, orta ~30px, yakın ~40px (perspektif)
-y 70-116 orta şerit (L1)   ├  her şerit 5 gemi pozisyonu: P5 (doğma, sağ) … P1 (tehlike, kayanın önü)
-y118-170 yakın şerit (L2)  ┘
-x 0-104    fener kulesi (gövde sabit), 3 pencere: L0 y≈40, L1 y≈92, L2 y≈142 (bekçi + lamba her pencerede ayrı segment)
-x 106-150  kayalar (her şeritte), çarpma segmenti P0 burada
-x 120-640  ışık huzmesi: her şerit için tek segment (pencereden P1'e uzanan koni), sadece bekçinin şeridi yanar
-P1..P5 x merkezleri: 190, 300, 410, 520, 615 (tüm şeritlerde aynı; uzak şerit sprite'ı küçük)
+y 0-30   HUD: fener tepesi · GAME A / GAME B · basılı "HI" + 3 küçük 7-seg · 3 batan gemi ikonu · 3 büyük 7-seg skor
+y 31-69  uzak şerit (L0)   ┐  gemiler: uzak yelkenli, orta trol teknesi, yakın vapur (ölçek .62 / .8 / 1)
+y 69-117 orta şerit (L1)   ├  her şerit 5 gemi pozisyonu: P5 (doğma, sağ) … P1 (tehlike, kayanın önü)
+y117-172 yakın şerit (L2)  ┘  (dokunma sınırları GameFener.cpp LANE_SPLIT_Y = 69, 117)
+x 10-98    fener kulesi (basılı), 3 pencere: y 47 / 93 / 139 (bekçi + elindeki fener ayrı segment)
+x 100-165  kayalar (basılı, her şeritte), batık segmenti (P0) üstünde
+huzme      fenerden P1 gemisinin pruvasına 3 ışın + 2 parıltı, şerit başına tek segment, sadece bekçinin şeridi yanar
+P1..P5 x merkezleri: 198, 296, 394, 492, 588 (tüm şeritlerde aynı)
 ```
 Segment listesi (hepsi her karede çizilir: yanmayan = hayalet/GHOST, yanan = LIT):
 - 15 gemi (3 şerit × P1..P5), 3 "dönen gemi" (P1'de rotası sağ-yukarı dönmüş poz), 3 batık/çarpma (P0)
@@ -80,12 +80,17 @@ Radio_Beep imzasını koddan kontrol et; frekans/süre almıyorsa en yakın kar�
 Play menüsü → başlık ekranı (fener sahnesi hayalet çizimle, "GAME A  HI 123" sol yarı, "GAME B  HI 045" sağ yarı;
 dokun = o mod başlar) → 2 bip, 1 sn hazır → oyun → (bitti) → başlık. Saat bu ekranda HUD'da göstermez (dikkat dağıtmasın).
 
-## 4 tema
-- VFD: mevcut `vfd::GHOST/LIT/HALO` (yeşil-mavi fosfor), hayaletler çok sönük görünür → en "G&W/LCD" hissi bu.
-- C64: mavi zemin + açık mavi kenarlık, LIT açık mavi/beyaz, 2x geniş piksel; hayalet çok koyu mavi. Skor C64-style font.
-- Amiga: copper şeritli gökyüzü (zemin), segmentler beyaz/turuncu, hayaletler yarı saydam gri; başlık çubuğunda "FENER".
-- 2600: blok sprite'lar, hayalet YOK (o makinede LCD yok), huzme düz renk bant; skor 2600 rakamları.
-Sprite'lar string sprite (`px::sprite` biçimi), tema paletinden renklenir; telifli çizim yok.
+## Görünüm: tema bağımsız LCD (Melih 11-22)
+Fener dört temada da aynı görünür: gerçek bir G&W cihazı gibi renkli baskı (cam arkası) + üstünde siyah LCD segmentleri +
+sönük hayaletler. Tarz G&W'den; çizimler bizim (fener, bekçi, gemiler, kayalar), hiçbir Nintendo/Elektronika çizimi yok.
+- Kaynak: `tools/fener_lcd.py` (Python + PIL, derleme öncesi elle çalıştırılır). Çıktı: `GameFenerArt.h/.cpp` (baskı
+  RLE RGB565 + segment başına 1 bit maske, 85 segment, ~29 KB flash) ve `design/fener-lcd/*.png` önizlemeler.
+  Çizimi değiştirmek = script'i değiştir + çalıştır; üretilen dosyalar elle düzenlenmez.
+- Çizim sırası (her karede): baskı → yanan segmentin 2 px sağ-alt gölgesi (%20 koyu, mürekkep camda baskının üstünde)
+  → sönük segment (%7.5 mürekkep) → yanan segment (mürekkep). Kurtarılan gemi pozu P1 ile çakıştığı için hayaletsiz.
+- Başlık: GAME A ve B 1.5 sn'de bir sırayla kendi HI'sini gösterir, fener ışığı ve dalgalar oynar; iki basılı kart
+  (sol yarı A, sağ yarı B) + sağ üstte tık sesi anahtarı. Duraklat: kart + etkin GAME etiketi yanıp söner.
+- Oyunda yazı yok; sadece segmentler.
 
 ## Test planı (cihazda)
 1. Şerit bantlarına dokunma isabeti: 20 hızlı dokunuşta yanlış şerit sayısı (hedef 0-1).
