@@ -872,7 +872,8 @@ struct Puff {
   float x, y, vx, vy;
   uint8_t age;  // frames, 0 = unused
 };
-static Puff puffs[14];
+static Puff puffs[20];
+static uint8_t ship_look = 0;  // what Wave_Draw drew this frame: 0 real, 1 pixel liner, 2 C64, 3 Amiga, 4 2600
 static int horn_t = -1;         // frames since the horn sounded
 static int whale_t = -1;        // frames since the whale surfaced
 static uint32_t whale_next = 0; // frame_no of the next visit
@@ -885,26 +886,38 @@ void Wave_Hold()
   if (Radio_Ready() && !Radio_On()) Radio_Beep(98, 1100);  // a long low blast, only if nothing else is playing
 }
 
+// Top centre of each of the four funnels, in screen pixels from the ship's pivot (waterline, middle), per drawn liner.
+// Real and pixel liner: from the bitmap (funnel x0 + 1 and row 0, scaled); machine sprites: measured on assets/art/ship_*.img
+// (the cap's first full row, the curl of old smoke the artist drew above it is left under the new puffs).
+static const int16_t FUNNEL[5][4][2] = {
+  { { -68, -68 }, { -32, -68 }, { 4, -68 }, { 40, -68 } },      // real
+  { { -70, -68 }, { -34, -68 }, { 2, -68 }, { 38, -68 } },      // pixel (VFD)
+  { { -54, -60 }, { -18, -60 }, { 22, -60 }, { 60, -60 } },     // C64
+  { { -59, -50 }, { -22, -50 }, { 14, -50 }, { 51, -50 } },     // Amiga
+  { { -58, -54 }, { -16, -54 }, { 26, -54 }, { 68, -54 } },     // 2600
+};
+
 static void extrasStep()
 {
   if (horn_t >= 0) {
-    if (horn_t % 3 == 0) {  // a puff from the second funnel, raked and tilted with the ship
-      float c = cosf(ship_ang), s = sinf(ship_ang), dx = -24, dy = -68;
-      for (auto &p : puffs)
-        if (!p.age) {
-          p = { ship_x + dx * c - dy * s, ship_y + dx * s + dy * c, 0.5f + frand() * 0.3f, -(1.4f + frand() * 0.5f), 1 };
-          break;
-        }
-    }
-    if (++horn_t > 24) horn_t = -1;
+    for (int f = 0; f < 4; f++)
+      if (horn_t % 8 == f * 2) {  // a puff from each funnel in turn, raked and tilted with the ship
+        float c = cosf(ship_ang), s = sinf(ship_ang), dx = FUNNEL[ship_look][f][0], dy = FUNNEL[ship_look][f][1] - 3;
+        for (auto &p : puffs)
+          if (!p.age) {
+            p = { ship_x + dx * c - dy * s, ship_y + dx * s + dy * c, -(0.35f + frand() * 0.2f), -(0.75f + frand() * 0.25f), 1 };
+            break;
+          }
+      }
+    if (++horn_t > 26) horn_t = -1;
   }
   for (auto &p : puffs) {
     if (!p.age) continue;
     p.x += p.vx;
     p.y += p.vy;
-    p.vy *= 0.985f;
-    p.vx += 0.01f;
-    if (++p.age > 90) p.age = 0;
+    p.vy *= 0.96f;
+    p.vx -= 0.012f;  // the wind takes it aft
+    if (++p.age > 72) p.age = 0;
   }
   if (!whale_next) whale_next = frame_no + 3600 + esp_random() % 7200;  // 3 to 9 minutes
   if (whale_t < 0 && frame_no >= whale_next) {
@@ -920,16 +933,28 @@ static void extrasStep()
 static void extrasDraw()
 {
   using namespace px;
+  // round puffs: a disc that grows and thins out (checker, then gone), in the lit greys of the theme
+  int gw = 1, gh = 1;
+  uint16_t c1, c2, c3;
+  switch (ship_look) {
+    case 2: gw = 4, gh = 2, c1 = WHITE, c2 = pack565(204, 204, 204), c3 = pack565(149, 149, 149); break;
+    case 3: gw = 2, gh = 2, c1 = pack565(0xee, 0xee, 0xff), c2 = pack565(0xcc, 0xcc, 0xdd), c3 = pack565(0x99, 0x99, 0xaa); break;
+    case 4: gw = 4, gh = 2, c1 = A_WHITE, c2 = pack565(0xb4, 0xb4, 0xb4), c3 = pack565(0x84, 0x84, 0x84); break;
+    default: c1 = ink(N6), c2 = ink(N5), c3 = ink(N4);
+  }
   for (auto &p : puffs) {
     if (!p.age) continue;
-    int r = 2 + p.age / 14, x = (int)p.x, y = (int)p.y;
-    uint16_t c = ink(p.age < 40 ? N5 : N4);
-    if (p.age < 55) {
-      vfd::rect(x - r, y - r, 2 * r, 2 * r, c);
-    } else {  // thinning out: a checker of 2x2 cells
-      for (int yy = -r; yy < r; yy += 2)
-        for (int xx = -r; xx < r; xx += 2)
-          if (((xx + yy) / 2) % 2 == 0) vfd::rect(x + xx, y + yy, 2, 2, c);
+    int r = 4 + p.age / 9;  // 4 up to 12
+    uint16_t c = p.age < 22 ? c1 : (p.age < 44 ? c2 : c3);
+    int cx = (int)p.x, cy = (int)p.y;
+    for (int yy = -r; yy <= r; yy += gh) {
+      int hw = (int)sqrtf((float)(r * r - yy * yy));
+      for (int xx = -hw; xx < hw; xx += gw) {
+        int x = cx + xx, y = cy + yy;
+        if (gw > 1 || gh > 1) x = x / gw * gw, y = y / gh * gh;
+        if (p.age > 50 && (((x / (gw * 2)) + (y / (gh * 2))) & 1)) continue;  // thinning out: a checker
+        vfd::rect(x, y, gw, gh, c);
+      }
     }
   }
   if (whale_t < 0) return;
@@ -973,9 +998,13 @@ void Wave_Draw(const char *corner_text)
   updateParticles();
   theme::Id id = theme::current();
   if (px::theme() == px::Theme::Natural) {
+    ship_look = 0;
     drawReal(corner_text);
   } else if (id == theme::VFD || !drawMachine(corner_text, id == theme::C64 ? M_C64 : (id == theme::AMIGA ? M_AMIGA : M_ATARI))) {
+    ship_look = 1;
     drawPixels(corner_text);
+  } else {
+    ship_look = id == theme::C64 ? 2 : (id == theme::AMIGA ? 3 : 4);
   }
   extrasStep();
   extrasDraw();
