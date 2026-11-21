@@ -49,9 +49,10 @@ void gradient(int y0, int y1, const uint8_t *cols, int n);
 void sprite(const char *const *rows, int n, int x, int y, const char *key, const uint8_t *vals, bool flip = false);
 // Puts the scene on the canvas (2x2 per pixel), through the current theme.
 void present();
-// Like present() but skips CLR pixels, for actors drawn over a picture (RetroScene). wide = pairs of pixels share one
-// color (C64 / 2600 pixels); solid != 0 = every pixel in that one color (LCD figures).
-void overlay(bool wide, uint16_t solid = 0);
+// Like present() but skips CLR pixels, for actors drawn over a picture (RetroScene). A machine pixel is bw x bh Px
+// pixels, the one at its top left decides (1x1 Amiga, 2x1 C64, 4x2 2600: those are drawn flat, without the checker);
+// solid != 0 = every pixel in that one color (LCD figures).
+void overlay(int bw = 1, int bh = 1, uint16_t solid = 0);
 
 // Themes recolor every scene at present(), as if the scene were loaded on that machine: Natural = the palette above;
 // Ega = the 16 EGA colors with a checker dither between two of them where no single one fits (Sierra-era look); Vfd =

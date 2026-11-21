@@ -82,6 +82,7 @@ void sprite(const char *const *rows, int n, int x, int y, const char *key, const
 
 static Theme cur = Theme::Natural;
 static uint16_t pair_a[COLORS], pair_b[COLORS];  // even / odd checker cell of each palette color
+static uint16_t pair_flat[COLORS];               // the lighter of the two, for flat blocks (2600)
 static bool pairs_ready = false;
 
 struct Rgb {
@@ -196,6 +197,11 @@ void setTheme(Theme t)
   if (t >= Theme::COUNT) t = Theme::Natural;
   cur = t;
   buildPairs();
+  for (int i = 0; i < COLORS; i++) {  // the lighter of the two, for flat blocks
+    int la = ((pair_a[i] >> 11) * 3 + ((pair_a[i] >> 5) & 63) * 3 + (pair_a[i] & 31) * 1);
+    int lb = ((pair_b[i] >> 11) * 3 + ((pair_b[i] >> 5) & 63) * 3 + (pair_b[i] & 31) * 1);
+    pair_flat[i] = lb > la ? pair_b[i] : pair_a[i];
+  }
   pairs_ready = true;
 }
 Theme theme() { return cur; }
@@ -227,19 +233,20 @@ void present()
   }
 }
 
-void overlay(bool wide, uint16_t solid)
+void overlay(int bw, int bh, uint16_t solid)
 {
   if (!pairs_ready) setTheme(cur);
   if (!buf) begin();
   uint16_t *cv = vfd::canvas();
-  int mask = wide ? ~1 : ~0;
+  int mx = ~(max(1, bw) - 1), my = ~(max(1, bh) - 1);
+  bool flat = bw > 2;  // a 2600 block is one flat color: no checker between two
   for (int y = 0; y < H; y++) {
     uint16_t *r0 = cv + (2 * y) * vfd::W, *r1 = r0 + vfd::W;
-    const uint8_t *src = buf[y];
+    const uint8_t *src = buf[y & my];
     for (int x = 0; x < W; x++) {
-      uint8_t i = src[x & mask];
+      uint8_t i = src[x & mx];
       if (i == CLR) continue;
-      uint16_t c = solid ? solid : ((((x & mask) ^ y) & 1) ? pair_b[i] : pair_a[i]);
+      uint16_t c = solid ? solid : flat ? pair_flat[i] : ((((x & mx) ^ y) & 1) ? pair_b[i] : pair_a[i]);
       r0[2 * x] = r0[2 * x + 1] = r1[2 * x] = r1[2 * x + 1] = c;
     }
   }

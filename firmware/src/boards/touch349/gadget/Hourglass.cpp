@@ -6,7 +6,6 @@
 #include "Settings.h"
 #include "Radio.h"
 #include "Theme.h"
-#include "RetroScene.h"
 
 using namespace px;
 
@@ -159,22 +158,35 @@ static void portraitText(const char *s, int y, uint16_t color)
   }
 }
 
-static void machineGlass(uint32_t secs, bool flowing)
+// Machine pages draw straight on a black canvas, so everything outside the glass stays black and the glass stands out.
+// Colors are RGB 0..15 per channel (12 bit) for the Amiga.
+static uint16_t c12(int r, int g, int b) { return rgb(r * 17, g * 17, b * 17); }
+
+static uint32_t hsh(int x, int y)
 {
-  const theme::Id id = theme::current();
-  const char *picture = id == theme::C64 ? "sand_c64" : id == theme::AMIGA ? "sand_amiga" : "sand_atari";
-  if (!RetroPicture_Draw(picture)) vfd::clear(px::ink(NIGHT));
-  uint16_t light, dark, glass, wood;
-  if (id == theme::C64) {
-    light = rgb(184, 199, 111); dark = rgb(111, 79, 37);
-    glass = rgb(149, 149, 149); wood = rgb(154, 103, 89);
-  } else if (id == theme::AMIGA) {
-    light = rgb(238, 204, 119); dark = rgb(204, 153, 68);
-    glass = rgb(187, 221, 238); wood = rgb(187, 119, 68);
-  } else {
-    light = rgb(236, 200, 120); dark = rgb(220, 180, 104);
-    glass = rgb(236, 236, 236); wood = rgb(208, 128, 92);
-  }
+  uint32_t h = (uint32_t)x * 73856093u ^ (uint32_t)y * 19349663u;
+  h ^= h >> 13;
+  h *= 0x5bd1e995u;
+  return h >> 16;
+}
+
+static bool sandAt(int x, int y) { return y >= 0 && y < CH && x >= 0 && x < CW && grid[y][x]; }
+
+static void labels(uint32_t secs, bool flowing, uint16_t flow, uint16_t idle, uint16_t duration)
+{
+  char label[12];
+  snprintf(label, sizeof(label), "%lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
+  portraitText(label, 4, flowing ? flow : idle);
+  snprintf(label, sizeof(label), L("%d MIN", "%d DK"), DURATIONS[dur_idx]);
+  portraitText(label, PH * 2 - 20, duration);
+}
+
+// C64: 4x2 pixels, a cell is one 8x8 block of portrait units, flat glass outline, caps and posts in light red.
+static void c64Glass(uint32_t secs, bool flowing)
+{
+  const uint16_t light = rgb(184, 199, 111), dark = rgb(111, 79, 37), glass = rgb(149, 149, 149),
+                 wood = rgb(154, 103, 89);
+  vfd::clear(0);
   for (int y = 0; y < CH; y++) {
     int left = CW / 2 - half[y] - 1, right = CW / 2 + half[y] + 1;
     portraitRect((OX + left * S) * 2, (OY + y * S) * 2, S * 2, S * 2, glass);
@@ -191,11 +203,155 @@ static void machineGlass(uint32_t secs, bool flowing)
       if (g) portraitRect((OX + x * S) * 2, (OY + y * S) * 2, S * 2, S * 2,
                           (g & 0x80) || (g & 0x7f) != 2 ? light : dark);
     }
-  char label[12];
-  snprintf(label, sizeof(label), "%lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
-  portraitText(label, 4, flowing ? glass : dark);
-  snprintf(label, sizeof(label), L("%d MIN", "%d DK"), DURATIONS[dur_idx]);
-  portraitText(label, PH * 2 - 20, light);
+  labels(secs, flowing, glass, dark, light);
+}
+
+// Amiga: 2x2 pixels, so one portrait pixel is one machine pixel; the showpiece with shaded sand, a glossy glass
+// rim, wooden caps and brass posts.
+static void amigaCap(int y0)
+{
+  const uint16_t tone[4] = { c12(14, 10, 5), c12(11, 7, 3), c12(9, 5, 2), c12(4, 2, 1) };
+  for (int c = 0; c < PW; c++)
+    for (int r = 0; r < S; r++) {
+      uint16_t col = tone[r];
+      if ((r == 1 || r == 2) && (hsh(c / 5, r + y0) & 3) == 0) col = tone[r + 1];  // grain dashes
+      if (c < 2) col = tone[max(0, r - 1)];                                        // bevelled ends
+      else if (c >= PW - 2) col = tone[min(3, r + 1)];
+      portraitRect(c * 2, (y0 + r) * 2, 2, 2, col);
+    }
+}
+
+static void amigaGlass(uint32_t secs, bool flowing)
+{
+  const uint16_t sand[4] = { c12(15, 13, 7), c12(13, 10, 5), c12(10, 7, 3), c12(11, 8, 4) };  // lit, body, edge, grain
+  const uint16_t stream = c12(15, 14, 9), streamGrain = c12(13, 12, 6);
+  const uint16_t rimOut = c12(4, 6, 8), rim[3] = { c12(6, 8, 11), c12(9, 11, 14), c12(11, 13, 15) };
+  const uint16_t tint1 = c12(1, 3, 6), tint2 = c12(0, 1, 3), shine = c12(15, 15, 15);
+  const uint16_t brassDark = c12(9, 6, 2), brassLight = c12(15, 13, 6);
+  vfd::clear(0);
+
+  // brass posts first: the glass rim overlaps them where the bulbs are widest
+  for (int y = OY; y < OY + CH * S; y++) {
+    uint16_t hi = (y / 24) & 1 ? c12(13, 10, 4) : brassLight;
+    portraitRect(0, y * 2, 2, 2, brassDark);
+    portraitRect(2, y * 2, 2, 2, hi);
+    portraitRect((PW - 2) * 2, y * 2, 2, 2, hi);
+    portraitRect((PW - 1) * 2, y * 2, 2, 2, brassDark);
+  }
+  for (int y = 0; y < CH; y++) {
+    int xl = OX + (CW / 2 - half[y]) * S, xr = OX + (CW / 2 + half[y] + 1) * S;
+    for (int r = 0; r < S; r++) {
+      int yy = OY + y * S + r;
+      portraitRect(xl * 2, yy * 2, 2, 2, tint1);
+      portraitRect((xl + 1) * 2, yy * 2, 2, 2, tint2);
+      portraitRect((xr - 1) * 2, yy * 2, 2, 2, tint1);
+      portraitRect((xr - 2) * 2, yy * 2, 2, 2, tint2);
+    }
+  }
+  for (int y = 0; y < CH; y++)
+    for (int x = 0; x < CW; x++) {
+      uint8_t g = grid[y][x];
+      if (!g) continue;
+      bool moved = g & 0x80;
+      // the surface faces the empty side: where the sand falls from
+      bool surface = !sandAt(x, y - dir), lSide = !sandAt(x - 1, y), rSide = !sandAt(x + 1, y);
+      for (int r = 0; r < S; r++)
+        for (int c = 0; c < S; c++) {
+          int px = OX + x * S + c, py = OY + y * S + r;
+          uint32_t h = hsh(px, py);
+          uint16_t col;
+          if (moved) col = (h & 3) == 0 ? streamGrain : stream;
+          else if (surface && r == (dir > 0 ? 0 : S - 1)) col = sand[0];
+          else if ((lSide && c == 0) || (rSide && c == S - 1)) col = sand[2];
+          else if ((h & 7) == 0) col = sand[(g & 0x7f) == 2 ? 2 : 0];
+          else if ((h & 7) == 1) col = sand[3];
+          else col = (g & 0x7f) == 2 ? sand[2] : sand[1];
+          portraitRect(px * 2, py * 2, 2, 2, col);
+        }
+    }
+  for (int y = 0; y < CH; y++) {
+    int xl = OX + (CW / 2 - half[y] - 1) * S, xr = OX + (CW / 2 + half[y] + 1) * S;
+    float d = fabsf(y + 0.5f - NECK) / NECK;
+    bool gloss = d > 0.12f && d < 0.8f;
+    for (int r = 0; r < S; r++) {
+      int yy = OY + y * S + r;
+      bool streak = gloss && yy % 40 < 30;  // a broken white highlight along the left side of each bulb
+      portraitRect(xl * 2, yy * 2, 2, 2, rimOut);
+      portraitRect((xl + 1) * 2, yy * 2, 2, 2, rim[0]);
+      portraitRect((xl + 2) * 2, yy * 2, 2, 2, streak ? shine : rim[1]);
+      portraitRect((xl + 3) * 2, yy * 2, 2, 2, rim[2]);
+      portraitRect(xr * 2, yy * 2, 2, 2, rim[1]);
+      portraitRect((xr + 1) * 2, yy * 2, 2, 2, rim[0]);
+      portraitRect((xr + 2) * 2, yy * 2, 2, 2, rim[0]);
+      portraitRect((xr + 3) * 2, yy * 2, 2, 2, rimOut);
+    }
+  }
+  amigaCap(OY - S);
+  amigaCap(OY + CH * S);
+  labels(secs, flowing, c12(12, 14, 15), c12(13, 10, 5), c12(15, 13, 7));
+}
+
+// 2600: blocks of 8 (screen x) x 4 (screen y) pixels. Sand is merged to 2x2 cells (16 x 16 units), flat colors that
+// change per block row like a scanline colour register, no shading.
+static void atariGlass(uint32_t secs, bool flowing)
+{
+  const uint16_t band[3] = { rgb(252, 224, 140), rgb(236, 200, 120), rgb(212, 176, 96) };
+  const uint16_t stream = rgb(252, 244, 188), glass = rgb(236, 236, 236), wood = rgb(208, 128, 92);
+  vfd::clear(0);
+  const int c = S * 2;  // one sim cell in units; a column is 8 units wide, 8 long (two 8x4 blocks)
+  portraitRect(0, OY * 2, 4, CH * c, wood);
+  portraitRect(PW * 2 - 4, OY * 2, 4, CH * c, wood);
+  for (int by = 0; by < CH / 2; by++)
+    for (int bx = 0; bx < (CW + 1) / 2; bx++) {
+      bool any = false, moved = false;
+      for (int k = 0; k < 4; k++) {
+        int x = bx * 2 + (k & 1), y = by * 2 + (k >> 1);
+        if (x < CW && grid[y][x]) {
+          any = true;
+          moved |= grid[y][x] & 0x80;
+        }
+      }
+      if (!any) continue;
+      for (int r = 0; r < 2; r++) {
+        int y = by * 2 + r;
+        // keep the block inside the glass, so the black outside stays black
+        int x0 = max(bx * 2, CW / 2 - half[y] - 1), x1 = min(bx * 2 + 1, CW / 2 + half[y] + 1);
+        if (x1 >= x0)
+          portraitRect(x0 * c, (OY + y * S) * 2, (x1 - x0 + 1) * c, c, moved ? stream : band[by % 3]);
+      }
+    }
+  for (int y = 0; y < CH; y++) {
+    int left = CW / 2 - half[y] - 1, right = CW / 2 + half[y] + 1;
+    portraitRect(left * c, (OY + y * S) * 2, c, c, glass);
+    portraitRect(right * c, (OY + y * S) * 2, c, c, glass);
+  }
+  portraitRect(0, (OY - S) * 2, PW * 2, c, wood);
+  portraitRect(0, (OY + CH * S) * 2, PW * 2, c, wood);
+  labels(secs, flowing, glass, band[2], band[0]);
+}
+
+// VFD keeps its dot sand; the glass is dim dots with a halo in the gaps of the 4x4 slots.
+static void vfdGlass()
+{
+  auto dot = [](int x, int y) {
+    for (int dy = 0; dy < S; dy++)
+      for (int dx = -1; dx < S; dx++)
+        if (dx >= 0 && dx < S - 1 && dy < S - 1) pset(x + dx, y + dy, C2, true);
+        else pset(x + dx, y + dy, C1, true);
+  };
+  for (int y = 0; y < CH; y++) {
+    dot(OX + (CW / 2 - half[y] - 1) * S, OY + y * S);
+    dot(OX + (CW / 2 + half[y] + 1) * S, OY + y * S);
+  }
+  for (int x = 0; x < CW; x++) {
+    dot(OX + x * S, OY - S);
+    dot(OX + x * S, OY + CH * S);
+  }
+  for (int y = 0; y < CH; y++)
+    for (int k = 0; k < S - 1; k++) {
+      pset(0, OY + y * S + k, C2, true);
+      pset(PW - 1, OY + y * S + k, C2, true);
+    }
 }
 
 void Hourglass_Draw(const char *)
@@ -226,12 +382,15 @@ void Hourglass_Draw(const char *)
   }
 
   uint32_t secs = total ? (uint32_t)(up * DURATIONS[dur_idx] * 60.0f / total + 0.5f) : 0;
-  if (theme::current() != theme::VFD) {
-    machineGlass(secs, flowing);
-    return;
+  switch (theme::current()) {
+    case theme::C64: c64Glass(secs, flowing); return;
+    case theme::AMIGA: amigaGlass(secs, flowing); return;
+    case theme::ATARI: atariGlass(secs, flowing); return;
+    default: break;
   }
 
   clear(NIGHT);
+  vfdGlass();
   for (int y = 0; y < CH; y++)
     for (int x = 0; x < CW; x++) {
       uint8_t g = grid[y][x];

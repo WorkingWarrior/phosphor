@@ -21,5 +21,21 @@ void RetroScene_Stir(float strength);  // 0..1, a tap or a shake: whirls the sno
 // Shares the scene background cache; false asks the clock to use its plain layout.
 bool RetroWorld_Draw();
 
+// Px pixels per block of the current scene's picture (1 Amiga, 2 C64, 4 2600): actors that must sit on the machine's
+// grid snap to it (blocks are this wide and half as tall, at least 1).
+int RetroScene_Block();
+
 // Named app backdrop, sharing the single decoded PSRAM picture.
 bool RetroPicture_Draw(const char *name);
+
+// A small picture on its own (a ship, a figure) decoded into its own PSRAM buffer, so it can be drawn in the same frame
+// as a backdrop. Pixels are palette indices, row by row; sx x sy screen pixels each. keyed = index 0 is transparent.
+// Cached by name (a few at a time); nullptr when the asset pack or the sprite is missing.
+struct RetroSprite {
+  uint16_t w, h;
+  uint8_t sx, sy;
+  bool keyed;
+  const uint16_t *pal;  // RGB565
+  const uint8_t *idx;
+};
+const RetroSprite *RetroSprite_Get(const char *name);

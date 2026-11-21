@@ -3,6 +3,8 @@
 #include "Wave.h"
 #include "Motion.h"
 #include "Px.h"
+#include "RetroScene.h"
+#include "Theme.h"
 #include "Vfd.h"
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -43,7 +45,7 @@ static Bub bubs[NB];
 
 static float frand() { return (esp_random() & 0xffff) / 65535.0f; }
 static inline int cl255(int v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
-static inline uint16_t pack565(int r, int g, int b) { return (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)); }
+static constexpr uint16_t pack565(int r, int g, int b) { return (uint16_t)(((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)); }
 
 static float surf(float x)
 {
@@ -311,6 +313,7 @@ static void buildPixelShip()
 
 static uint8_t wR[FH], wG[FH], wB[FH];   // liquid color by depth below the surface
 static uint8_t fadeD[FH];                // light shaft strength by depth
+static uint8_t depthQ[FH];               // depth below the surface in 1/16 shade, 0..127, for the machine renderers
 static uint8_t oR[FH], oG[FH], oB[FH];   // oil color by row
 static uint8_t eAdd[FW];                 // box edge reflections in the oil
 static uint8_t glare[FW + FH / 3 + 8];   // diagonal glass glare, indexed by x + y/3
@@ -334,6 +337,7 @@ static void buildTables()
     wG[d] = (uint8_t)(stops[k][2] + (stops[k + 1][2] - stops[k][2]) * t);
     wB[d] = (uint8_t)(stops[k][3] + (stops[k + 1][3] - stops[k][3]) * t);
     fadeD[d] = (uint8_t)(255.0f * expf(-d / 55.0f));
+    depthQ[d] = (uint8_t)min(127.0f, sqrtf((float)d) * 14.0f);
   }
   // oil: nearly black, a hint of blue, a touch lighter toward the liquid
   for (int y = 0; y < FH; y++) {
@@ -616,6 +620,191 @@ static void drawPixels(const char *corner_text)
   }
 }
 
+
+// ---------------------------------------------------------------------------------------------------------------
+// Machine render (C64, Amiga, 2600): the night sky picture, the water on the machine's grid, the liner as a sprite
+// ---------------------------------------------------------------------------------------------------------------
+
+namespace {
+
+enum Mach { M_C64, M_AMIGA, M_ATARI };
+struct MachLook {
+  const char *sky, *ship;
+  int gw, gh;       // machine pixel in screen px
+  float pivot_row;  // sprite row of the hull bottom edge that sits on the water; the rows below it are hidden
+};
+// Pivots measured on the sprites (assets/art/ship_<m>.img): where the lit hull ends and the black underwater strip begins.
+const MachLook LOOKS[] = {
+  { "sky_night_c64", "ship_c64", 4, 2, 39 },
+  { "sky_night_amiga", "ship_amiga", 2, 2, 32 },
+  { "sky_night_atari", "ship_atari", 8, 4, 34 },
+};
+
+constexpr uint16_t c12(int r, int g, int b) { return pack565(r * 17, g * 17, b * 17); }
+constexpr uint16_t WHITE = pack565(255, 255, 255);
+// C64 (Pepto) and 2600 (Stella NTSC) colors
+constexpr uint16_t C_BLACK = 0, C_BLUE = pack565(53, 40, 121), C_LBLUE = pack565(108, 94, 181),
+                   C_CYAN = pack565(112, 164, 178), C_YELLOW = pack565(184, 199, 111);
+constexpr uint16_t A_WATER[4] = { pack565(0x7c, 0x9c, 0xdc), pack565(0x50, 0x70, 0xbc), pack565(0x38, 0x54, 0xa8),
+                                  pack565(0x1c, 0x38, 0x90) };
+constexpr uint16_t A_WHITE = pack565(0xec, 0xec, 0xec), A_GLINT = pack565(0xfc, 0xe0, 0x8c);
+// Amiga: 12-bit blue-greens from the surface down, light foam steps and the moon's glitter
+constexpr uint16_t AM_WATER[8] = { c12(3, 9, 12), c12(2, 7, 11), c12(2, 6, 10), c12(1, 5, 9),
+                                   c12(1, 4, 8),  c12(0, 3, 7),  c12(0, 2, 5),  c12(0, 1, 4) };
+constexpr uint16_t AM_FOAM0 = c12(15, 15, 15), AM_FOAM1 = c12(11, 15, 15), AM_FOAM2 = c12(6, 13, 15),
+                   AM_GLINT = c12(15, 15, 11);
+
+// Screen pixels of a cell row start nearest to the surface at screen y s.
+inline int snapRow(float s, int gh) { return (int)(s / gh + 0.5f) * gh; }
+
+inline void cellFill(int x, int y, int w, int h, uint16_t c)
+{
+  if ((unsigned)(y + h - 1) >= (unsigned)FH || (unsigned)(x + w - 1) >= (unsigned)FW) return;
+  for (int j = 0; j < h; j++) {
+    uint16_t *p = cv + (y + j) * FW + x;
+    for (int i = 0; i < w; i++) p[i] = c;
+  }
+}
+
+uint16_t waterCell(int m, int cx, int cy, int d, int th, int shaftA)
+{
+  int v = depthQ[d];
+  bool chk = (cx + cy) & 1;
+  if (m == M_AMIGA) {
+    if (d < th) {  // foam band, dithered into the water
+      int fr = (th - d) * 16 / th + BAYER[((cy & 3) << 2) | (cx & 3)] - 8;
+      if (d == 0 || fr >= 11) return AM_FOAM0;
+      if (fr >= 6) return AM_FOAM1;
+      if (fr >= 3) return AM_FOAM2;
+    }
+    v = max(0, v - (shaftA >> 1));
+    return AM_WATER[min(7, (v + BAYER[((cy & 3) << 2) | (cx & 3)]) >> 4)];
+  }
+  if (m == M_C64) {
+    if (d < th) {
+      int fr = (th - d) * 16 / th;
+      if (d == 0 || fr >= 9 || (fr >= 4 && chk)) return WHITE;
+      if (fr >= 2 && !chk) return C_CYAN;
+    }
+    int band = v >> 5, fr = v & 31;
+    if (fr >= 22 || (fr >= 11 && chk)) band++;
+    if (shaftA > 18 && d > 3 && d < 50 && chk) band--;
+    band = constrain(band, 0, 3);
+    static const uint16_t BAND[3] = { C_CYAN, C_LBLUE, C_BLUE };
+    return band < 3 ? BAND[band] : (chk ? C_BLUE : C_BLACK);
+  }
+  if (d < 4) return A_WHITE;  // the first block row is foam
+  if (d < th && th >= 6 && d < 8 && ((cx * 7 + cy * 3) & 1)) return A_WHITE;
+  return A_WATER[min(3, v >> 5)];
+}
+
+void drawMachineWater(int m)
+{
+  const MachLook &lk = LOOKS[m];
+  for (int cx = 0; cx < FW / lk.gw; cx++) {
+    int x0 = cx * lk.gw, xs = x0 + lk.gw / 2;
+    int sp = snapRow(sy[xs], lk.gh), th = thick[xs];
+    for (int y0 = sp; y0 < FH; y0 += lk.gh) {
+      int d = y0 - sp;
+      int a = m == M_ATARI ? 0 : (shaft[x0 + y0 * 2 / 5] * fadeD[d]) >> 8;
+      cellFill(x0, y0, lk.gw, lk.gh, waterCell(m, cx, y0 / lk.gh, d, th, a));
+    }
+  }
+}
+
+// Short bright dashes flickering on the surface under the moon (x about 448 on the night skies).
+void drawMoonGlints(int m)
+{
+  const MachLook &lk = LOOKS[m];
+  const uint16_t c0 = m == M_AMIGA ? AM_GLINT : (m == M_C64 ? WHITE : A_WHITE),
+                 c1 = m == M_AMIGA ? AM_FOAM1 : (m == M_C64 ? C_YELLOW : A_GLINT);
+  for (int i = 0; i < 22; i++) {
+    uint32_t h = (uint32_t)(i * 977 + (frame_no / 4) * 131) * 2654435761u;
+    h ^= h >> 15;
+    if (h % 5 >= 2) continue;
+    int x = 380 + (h >> 3) % 141;
+    if (abs(x - 450) > 45 && ((h >> 20) & 1)) continue;  // thinner toward the edges of the glitter
+    int cx = x / lk.gw, sp = snapRow(sy[constrain(x, 0, FW - 1)], lk.gh);
+    int y = sp + lk.gh * (1 + (int)((h >> 12) % 5)), wc = 1 + (h >> 18) % 3;
+    for (int k = 0; k < wc; k++) cellFill((cx + k) * lk.gw, y, lk.gw, lk.gh, (h >> 25) & 1 ? c0 : c1);
+  }
+}
+
+void drawMachineShip(int m, const RetroSprite *sp)
+{
+  const MachLook &lk = LOOKS[m];
+  float c = cosf(ship_ang), s = sinf(ship_ang);
+  float hw = sp->w * sp->sx * 0.5f, hh = sp->h * sp->sy;
+  int rx = (int)ceilf(fabsf(c) * hw + fabsf(s) * hh) + lk.gw, ry = (int)ceilf(fabsf(s) * hw + fabsf(c) * hh) + lk.gh;
+  int cx0 = max(0, (int)(ship_x - rx) / lk.gw), cx1 = min(FW / lk.gw - 1, (int)(ship_x + rx) / lk.gw);
+  int cy0 = max(0, (int)(ship_y - ry) / lk.gh), cy1 = min(FH / lk.gh - 1, (int)(ship_y + ry) / lk.gh);
+  float isx = 1.0f / sp->sx, isy = 1.0f / sp->sy;
+  for (int cy = cy0; cy <= cy1; cy++) {
+    float dy = cy * lk.gh + lk.gh * 0.5f - ship_y;
+    for (int cx = cx0; cx <= cx1; cx++) {
+      float dx = cx * lk.gw + lk.gw * 0.5f - ship_x;
+      // rotate in screen pixels, then into the sprite's own (maybe non-square) pixels
+      int u = (int)floorf((dx * c + dy * s) * isx + sp->w * 0.5f);
+      int v = (int)floorf((-dx * s + dy * c) * isy + lk.pivot_row);
+      if ((unsigned)u >= sp->w || (unsigned)v >= sp->h) continue;
+      uint8_t i = sp->idx[v * sp->w + u];
+      if (sp->keyed && !i) continue;
+      int x = cx * lk.gw, y = cy * lk.gh;
+      if (y >= snapRow(sy[x + lk.gw / 2], lk.gh) + 2) continue;  // under the water line
+      cellFill(x, y, lk.gw, lk.gh, sp->pal[i]);
+    }
+  }
+}
+
+void drawMachineParticles(int m, bool foamPass)
+{
+  const MachLook &lk = LOOKS[m];
+  if (foamPass) {
+    for (int i = 0; i < NF; i++) {
+      const Foam &f = foam[i];
+      if (f.r < 2 && m != M_AMIGA) continue;
+      int xi = constrain((int)f.x, 0, FW - 1);
+      cellFill((int)f.x / lk.gw * lk.gw, (int)(sy[xi] + f.off) / lk.gh * lk.gh, lk.gw, lk.gh,
+               m == M_AMIGA ? (f.r >= 2 ? AM_FOAM0 : AM_FOAM1) : (m == M_C64 ? WHITE : A_WHITE));
+    }
+    return;
+  }
+  for (int i = 0; i < NB; i++) {
+    const Bub &b = bubs[i];
+    int xi = constrain((int)b.x, 0, FW - 1);
+    if (b.y < sy[xi] + 5 || (m == M_ATARI && b.r < 2)) continue;
+    uint16_t col = m == M_AMIGA ? AM_FOAM2 : (m == M_C64 ? (b.r >= 2 ? WHITE : C_CYAN) : A_WHITE);
+    int gx = (int)b.x / lk.gw * lk.gw, gy = (int)b.y / lk.gh * lk.gh;
+    cellFill(gx, gy, lk.gw, lk.gh, col);
+    if (b.r >= 3 && m != M_ATARI) cellFill(gx + lk.gw, gy, lk.gw, lk.gh, col);
+  }
+}
+
+}  // namespace
+
+// false = the asset pack lacks this theme's sky or ship: the caller draws the plain pixel version.
+static bool drawMachine(const char *corner_text, int m)
+{
+  const MachLook &lk = LOOKS[m];
+  const RetroSprite *sp = RetroSprite_Get(lk.ship);
+  if (!sp || !RetroPicture_Draw(lk.sky)) return false;
+  cv = vfd::canvas();
+  buildShafts();
+  drawMachineWater(m);
+  drawMoonGlints(m);
+  drawMachineParticles(m, false);
+  drawMachineShip(m, sp);
+  drawMachineParticles(m, true);
+  if (corner_text && *corner_text) {  // the sky is busy: black outline, one font pixel wide
+    int w = vfd::textWidth(corner_text, 2), x = vfd::W - 12 - w;
+    for (int dy = -2; dy <= 2; dy += 2)
+      for (int dx = -2; dx <= 2; dx += 2)
+        if (dx || dy) vfd::text(corner_text, x + dx, 6 + dy, 2, vfd::Ink{ 0 });
+    vfd::text(corner_text, x, 6, 2, vfd::LIT_INK);
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 
 static void waveInit()
@@ -701,9 +890,10 @@ void Wave_Draw(const char *corner_text)
   buildSurface();
   updateShip();
   updateParticles();
+  theme::Id id = theme::current();
   if (px::theme() == px::Theme::Natural) {
     drawReal(corner_text);
-  } else {
+  } else if (id == theme::VFD || !drawMachine(corner_text, id == theme::C64 ? M_C64 : (id == theme::AMIGA ? M_AMIGA : M_ATARI))) {
     drawPixels(corner_text);
   }
 }
