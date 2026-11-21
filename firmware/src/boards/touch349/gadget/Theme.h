@@ -9,7 +9,7 @@
 
 namespace theme {
 
-enum Id : uint8_t { VFD, CGA, EGA, C64, AMIGA, COUNT };
+enum Id : uint8_t { VFD, CGA, EGA, C64, AMIGA, ATARI, LCD, COUNT };
 
 struct Palette {
   uint16_t bg, ghost, faint, halo, lit, dim, hot, hoth, kelp;

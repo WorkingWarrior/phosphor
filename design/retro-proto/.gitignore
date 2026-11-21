@@ -1,0 +1,6 @@
+gen/*.log
+gen/amiga.png
+gen/c64.png
+gen/atari.png
+gen/lcd.png
+out/

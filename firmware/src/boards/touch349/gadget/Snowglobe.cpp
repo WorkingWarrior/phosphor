@@ -3,6 +3,7 @@
 #include "Snowglobe.h"
 #include "Motion.h"
 #include "Px.h"
+#include "RetroScene.h"
 #include "SettingsUi.h"
 #include "Vfd.h"
 
@@ -127,6 +128,7 @@ static void build()
 
 void Snowglobe_Stir(float strength)
 {
+  RetroScene_Stir(strength);
   if (globe) {
     globeStir(strength);
     return;
@@ -685,6 +687,7 @@ void Snowglobe_Draw(const char *corner_text)
     drawGlobe(corner_text);
     return;
   }
+  if (RetroScene_Snow(corner_text)) return;  // the theme has its own art for this scene
   if (!scene) build();
   t_scene = scene;
   t_solid = solid;

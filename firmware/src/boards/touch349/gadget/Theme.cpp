@@ -32,6 +32,15 @@ static const Def DEFS[COUNT] = {
     { rgb(0, 85, 170), rgb(0, 68, 136), rgb(0, 68, 136), rgb(255, 255, 255), rgb(255, 255, 255), rgb(0, 0, 34),
       rgb(255, 136, 0), rgb(255, 136, 0), rgb(255, 136, 0) },
     FLAT, px::Theme::Amiga, 0, 0 },
+  // prototypes (design/retro-proto): only the snow cabin has its own art so far
+  { "atari", "2600-STYLE",
+    { rgb(0, 0, 0), rgb(24, 26, 80), rgb(24, 26, 80), rgb(236, 236, 236), rgb(236, 236, 236), rgb(160, 160, 200),
+      rgb(252, 188, 116), rgb(252, 188, 116), rgb(92, 186, 92) },
+    FLAT, px::Theme::Ega, 0, 0 },
+  { "lcd", "LCD-STYLE",
+    { rgb(178, 186, 168), rgb(166, 174, 156), rgb(166, 174, 156), rgb(178, 186, 168), rgb(34, 38, 36), rgb(80, 86, 80),
+      rgb(150, 56, 40), rgb(150, 56, 40), rgb(60, 90, 60) },
+    { &vfd::VFD_FONT, true, false, false }, px::Theme::Natural, 0, 0 },
 };
 
 static Preferences prefs;
