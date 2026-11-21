@@ -572,6 +572,7 @@ void Touch349Board::trackGesture(bool down, int x, int y, uint32_t now_ms)
     touch_y0_ = touch_y_ = y;
     touch_down_ms_ = now_ms;
     long_sent_ = false;
+    down_used_ = Gadget_TouchDown(x, y);
   } else if (down) {
     touch_x_ = x;
     touch_y_ = y;
@@ -582,8 +583,8 @@ void Touch349Board::trackGesture(bool down, int x, int y, uint32_t now_ms)
     }
   } else if (touching_) {
     int dx = touch_x_ - touch_x0_, dy = touch_y_ - touch_y0_;
-    if (long_sent_) {
-      // already acted
+    if (long_sent_ || down_used_) {
+      // already acted (the hold, or the app at touch-down)
     } else if (abs(dx) >= SWIPE_MIN_PX && abs(dx) > abs(dy) * 6 / 5) {
       Gadget_Gesture(dx < 0 ? Gesture::SwipeLeft : Gesture::SwipeRight, touch_x0_, touch_y0_);
     } else if (abs(dy) >= VSWIPE_MIN_PX && abs(dy) > abs(dx)) {

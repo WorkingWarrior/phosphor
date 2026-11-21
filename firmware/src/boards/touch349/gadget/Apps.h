@@ -23,6 +23,10 @@ struct App {
   bool (*gesture)(Gesture g, int x, int y);
   void (*tick)();           // every loop while open (motion, timers)
   uint32_t (*frame_ms)();   // redraw period, null or 0 = every 50 ms
+  // Games only (null = off): act on a finger touching down, not on its release (true = used, then the touch makes no tap or
+  // swipe); and, while it returns true, a left/right swipe is swallowed instead of closing the app.
+  bool (*touch_down)(int x, int y);
+  bool (*swipes_locked)();
 };
 
 // Menu pages: Mode::Tools or Mode::Play.
@@ -37,6 +41,7 @@ bool Apps_FullScreen();
 void Apps_Draw(const DateTime &now);
 // Gesture while Mode::App; true = used (a left/right swipe closes the app).
 bool Apps_Gesture(Gesture g, int x, int y);
+bool Apps_TouchDown(int x, int y);  // see App::touch_down
 void Apps_Tick();
 uint32_t Apps_FrameMs();
 const char *Apps_Key();  // key of the open app, "" if none
