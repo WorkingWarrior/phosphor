@@ -33,6 +33,7 @@ void RadioFaces_Border();
 void WeatherFaces_Draw(const WeatherFace &face);
 void MachineLabel(const String &s, int x, int y, uint16_t color, bool shadow = false);
 void MachinePanel(int x, int y, int w, int h);
+void MachineShade(int x, int y, int w, int h);
 void MachineTemperature(const String &s, int x, int y, bool amiga, bool atari);
 
 void MachineReading(const String &s, int x, int y, int w, uint16_t color, bool scroll = true, bool outline = false);

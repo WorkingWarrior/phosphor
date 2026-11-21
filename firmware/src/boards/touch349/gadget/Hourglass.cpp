@@ -172,6 +172,16 @@ static uint32_t hsh(int x, int y)
 
 static bool sandAt(int x, int y) { return y >= 0 && y < CH && x >= 0 && x < CW && grid[y][x]; }
 
+// The glass closes each bulb at its own width (no caps or posts around it): cells from the left to the right outline
+// column on the row just beyond either end.
+static void glassEnds(void (*cell)(int x, int y, bool top))
+{
+  for (int end = 0; end < 2; end++) {
+    int h = half[end ? CH - 1 : 0];
+    for (int x = CW / 2 - h - 1; x <= CW / 2 + h + 1; x++) cell(x, end ? CH : -1, !end);
+  }
+}
+
 static void labels(uint32_t secs, bool flowing, uint16_t flow, uint16_t idle, uint16_t duration)
 {
   char label[12];
@@ -181,22 +191,17 @@ static void labels(uint32_t secs, bool flowing, uint16_t flow, uint16_t idle, ui
   portraitText(label, PH * 2 - 20, duration);
 }
 
-// C64: 4x2 pixels, a cell is one 8x8 block of portrait units, flat glass outline, caps and posts in light red.
+// C64: 4x2 pixels, a cell is one 8x8 block of portrait units, flat glass outline.
 static void c64Glass(uint32_t secs, bool flowing)
 {
-  const uint16_t light = rgb(184, 199, 111), dark = rgb(111, 79, 37), glass = rgb(149, 149, 149),
-                 wood = rgb(154, 103, 89);
+  const uint16_t light = rgb(184, 199, 111), dark = rgb(111, 79, 37), glass = rgb(149, 149, 149);
   vfd::clear(0);
   for (int y = 0; y < CH; y++) {
     int left = CW / 2 - half[y] - 1, right = CW / 2 + half[y] + 1;
     portraitRect((OX + left * S) * 2, (OY + y * S) * 2, S * 2, S * 2, glass);
     portraitRect((OX + right * S) * 2, (OY + y * S) * 2, S * 2, S * 2, glass);
   }
-  // Caps and posts sit outside the cells, so the simulation remains untouched.
-  portraitRect(0, (OY - S) * 2, PW * 2, S * 2, wood);
-  portraitRect(0, (OY + CH * S) * 2, PW * 2, S * 2, wood);
-  portraitRect(0, OY * 2, 2, CH * S * 2, wood);
-  portraitRect(PW * 2 - 2, OY * 2, 2, CH * S * 2, wood);
+  glassEnds([](int x, int y, bool) { portraitRect((OX + x * S) * 2, (OY + y * S) * 2, S * 2, S * 2, rgb(149, 149, 149)); });
   for (int y = 0; y < CH; y++)
     for (int x = 0; x < CW; x++) {
       uint8_t g = grid[y][x];
@@ -206,38 +211,15 @@ static void c64Glass(uint32_t secs, bool flowing)
   labels(secs, flowing, glass, dark, light);
 }
 
-// Amiga: 2x2 pixels, so one portrait pixel is one machine pixel; the showpiece with shaded sand, a glossy glass
-// rim, wooden caps and brass posts.
-static void amigaCap(int y0)
-{
-  const uint16_t tone[4] = { c12(14, 10, 5), c12(11, 7, 3), c12(9, 5, 2), c12(4, 2, 1) };
-  for (int c = 0; c < PW; c++)
-    for (int r = 0; r < S; r++) {
-      uint16_t col = tone[r];
-      if ((r == 1 || r == 2) && (hsh(c / 5, r + y0) & 3) == 0) col = tone[r + 1];  // grain dashes
-      if (c < 2) col = tone[max(0, r - 1)];                                        // bevelled ends
-      else if (c >= PW - 2) col = tone[min(3, r + 1)];
-      portraitRect(c * 2, (y0 + r) * 2, 2, 2, col);
-    }
-}
-
+// Amiga: 2x2 pixels, so one portrait pixel is one machine pixel; the showpiece with shaded sand and a glossy glass
+// rim.
 static void amigaGlass(uint32_t secs, bool flowing)
 {
   const uint16_t sand[4] = { c12(15, 13, 7), c12(13, 10, 5), c12(10, 7, 3), c12(11, 8, 4) };  // lit, body, edge, grain
   const uint16_t stream = c12(15, 14, 9), streamGrain = c12(13, 12, 6);
   const uint16_t rimOut = c12(4, 6, 8), rim[3] = { c12(6, 8, 11), c12(9, 11, 14), c12(11, 13, 15) };
   const uint16_t tint1 = c12(1, 3, 6), tint2 = c12(0, 1, 3), shine = c12(15, 15, 15);
-  const uint16_t brassDark = c12(9, 6, 2), brassLight = c12(15, 13, 6);
   vfd::clear(0);
-
-  // brass posts first: the glass rim overlaps them where the bulbs are widest
-  for (int y = OY; y < OY + CH * S; y++) {
-    uint16_t hi = (y / 24) & 1 ? c12(13, 10, 4) : brassLight;
-    portraitRect(0, y * 2, 2, 2, brassDark);
-    portraitRect(2, y * 2, 2, 2, hi);
-    portraitRect((PW - 2) * 2, y * 2, 2, 2, hi);
-    portraitRect((PW - 1) * 2, y * 2, 2, 2, brassDark);
-  }
   for (int y = 0; y < CH; y++) {
     int xl = OX + (CW / 2 - half[y]) * S, xr = OX + (CW / 2 + half[y] + 1) * S;
     for (int r = 0; r < S; r++) {
@@ -286,8 +268,12 @@ static void amigaGlass(uint32_t secs, bool flowing)
       portraitRect((xr + 3) * 2, yy * 2, 2, 2, rimOut);
     }
   }
-  amigaCap(OY - S);
-  amigaCap(OY + CH * S);
+  // the ends in the same rim shades, outermost row darkest
+  glassEnds([](int x, int y, bool top) {
+    const uint16_t shade[4] = { c12(4, 6, 8), c12(6, 8, 11), c12(9, 11, 14), c12(11, 13, 15) };
+    for (int r = 0; r < S; r++)
+      portraitRect((OX + x * S) * 2, (OY + y * S + r) * 2, S * 2, 2, shade[top ? r : S - 1 - r]);
+  });
   labels(secs, flowing, c12(12, 14, 15), c12(13, 10, 5), c12(15, 13, 7));
 }
 
@@ -296,11 +282,9 @@ static void amigaGlass(uint32_t secs, bool flowing)
 static void atariGlass(uint32_t secs, bool flowing)
 {
   const uint16_t band[3] = { rgb(252, 224, 140), rgb(236, 200, 120), rgb(212, 176, 96) };
-  const uint16_t stream = rgb(252, 244, 188), glass = rgb(236, 236, 236), wood = rgb(208, 128, 92);
+  const uint16_t stream = rgb(252, 244, 188), glass = rgb(236, 236, 236);
   vfd::clear(0);
   const int c = S * 2;  // one sim cell in units; a column is 8 units wide, 8 long (two 8x4 blocks)
-  portraitRect(0, OY * 2, 4, CH * c, wood);
-  portraitRect(PW * 2 - 4, OY * 2, 4, CH * c, wood);
   for (int by = 0; by < CH / 2; by++)
     for (int bx = 0; bx < (CW + 1) / 2; bx++) {
       bool any = false, moved = false;
@@ -325,33 +309,26 @@ static void atariGlass(uint32_t secs, bool flowing)
     portraitRect(left * c, (OY + y * S) * 2, c, c, glass);
     portraitRect(right * c, (OY + y * S) * 2, c, c, glass);
   }
-  portraitRect(0, (OY - S) * 2, PW * 2, c, wood);
-  portraitRect(0, (OY + CH * S) * 2, PW * 2, c, wood);
+  glassEnds([](int x, int y, bool) { portraitRect(x * S * 2, (OY + y * S) * 2, S * 2, S * 2, rgb(236, 236, 236)); });
   labels(secs, flowing, glass, band[2], band[0]);
 }
 
 // VFD keeps its dot sand; the glass is dim dots with a halo in the gaps of the 4x4 slots.
+static void vfdDot(int x, int y)
+{
+  for (int dy = 0; dy < S; dy++)
+    for (int dx = -1; dx < S; dx++)
+      if (dx >= 0 && dx < S - 1 && dy < S - 1) pset(x + dx, y + dy, C2, true);
+      else pset(x + dx, y + dy, C1, true);
+}
+
 static void vfdGlass()
 {
-  auto dot = [](int x, int y) {
-    for (int dy = 0; dy < S; dy++)
-      for (int dx = -1; dx < S; dx++)
-        if (dx >= 0 && dx < S - 1 && dy < S - 1) pset(x + dx, y + dy, C2, true);
-        else pset(x + dx, y + dy, C1, true);
-  };
   for (int y = 0; y < CH; y++) {
-    dot(OX + (CW / 2 - half[y] - 1) * S, OY + y * S);
-    dot(OX + (CW / 2 + half[y] + 1) * S, OY + y * S);
+    vfdDot(OX + (CW / 2 - half[y] - 1) * S, OY + y * S);
+    vfdDot(OX + (CW / 2 + half[y] + 1) * S, OY + y * S);
   }
-  for (int x = 0; x < CW; x++) {
-    dot(OX + x * S, OY - S);
-    dot(OX + x * S, OY + CH * S);
-  }
-  for (int y = 0; y < CH; y++)
-    for (int k = 0; k < S - 1; k++) {
-      pset(0, OY + y * S + k, C2, true);
-      pset(PW - 1, OY + y * S + k, C2, true);
-    }
+  glassEnds([](int x, int y, bool) { vfdDot(OX + x * S, OY + y * S); });
 }
 
 void Hourglass_Draw(const char *)

@@ -2,6 +2,7 @@
 # then writes a preview PNG (640x172, as on the bar) and an .img blob for the firmware's asset pack.
 #
 #   amiga  320x86, 2x2 px, 32 colors snapped to 12-bit (4096), ordered dither
+#   amiga_stars  amiga, and the slots a smooth night sky leaves free after the 12-bit snap go to its stars
 #   c64    160x86, 4x2 px (double-wide multicolor), the 16 C64 colors, checker dither, and per 4x8 cell only the
 #          shared background plus 3 colors, like multicolor character mode
 #   atari  160x86, 4x2 px, Atari 2600 NTSC colors, no dither, at most 4 colors on each line (COLUBK, COLUPF, COLUP0, COLUP1)
@@ -135,12 +136,20 @@ def with_accents(img, n, k):
 
 
 def convert(machine, path):
-    if machine == 'amiga':
+    if machine in ('amiga', 'amiga_stars'):
         w, h, sx, sy = 320, 86, 2, 2
         img = load(path, w, h)
         pal = with_accents(img, 32, 6)
         pal = np.round(pal / 17) * 17  # 12-bit: 16 levels a channel
         pal = np.unique(pal, axis=0)
+        # a smooth sky collapses to a few 12-bit steps: the freed slots go to the brightest pixels (stars), which median
+        # cut would otherwise average into the sky
+        flat = img.reshape(-1, 3)
+        lum = flat.sum(1)
+        hi = flat[lum > max(450, np.percentile(lum, 99.5))]
+        if machine == 'amiga_stars' and len(pal) < 32 and len(hi) >= 4:
+            extra = np.round(median_cut(hi.reshape(1, -1, 3), min(8, 32 - len(pal))) / 17) * 17
+            pal = np.unique(np.vstack([pal, extra]), axis=0)
         spread = 26
         b = bayer(4)
         img2 = img + b[np.arange(h)[:, None] % 4, np.arange(w)[None, :] % 4][:, :, None] * spread

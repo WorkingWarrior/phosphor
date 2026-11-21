@@ -635,24 +635,23 @@ struct MachLook {
 };
 // Pivots measured on the sprites (assets/art/ship_<m>.img): where the lit hull ends and the black underwater strip begins.
 const MachLook LOOKS[] = {
-  { "sky_night_c64", "ship_c64", 4, 2, 39 },
-  { "sky_night_amiga", "ship_amiga", 2, 2, 32 },
-  { "sky_night_atari", "ship_atari", 8, 4, 34 },
+  { "sky_stars_c64", "ship_c64", 4, 2, 39 },
+  { "sky_stars_amiga", "ship_amiga", 2, 2, 32 },
+  { "sky_stars_atari", "ship_atari", 8, 4, 34 },
 };
 
 constexpr uint16_t c12(int r, int g, int b) { return pack565(r * 17, g * 17, b * 17); }
 constexpr uint16_t WHITE = pack565(255, 255, 255);
 // C64 (Pepto) and 2600 (Stella NTSC) colors
 constexpr uint16_t C_BLACK = 0, C_BLUE = pack565(53, 40, 121), C_LBLUE = pack565(108, 94, 181),
-                   C_CYAN = pack565(112, 164, 178), C_YELLOW = pack565(184, 199, 111);
+                   C_CYAN = pack565(112, 164, 178);
 constexpr uint16_t A_WATER[4] = { pack565(0x7c, 0x9c, 0xdc), pack565(0x50, 0x70, 0xbc), pack565(0x38, 0x54, 0xa8),
                                   pack565(0x1c, 0x38, 0x90) };
-constexpr uint16_t A_WHITE = pack565(0xec, 0xec, 0xec), A_GLINT = pack565(0xfc, 0xe0, 0x8c);
-// Amiga: 12-bit blue-greens from the surface down, light foam steps and the moon's glitter
+constexpr uint16_t A_WHITE = pack565(0xec, 0xec, 0xec);
+// Amiga: 12-bit blue-greens from the surface down and light foam steps
 constexpr uint16_t AM_WATER[8] = { c12(3, 9, 12), c12(2, 7, 11), c12(2, 6, 10), c12(1, 5, 9),
                                    c12(1, 4, 8),  c12(0, 3, 7),  c12(0, 2, 5),  c12(0, 1, 4) };
-constexpr uint16_t AM_FOAM0 = c12(15, 15, 15), AM_FOAM1 = c12(11, 15, 15), AM_FOAM2 = c12(6, 13, 15),
-                   AM_GLINT = c12(15, 15, 11);
+constexpr uint16_t AM_FOAM0 = c12(15, 15, 15), AM_FOAM1 = c12(11, 15, 15), AM_FOAM2 = c12(6, 13, 15);
 
 // Screen pixels of a cell row start nearest to the surface at screen y s.
 inline int snapRow(float s, int gh) { return (int)(s / gh + 0.5f) * gh; }
@@ -709,24 +708,6 @@ void drawMachineWater(int m)
       int a = m == M_ATARI ? 0 : (shaft[x0 + y0 * 2 / 5] * fadeD[d]) >> 8;
       cellFill(x0, y0, lk.gw, lk.gh, waterCell(m, cx, y0 / lk.gh, d, th, a));
     }
-  }
-}
-
-// Short bright dashes flickering on the surface under the moon (x about 448 on the night skies).
-void drawMoonGlints(int m)
-{
-  const MachLook &lk = LOOKS[m];
-  const uint16_t c0 = m == M_AMIGA ? AM_GLINT : (m == M_C64 ? WHITE : A_WHITE),
-                 c1 = m == M_AMIGA ? AM_FOAM1 : (m == M_C64 ? C_YELLOW : A_GLINT);
-  for (int i = 0; i < 22; i++) {
-    uint32_t h = (uint32_t)(i * 977 + (frame_no / 4) * 131) * 2654435761u;
-    h ^= h >> 15;
-    if (h % 5 >= 2) continue;
-    int x = 380 + (h >> 3) % 141;
-    if (abs(x - 450) > 45 && ((h >> 20) & 1)) continue;  // thinner toward the edges of the glitter
-    int cx = x / lk.gw, sp = snapRow(sy[constrain(x, 0, FW - 1)], lk.gh);
-    int y = sp + lk.gh * (1 + (int)((h >> 12) % 5)), wc = 1 + (h >> 18) % 3;
-    for (int k = 0; k < wc; k++) cellFill((cx + k) * lk.gw, y, lk.gw, lk.gh, (h >> 25) & 1 ? c0 : c1);
   }
 }
 
@@ -791,7 +772,6 @@ static bool drawMachine(const char *corner_text, int m)
   cv = vfd::canvas();
   buildShafts();
   drawMachineWater(m);
-  drawMoonGlints(m);
   drawMachineParticles(m, false);
   drawMachineShip(m, sp);
   drawMachineParticles(m, true);

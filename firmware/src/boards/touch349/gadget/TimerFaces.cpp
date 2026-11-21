@@ -23,7 +23,7 @@ bool TimerFaces_Draw(const TimerFace &f)
   uint16_t dim = c64 ? rgb(149,149,149) : amiga ? rgb(153,153,170) : rgb(160,160,160);
   if (f.visible) MachineDigits_Draw(f.digits,20,12,70,100,12,f.done);
   Rocket_Draw(f.done,f.launch_ms);
-  if (atari) rect(466,0,174,118,0);
+  if (atari) MachineShade(466,0,174,118);
   // The title uses p3; longer state lines retain p2 and scroll inside the column.
   clip(468,12,640,46);
   if (!atari) {

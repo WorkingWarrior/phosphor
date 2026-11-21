@@ -15,10 +15,14 @@ sea_atari      atari    gen/seaside_atari_raw.png     0.00:1.00
 world_amiga    amiga        gen/world_amiga.png    0.03:0.98
 world_c64      c64_free     gen/world_c64.png     0.00:1.00  0
 world_atari    atari_vivid  gen/world_atari.png    -
-# app backdrops: sky-only weather in 8 skies (also the wave's night sky), the timer launch field (rocket drawn by
-# code), radio (Amiga) and the study room
+# app backdrops: sky-only weather in 8 skies, the wave's starry sky, the timer launch field (rocket drawn by code),
+# radio (Amiga) and the study room
+# sky_stars_<m> source: gen/sky_night_<m>.png with the moon painted out (C64/2600: the sky beside it copied over;
+# Amiga: the clean left part mirrored, then repeated, since the glow fills the right half; stars redrawn one machine
+# pixel big so they survive the scale-down), saved as gen/sky_stars_<m>.png
 sky_clear_c64   c64_free     gen/sky_clear_c64.png        - 20
 sky_night_c64   c64_free     gen/sky_night_c64.png        - 20
+sky_stars_c64   c64_free     gen/sky_stars_c64.png        - 20
 sky_part_c64    c64_free     gen/sky_part_c64.png         - 20
 sky_partn_c64   c64_free     gen/sky_partn_c64.png        - 20
 # sky_cloud_c64 source: out/sky_rain_c64.png recolored (sky grey, clouds two steps lighter), saved as gen/sky_cloud_c64.png
@@ -28,9 +32,9 @@ sky_snow_c64    c64_cool     gen/sky_snow_c64.png         - 12
 sky_storm_c64   c64_free     gen/sky_storm_c64.png        - 20
 timer_c64       c64_free     gen/launch_c64.png           - 20
 study_c64       c64_free     gen/study_c64.png            0.22:0.723 20
-sand_c64        c64_free     gen/sand_c64.png             - 20
 sky_clear_amiga amiga        gen/sky_clear_amiga.png      -
 sky_night_amiga amiga        gen/sky_night_amiga.png      -
+sky_stars_amiga amiga_stars  gen/sky_stars_amiga.png      -
 sky_part_amiga  amiga        gen/sky_part_amiga.png       -
 sky_partn_amiga amiga        gen/sky_partn_amiga.png      -
 sky_cloud_amiga amiga        gen/sky_cloud_amiga.png      -
@@ -40,9 +44,9 @@ sky_storm_amiga amiga        gen/sky_storm_amiga.png      -
 radio_amiga     amiga        gen/radio_amiga.png          -
 timer_amiga     amiga        gen/launch_amiga.png         -
 study_amiga     amiga        gen/study_amiga.png          0.25:0.753
-sand_amiga      amiga        gen/sand_amiga.png           -
 sky_clear_atari atari_vivid  gen/sky_clear_atari.png      -
 sky_night_atari atari_vivid  gen/sky_night_atari.png      -
+sky_stars_atari atari_vivid  gen/sky_stars_atari.png      -
 sky_part_atari  atari_vivid  gen/sky_part_atari.png       -
 sky_partn_atari atari_vivid  gen/sky_partn_atari.png      -
 sky_cloud_atari atari_vivid  gen/sky_cloud_atari.png      -
@@ -51,7 +55,6 @@ sky_snow_atari  atari_vivid  gen/sky_snow_atari.png       -
 sky_storm_atari atari_vivid  gen/sky_storm_atari.png      -
 timer_atari     atari_vivid  gen/launch_atari.png         -
 study_atari     atari_free   gen/study_atari.png          0.22:0.723
-sand_atari      atari_vivid  gen/sand_atari.png           -
 # sprites: one object on flat magenta, keyed out; the crop column is the width in screen px
 ship_c64        sprite_c64   gen/shipsprite_c64.png       300
 ship_amiga      sprite_amiga gen/shipsprite_amiga.png     300

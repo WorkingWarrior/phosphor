@@ -150,7 +150,7 @@ void ClockFaces_Draw(const ClockFace &f)
     uint16_t dim = atari ? rgb(144, 144, 144) : rgb(153, 153, 170);
     uint16_t hot = atari ? rgb(252, 188, 148) : ORANGE;
     if (amiga) { bigTime(f.time); panel(402, 14, 230, 152); }
-    else { atariTime(f.time); rect(400, 0, 240, H, 0); }
+    else { atariTime(f.time); MachineShade(400, 0, 240, H); }
     clip(400, 14, 632, 166);
     label("AL", 412, 26, f.alarm_on ? hot : dim, amiga);
     label(f.period, 412, 48, dim, amiga);
@@ -204,6 +204,15 @@ void ClockFaces_Draw(const ClockFace &f)
 }
 void MachineLabel(const String &s, int x, int y, uint16_t color, bool shadow) { label(s, x, y, color, shadow); }
 void MachinePanel(int x, int y, int w, int h) { panel(x, y, w, h); }
+
+void MachineShade(int x0, int y0, int w, int h)
+{
+  // 3/8 of the picture: the 2600 column reads like a dark glass over the scene, still light enough to see through.
+  for (int y = y0; y < y0 + h; y++) for (int x = x0; x < x0 + w; x++) {
+    uint16_t &c = canvas()[y * W + x];
+    c = ((c >> 2) & 0x39E7) + ((c >> 3) & 0x18E3);
+  }
+}
 
 String MachineFit(const String &s, int cells)
 {
@@ -336,9 +345,6 @@ void RadioFaces_Draw(const RadioFaceData &f)
   if (amiga) {
     panel(8, 4, right + 6, 126);
     panel(422, 4, 210, 126);
-  } else if (atari) {
-    const uint16_t bands[] = { peach, rgb(224, 148, 112), rgb(208, 128, 92), rgb(176, 60, 60) };
-    for (int i = 0; i < 4; i++) rect(0, 28 + i * 2, W, 2, bands[i]);
   }
   clip(16, 4, right + 12, 130);
   label(f.channel, 16, 10, amiga ? ORANGE : dim, amiga);
