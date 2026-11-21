@@ -3,7 +3,7 @@
 #include "Apps.h"
 #include "../../../core/state.h"
 #include "Radio.h"
-#include "GamePoker.h"
+#include "GameBlackjack.h"
 #include "GameRunner.h"
 #include "Settings.h"
 #include "Theme.h"
@@ -17,7 +17,7 @@ static const App *const TOOLS[] = { &APP_LEVEL, &APP_COIN, &APP_BREATHE, &APP_SC
 // The Play page joins the ring once this lists a game.
 static const App *const PLAY[] = {
   &APP_FENER,
-  &APP_POKER,
+  &APP_BLACKJACK,
   &APP_RUNNER,
 };
 static constexpr int TOOLS_COUNT = sizeof(TOOLS) / sizeof(TOOLS[0]);
