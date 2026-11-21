@@ -128,6 +128,8 @@ void die()
   state.dirty = true;
 }
 
+
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Drawing
 // ---------------------------------------------------------------------------------------------------------------------
@@ -606,9 +608,9 @@ void panel(int y0, int y1)
     case theme::ATARI: fill = 0, edge = px::rgb(160, 160, 200); break;
     default: break;
   }
-  rect(142, y0, 356, y1 - y0, fill);
-  frame(142, y0, 356, y1 - y0, edge);
-  frame(143, y0 + 1, 354, y1 - y0 - 2, edge);
+  rect(110, y0, 420, y1 - y0, fill);
+  frame(110, y0, 420, y1 - y0, edge);
+  frame(111, y0 + 1, 418, y1 - y0 - 2, edge);
 }
 
 void centered(const char *s, int p, int yy, const Ink &ink) { text(s, (W - textWidth(s, p)) / 2, yy, p, ink); }
@@ -629,8 +631,8 @@ void runnerDraw(const DateTime &)
   if (rs == Rs::Ready) {
     panel(28, 138);
     centered(L("TAP TO RUN", "DOKUN: KOŞ"), 5, 40, lit);
-    centered(L("TOP: JUMP   HOLD: HIGHER", "ÜST: ZIPLA   BASILI: YÜKSEK"), 2, 86, hot);
-    centered(L("BOTTOM: DUCK   HOLD: STAY LOW", "ALT: EĞİL   BASILI: ALÇAK KAL"), 2, 108, hot);
+    centered(L("TOP: JUMP  HOLD: HIGHER", "ÜST: ZIPLA  BASILI: YÜKSEK"), 2, 86, hot);
+    centered(L("BOTTOM: DUCK  HOLD: LOW", "ALT: EĞİL  BASILI: ALÇAK"), 2, 108, hot);
   } else if (rs == Rs::Dead) {
     panel(24, 136);
     centered(L("GAME OVER", "OYUN BİTTİ"), 5, 36, hot);
