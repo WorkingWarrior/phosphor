@@ -5,13 +5,14 @@
 #include "Radio.h"
 #include "Settings.h"
 #include "Theme.h"
+#include "ToolApps.h"
 #include "Vfd.h"
 
 using namespace vfd;
 
-static const App *const TOOLS[] = { nullptr };  // the Tools apps join in the next commit
+static const App *const TOOLS[] = { &APP_LEVEL, &APP_COIN, &APP_BREATHE, &APP_SCORE, &APP_LAMP };
 static const App *const PLAY[] = { nullptr };  // no games yet; the Play page joins the ring when this lists one
-static constexpr int TOOLS_COUNT = 0;
+static constexpr int TOOLS_COUNT = sizeof(TOOLS) / sizeof(TOOLS[0]);
 static constexpr int PLAY_COUNT = 0;
 static constexpr int MAX_TILES = 6;
 
