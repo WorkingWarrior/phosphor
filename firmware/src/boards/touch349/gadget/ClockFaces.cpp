@@ -217,6 +217,34 @@ void ClockFaces_Draw(const ClockFace &f)
   }
   setStyle(saved);
 }
+void ClockFaces_Banner(const String &line)
+{
+  Style saved = style();
+  theme::Id t = theme::current();
+  if (t != theme::VFD) setStyle({ t == theme::ATARI ? &VFD_FONT : t == theme::AMIGA ? &AMIGA_FONT : &C64_FONT, false, false, false });
+  bool vfdFont = style().font == &VFD_FONT && t == theme::VFD;
+  int w = vfdFont ? textWidth(line.c_str(), 2) : MachineTextWidth(line), bw = min(W - 40, w + 40), bx = (W - bw) / 2, by = 128, bh = 32;
+  uint16_t ink;
+  noClip();
+  if (t == theme::VFD) {
+    rect(bx, by, bw, bh, BG);
+    frame(bx, by, bw, bh, DIM);
+    ink = LIT;
+  } else if (t == theme::AMIGA) {
+    panel(bx, by, bw, bh);
+    ink = WHITE;
+  } else if (t == theme::ATARI) {
+    rect(bx, by, bw, bh, 0);
+    frame(bx, by, bw, bh, rgb(144, 144, 144));
+    ink = rgb(236, 236, 236);
+  } else {
+    rect(bx, by, bw, bh, 0);
+    frame(bx, by, bw, bh, BASIC);
+    ink = BASIC_DIM;
+  }
+  label(line, bx + (bw - w) / 2, by + 9, ink, t == theme::AMIGA);
+  setStyle(saved);
+}
 void MachineLabel(const String &s, int x, int y, uint16_t color, bool shadow) { label(s, x, y, color, shadow); }
 void MachinePanel(int x, int y, int w, int h) { panel(x, y, w, h); }
 

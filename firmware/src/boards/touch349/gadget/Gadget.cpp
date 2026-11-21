@@ -73,6 +73,41 @@ static int fired_day = -1;
 static uint32_t volume_shown_ms = 0;
 #define VOLUME_SHOW_MS 1500
 
+// One-line banner over the bottom of the page: first-visit hints and prompts. Cleared when the page changes.
+static String banner;
+static uint32_t banner_until_ms = 0;
+static void showBanner(const char *en, const char *tr, uint32_t ms)
+{
+  banner = settings::tr() ? tr : en;
+  banner_until_ms = millis() + ms;
+  state.dirty = true;
+}
+static bool bannerOn() { return banner_until_ms && (int32_t)(banner_until_ms - millis()) > 0; }
+
+// First-visit hints: each page of the ring shows one line the first time it is entered, then never again. The seen
+// bits (index in PAGES) are kept in NVS ("hints"); POST /cmd name=hints arg=reset brings them all back.
+struct Hint {
+  Mode mode;
+  const char *en, *tr;  // same wording as the Settings > Help pages
+};
+static const Hint HINTS[] = {
+  { Mode::Clock, "TAP THE BELL: ALARM ON/OFF", "ZİLE DOKUN: ALARM AÇ/KAPA" },
+  { Mode::Radio, "TAP: PLAY / STOP", "DOKUN: ÇAL / DURDUR" },
+  { Mode::Weather, "SWIPE LEFT/RIGHT: NEXT PAGE", "SAĞA/SOLA KAYDIR: SAYFA" },
+  { Mode::Timer, "TAP: START / PAUSE", "DOKUN: BAŞLAT / DURAKLAT" },
+  { Mode::Study, "TAP: START / PAUSE", "DOKUN: BAŞLAT / DURAKLAT" },
+  { Mode::Hourglass, "HOURGLASS: TILT TO POUR", "KUM SAATİ: EĞ, KUM AKSIN" },
+  { Mode::Aquarium, "FISH TANK: TAP TO FEED", "AKVARYUM: DOKUN, YEM AT" },
+  { Mode::Snow, "SNOW: TAP OR SHAKE TO STIR", "KAR: DOKUN YA DA SALLA" },
+  { Mode::Fire, "FIREPLACE: TAP, CAT WAKES", "ŞÖMİNE: DOKUN, KEDİ UYANSIN" },
+  { Mode::Sea, "LIGHTHOUSE: TAP, BIG WAVE", "FENER: DOKUN, BÜYÜK DALGA" },
+  { Mode::Wave, "SHIP: TAP THE WATER", "GEMİ: SUYA DOKUN" },
+  { Mode::Lava, "LAVA LAMP: TAP, NEW COLORS", "LAV LAMBASI: DOKUN, YENİ RENK" },
+  { Mode::Settings, "SWIPE UP/DOWN: PICK AN ITEM", "YUKARI/AŞAĞI KAYDIR: SEÇ" },
+};
+static uint16_t hints_seen = 0;
+#define HINT_MS 3000
+
 // Countdown timer: minutes set with the buttons, counts down, rings (the interval programs come back later)
 enum class Phase { Idle, Running, Paused, Done };
 static Phase phase = Phase::Idle;
@@ -872,6 +907,7 @@ void Gadget_Begin(uint16_t *canvas, I2cMasterBus *bus, void (*amp)(bool))
     Radio_Play(st);  // selects it; stop right away, the radio starts silent
     Radio_Stop();
   }
+  hints_seen = prefs.getUShort("hints", 0);
   Weather_Begin();
   UpdateCheck_Begin([]() { return Radio_On(); });  // check only; waits while the radio plays
   Motion_Begin(bus);
@@ -907,9 +943,33 @@ static void autoPage()
   }
 }
 
+static void hintTick()
+{
+  static Mode last = Mode::Info;  // not a ring page: the first tick counts as entering the current one
+  if (state.mode != last) {
+    last = state.mode;
+    banner_until_ms = 0;
+    for (int i = 0; i < PAGE_COUNT; i++) {
+      if (PAGES[i] != state.mode || (hints_seen & (1 << i))) continue;
+      for (const Hint &h : HINTS) {
+        if (h.mode != state.mode) continue;
+        hints_seen |= 1 << i;
+        prefs.putUShort("hints", hints_seen);
+        showBanner(h.en, h.tr, HINT_MS);
+      }
+    }
+    state.dirty = true;
+  }
+  if (banner_until_ms && !bannerOn()) {
+    banner_until_ms = 0;
+    state.dirty = true;
+  }
+}
+
 void Gadget_Tick(const DateTime &now)
 {
   settings::tick();
+  hintTick();
   SettingsUi_Tick();
   autoPage();
   int day = now.year * 400 + now.month * 32 + now.day;
@@ -969,11 +1029,20 @@ void Gadget_Render(const DateTime &now)
     frame(140, 62, 360, 46, DIM);
     drawVolumeBar(158, 78);
   }
-  if (state.mode != Mode::Hourglass) theme::decorate();  // the hourglass stands alone on black, no machine border
+  if (state.mode != Mode::Hourglass) theme::decorate();
+  if (bannerOn() && !ringing) ClockFaces_Banner(banner);  // the hourglass stands alone on black, no machine border
   if (state.mode == Mode::Radio && radio_world) RadioFaces_Border();
 }
 
+static uint32_t frameMsBase(Mode m);
 uint32_t Gadget_FrameMs(Mode m)
+{
+  uint32_t ms = frameMsBase(m);
+  if (banner_until_ms && (!ms || ms > 100)) ms = 100;  // so the banner leaves on time
+  return ms;
+}
+
+static uint32_t frameMsBase(Mode m)
 {
   if (volume_shown_ms && millis() - volume_shown_ms < VOLUME_SHOW_MS + 100) return 100;
   switch (m) {
@@ -1146,6 +1215,13 @@ void Gadget_Gesture(Gesture g, int x, int y)
 
 String Gadget_Command(const String &name, const String &arg)
 {
+  if (name == "hints") {  // "reset": every first-visit hint shows again
+    if (arg == "reset") {
+      hints_seen = 0;
+      prefs.putUShort("hints", 0);
+    }
+    return "{\"hints_seen\":" + String(hints_seen) + "}";
+  }
   if (name == "radiotest") {  // settings page: play a stream before adding it
     if (arg.startsWith("http")) Radio_PlayUrl(arg.c_str());
     else Radio_Stop();

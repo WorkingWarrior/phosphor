@@ -14,6 +14,8 @@ struct ClockFace {
   String update;  // newer release tag ("v1.2.0") or empty: a small notice
 };
 void ClockFaces_Draw(const ClockFace &face);
+// One line of text in a box over the bottom of the page, in the current theme's font and colors (hints, prompts).
+void ClockFaces_Banner(const String &line);
 
 #include "Weather.h"
 struct RadioFaceData {
