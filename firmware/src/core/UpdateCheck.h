@@ -11,5 +11,7 @@ void UpdateCheck_Begin(bool (*busy)());
 const char *UpdateCheck_Newer();
 // Where to read about it (compiled in, never taken from the response).
 const char *UpdateCheck_Site();
+// HTTP status of the last request (negative = connection/TLS error), 0 before the first.
+int UpdateCheck_Code();
 // Free internal heap just before and after the last request, for /status (0 until one ran).
 void UpdateCheck_Heap(uint32_t &before, uint32_t &after);

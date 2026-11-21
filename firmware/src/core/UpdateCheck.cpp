@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <time.h>
+#include <esp_heap_caps.h>
 #include "UpdateCheck.h"
 #include "state.h"
 
@@ -12,11 +13,12 @@
 #define BUSY_RETRY_MS 60000UL         // radio playing: look again in a minute
 #define FAIL_RETRY_MS (60UL * 60000)  // a failed request: again in an hour
 #define INTERVAL_MS (24UL * 3600000)  // a good one: again in 24 h
-#define MIN_FREE_HEAP 70000           // a TLS handshake needs a good chunk of internal RAM; below it, wait
+#define MIN_FREE_HEAP 38000           // a TLS handshake wants most of the internal RAM that is left (about 47 KB idle); below it, wait
 
 static bool (*busy_fn)() = nullptr;
 static char newer[16] = "";
 static uint32_t heap_before = 0, heap_after = 0;
+static int last_code = 0;  // HTTP status (or the HTTPClient error) of the last request, for /status
 
 // "v1.2.0" or "1.2.0" -> major*1e6 + minor*1e3 + patch; -1 for anything else (a commit hash, "dev", "v1.0.2-3-g1a2b3c4").
 static long parseVersion(const char *s)
@@ -50,12 +52,27 @@ static bool versionField(const String &body, char *out, size_t cap)
   return true;
 }
 
+// The precompiled mbedTLS allocates from internal RAM only, and a handshake needs more than the ~48 KB the radio and the
+// pages leave free (the request failed with -1 there). For the length of this one request its allocator is pointed at
+// PSRAM (internal as the fallback), then put back to the stock one: the internal heap is not touched, so nothing else stutters.
+extern "C" {
+int mbedtls_platform_set_calloc_free(void *(*calloc_func)(size_t, size_t), void (*free_func)(void *));
+}
+static void *psramCalloc(size_t n, size_t size)
+{
+  void *p = heap_caps_calloc(n, size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+  return p ? p : heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+static void *internalCalloc(size_t n, size_t size) { return heap_caps_calloc(n, size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT); }  // the stock setting (CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC)
+static void psramFree(void *p) { heap_caps_free(p); }
+
 // One request. Returns true when the manifest was read (whatever it said).
 static bool check()
 {
   heap_before = ESP.getFreeHeap();
   bool ok = false;
   char remote[24] = "";
+  mbedtls_platform_set_calloc_free(psramCalloc, psramFree);
   {
     // setInsecure(): the answer only drives an informational notice; the address shown is compiled in, not read from the reply.
     WiFiClientSecure client;
@@ -66,6 +83,7 @@ static bool check()
     http.setConnectTimeout(8000);
     if (http.begin(client, MANIFEST_URL)) {
       int code = http.GET();
+      last_code = code;
       int len = http.getSize();
       if (code == 200 && len <= 4096) {  // the file is under 1 KB
         String body = http.getString();
@@ -76,6 +94,7 @@ static bool check()
       http.end();
     }
   }  // the TLS client is freed here
+  mbedtls_platform_set_calloc_free(internalCalloc, psramFree);
   heap_after = ESP.getFreeHeap();
   Serial.printf("update: free heap %u -> %u B, remote %s\n", (unsigned)heap_before, (unsigned)heap_after, ok ? remote : "(none)");
   if (!ok) return false;
@@ -122,6 +141,7 @@ void UpdateCheck_Begin(bool (*busy)())
 
 const char *UpdateCheck_Newer() { return newer; }
 const char *UpdateCheck_Site() { return SITE; }
+int UpdateCheck_Code() { return last_code; }
 void UpdateCheck_Heap(uint32_t &before, uint32_t &after)
 {
   before = heap_before;
