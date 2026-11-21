@@ -608,9 +608,10 @@ void panel(int y0, int y1)
     case theme::ATARI: fill = 0, edge = px::rgb(160, 160, 200); break;
     default: break;
   }
-  rect(110, y0, 420, y1 - y0, fill);
-  frame(110, y0, 420, y1 - y0, edge);
-  frame(111, y0 + 1, 418, y1 - y0 - 2, edge);
+  // x 156..484: clears the score and "REKOR 00000" at the top left (they end at x 152), still fits "TAP TO RUN" at size 5
+  rect(156, y0, 328, y1 - y0, fill);
+  frame(156, y0, 328, y1 - y0, edge);
+  frame(157, y0 + 1, 326, y1 - y0 - 2, edge);
 }
 
 void centered(const char *s, int p, int yy, const Ink &ink) { text(s, (W - textWidth(s, p)) / 2, yy, p, ink); }
