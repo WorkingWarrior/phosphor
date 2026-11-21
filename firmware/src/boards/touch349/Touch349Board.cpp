@@ -4,6 +4,7 @@
 // Pin map and panel setup follow Waveshare's Arduino examples (Examples/Arduino/09_LVGL_V8_Test).
 
 #include "Touch349Board.h"
+#include "gadget/Apps.h"
 #include "gadget/Settings.h"
 #include <Preferences.h>
 #include <driver/gpio.h>
@@ -572,6 +573,7 @@ void Touch349Board::trackGesture(bool down, int x, int y, uint32_t now_ms)
     touch_y0_ = touch_y_ = y;
     touch_down_ms_ = now_ms;
     long_sent_ = false;
+    Apps_Touch(true, x, y);
   } else if (down) {
     touch_x_ = x;
     touch_y_ = y;
@@ -581,6 +583,7 @@ void Touch349Board::trackGesture(bool down, int x, int y, uint32_t now_ms)
       Gadget_Gesture(Gesture::LongPress, touch_x0_, touch_y0_);
     }
   } else if (touching_) {
+    Apps_Touch(false, touch_x_, touch_y_);
     int dx = touch_x_ - touch_x0_, dy = touch_y_ - touch_y0_;
     if (long_sent_) {
       // already acted

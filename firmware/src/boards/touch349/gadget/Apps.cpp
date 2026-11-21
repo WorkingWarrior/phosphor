@@ -3,6 +3,8 @@
 #include "Apps.h"
 #include "../../../core/state.h"
 #include "Radio.h"
+#include "GamePoker.h"
+#include "GameRunner.h"
 #include "Settings.h"
 #include "Theme.h"
 #include "ToolApps.h"
@@ -11,9 +13,13 @@
 using namespace vfd;
 
 static const App *const TOOLS[] = { &APP_LEVEL, &APP_COIN, &APP_BREATHE, &APP_SCORE, &APP_LAMP };
-static const App *const PLAY[] = { nullptr };  // no games yet; the Play page joins the ring when this lists one
+// The Play page joins the ring once this lists a game.
+static const App *const PLAY[] = {
+  &APP_POKER,
+  &APP_RUNNER,
+};
 static constexpr int TOOLS_COUNT = sizeof(TOOLS) / sizeof(TOOLS[0]);
-static constexpr int PLAY_COUNT = 0;
+static constexpr int PLAY_COUNT = sizeof(PLAY) / sizeof(PLAY[0]);
 static constexpr int MAX_TILES = 6;
 
 static const App *const *menuList(Mode m, int &n)
@@ -193,6 +199,11 @@ void Apps_Tick()
     return;
   }
   if (cur->tick) cur->tick();
+}
+
+void Apps_Touch(bool down, int x, int y)
+{
+  if (cur && cur->touch && state.mode == Mode::App) cur->touch(down, x, y);
 }
 
 uint32_t Apps_FrameMs()

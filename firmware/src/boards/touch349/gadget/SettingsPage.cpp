@@ -246,7 +246,7 @@ function render() {
 const PAGES = [['clock', 'Clock', 'Saat', 1], ['radio', 'Radio', 'Radyo'], ['weather', 'Weather', 'Hava durumu'], ['timer', 'Timer', 'Sayaç'],
   ['study', 'Focus', 'Odak'], ['hourglass', 'Hourglass', 'Kum saati'], ['aquarium', 'Fish tank', 'Akvaryum'], ['snow', 'Snow', 'Kar'],
   ['fire', 'Fireplace', 'Şömine'], ['sea', 'Lighthouse', 'Fener'], ['wave', 'Ship', 'Gemi'], ['lava', 'Lava lamp', 'Lav lambası'],
-  ['tools', 'Tools', 'Araçlar'], ['settings', 'Settings', 'Ayarlar', 1]];
+  ['tools', 'Tools', 'Araçlar'], ['play', 'Play', 'Oyun'], ['settings', 'Settings', 'Ayarlar', 1]];
 function renderPages() {
   const hidden = new Set((S.hide || '').split(',').filter(Boolean)), box = $('#pages');
   box.innerHTML = '';
