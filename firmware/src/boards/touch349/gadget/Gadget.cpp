@@ -3,6 +3,7 @@
 #include "Gadget.h"
 #include "ClockFaces.h"
 #include "TimerFaces.h"
+#include "Apps.h"
 #include "RetroScene.h"
 #include <Preferences.h>
 #include "../../../core/Assets.h"
@@ -37,8 +38,16 @@ using namespace vfd;
 static Preferences prefs;
 
 static const Mode PAGES[] = { Mode::Clock, Mode::Radio, Mode::Weather, Mode::Timer, Mode::Study, Mode::Hourglass,
-                              Mode::Aquarium, Mode::Snow, Mode::Fire, Mode::Sea, Mode::Wave, Mode::Lava, Mode::Settings };
+                              Mode::Aquarium, Mode::Snow, Mode::Fire, Mode::Sea, Mode::Wave, Mode::Lava, Mode::Tools, Mode::Play,
+                              Mode::Settings };
 static constexpr int PAGE_COUNT = sizeof(PAGES) / sizeof(PAGES[0]);
+
+// Whether the ring has the page: a menu page only while it lists apps.
+static bool pageInRing(Mode m)
+{
+  if (m == Mode::Play || m == Mode::Tools) return Apps_Count(m) > 0;
+  return true;
+}
 
 static const char *const WEEKDAYS_TR[] = { "PAZ", "PZT", "SAL", "ÇAR", "PER", "CUM", "CMT" };
 static const char *const WEEKDAYS_EN[] = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" };
@@ -87,7 +96,7 @@ static bool banner_prompt = false;  // the banner is the low-battery question: a
 static bool bannerOn() { return banner_until_ms && (int32_t)(banner_until_ms - millis()) > 0; }
 
 // First-visit hints: each page of the ring shows one line the first time it is entered, then never again. The seen
-// bits (index in PAGES) are kept in NVS ("hints"); POST /cmd name=hints arg=reset brings them all back.
+// bits (bit = Mode value) are kept in NVS ("hints2"); POST /cmd name=hints arg=reset brings them all back.
 struct Hint {
   Mode mode;
   const char *en, *tr;  // same wording as the Settings > Help pages
@@ -105,9 +114,11 @@ static const Hint HINTS[] = {
   { Mode::Sea, "LIGHTHOUSE: TAP, BIG WAVE", "FENER: DOKUN, BÜYÜK DALGA" },
   { Mode::Wave, "SHIP: TAP THE WATER", "GEMİ: SUYA DOKUN" },
   { Mode::Lava, "LAVA LAMP: TAP, NEW COLORS", "LAV LAMBASI: DOKUN, YENİ RENK" },
+  { Mode::Tools, "TOOLS: TAP A TILE TO OPEN IT", "ARAÇLAR: DOKUN, AÇILSIN" },
+  { Mode::Play, "PLAY: TAP A TILE TO OPEN IT", "OYUN: DOKUN, AÇILSIN" },
   { Mode::Settings, "SWIPE UP/DOWN: PICK AN ITEM", "YUKARI/AŞAĞI KAYDIR: SEÇ" },
 };
-static uint16_t hints_seen = 0;
+static uint32_t hints_seen = 0;
 #define HINT_MS 3000
 
 // Countdown timer: minutes set with the buttons, counts down, rings (the interval programs come back later)
@@ -918,7 +929,17 @@ void Gadget_Begin(uint16_t *canvas, I2cMasterBus *bus, void (*amp)(bool))
     Radio_Play(st);  // selects it; stop right away, the radio starts silent
     Radio_Stop();
   }
-  hints_seen = prefs.getUShort("hints", 0);
+  hints_seen = prefs.getUInt("hints2", 0);
+  if (prefs.isKey("hints")) {  // before the Tools page the bits counted ring positions: carry them over by page
+    static const Mode OLD[] = { Mode::Clock, Mode::Radio, Mode::Weather, Mode::Timer, Mode::Study, Mode::Hourglass,
+                                Mode::Aquarium, Mode::Snow, Mode::Fire, Mode::Sea, Mode::Wave, Mode::Lava, Mode::Settings };
+    uint16_t old = prefs.getUShort("hints", 0);
+    for (int i = 0; i < 13; i++) {
+      if (old & (1 << i)) hints_seen |= 1u << (int)OLD[i];
+    }
+    prefs.putUInt("hints2", hints_seen);
+    prefs.remove("hints");
+  }
   Weather_Begin();
   UpdateCheck_Begin([]() { return Radio_On(); });  // check only; waits while the radio plays
   Motion_Begin(bus);
@@ -960,12 +981,12 @@ static void hintTick()
   if (state.mode != last) {
     last = state.mode;
     banner_until_ms = 0;
-    for (int i = 0; i < PAGE_COUNT; i++) {
-      if (PAGES[i] != state.mode || (hints_seen & (1 << i))) continue;
+    uint32_t bit = 1u << (int)state.mode;
+    if (!(hints_seen & bit)) {
       for (const Hint &h : HINTS) {
         if (h.mode != state.mode) continue;
-        hints_seen |= 1 << i;
-        prefs.putUShort("hints", hints_seen);
+        hints_seen |= bit;
+        prefs.putUInt("hints2", hints_seen);
         showBanner(h.en, h.tr, HINT_MS);
       }
     }
@@ -1046,6 +1067,7 @@ void Gadget_Tick(const DateTime &now)
     }
   }
   timerTick();
+  Apps_Tick();
   Study_Tick();
   Motion_Update();
 }
@@ -1054,7 +1076,7 @@ bool Gadget_Draws(Mode m)
 {
   return m == Mode::Clock || m == Mode::Radio || m == Mode::Weather || m == Mode::Aquarium || m == Mode::Snow || m == Mode::Timer ||
          m == Mode::Fire || m == Mode::Sea || m == Mode::Study || m == Mode::Wave || m == Mode::Lava ||
-         m == Mode::Hourglass || m == Mode::Settings;
+         m == Mode::Hourglass || m == Mode::Settings || m == Mode::Tools || m == Mode::Play || m == Mode::App;
 }
 
 void Gadget_Render(const DateTime &now)
@@ -1079,6 +1101,12 @@ void Gadget_Render(const DateTime &now)
     case Mode::Lava: Lava_Draw(""); break;
     case Mode::Hourglass: Hourglass_Draw(""); break;
     case Mode::Settings: SettingsUi_Draw(); break;
+    case Mode::Tools:
+    case Mode::Play:
+      if (Apps_Count(state.mode) > 0) Apps_DrawMenu(state.mode);
+      else state.mode = Mode::Clock, state.dirty = true;  // /page play while no app is there
+      break;
+    case Mode::App: Apps_Draw(now); break;
     default: break;
   }
   // volume bar over the other pages while it changes (the radio page has it in its title line)
@@ -1087,8 +1115,9 @@ void Gadget_Render(const DateTime &now)
     frame(140, 62, 360, 46, DIM);
     drawVolumeBar(158, 78);
   }
-  if (state.mode != Mode::Hourglass) theme::decorate();
-  if (bannerOn() && !ringing) ClockFaces_Banner(banner);  // the hourglass stands alone on black, no machine border
+  bool full = state.mode == Mode::App && Apps_FullScreen();  // the lamp is one color all over
+  if (state.mode != Mode::Hourglass && !full) theme::decorate();
+  if (bannerOn() && !ringing && !full) ClockFaces_Banner(banner);  // the hourglass stands alone on black, no machine border
   if (state.mode == Mode::Radio && radio_world) RadioFaces_Border();
 }
 
@@ -1117,6 +1146,7 @@ static uint32_t frameMsBase(Mode m)
     case Mode::Hourglass: return 50;
     case Mode::Timer: return phase == Phase::Running || phase == Phase::Done ? 60 : 400;
     case Mode::Settings: return SettingsUi_Busy() ? 150 : 1000;
+    case Mode::App: return Apps_FrameMs();
     default: return 0;
   }
 }
@@ -1127,8 +1157,12 @@ static void goPage(int dir)
   for (int i = 0; i < PAGE_COUNT; i++) {
     if (PAGES[i] == state.mode) idx = i;
   }
-  idx = (idx + dir + PAGE_COUNT) % PAGE_COUNT;
-  state.mode = PAGES[idx];
+  Mode next;
+  do {
+    idx = (idx + dir + PAGE_COUNT) % PAGE_COUNT;
+    next = PAGES[idx];
+  } while (!pageInRing(next));
+  state.mode = next;
   state.mode_until_ms = 0;
   state.dirty = true;
 }
@@ -1220,6 +1254,10 @@ void Gadget_Gesture(Gesture g, int x, int y)
     state.dirty = true;
     return;
   }
+  if (state.mode == Mode::App && Apps_Gesture(g, x, y)) {  // an open app owns taps, holds and its own swipes
+    state.dirty = true;
+    return;
+  }
   switch (g) {
     case Gesture::SwipeLeft: goPage(1); return;
     case Gesture::SwipeRight: goPage(-1); return;
@@ -1279,6 +1317,8 @@ void Gadget_Gesture(Gesture g, int x, int y)
         case Mode::Hourglass: Hourglass_Tap(); break;
         case Mode::Timer: tapTimer(x, y); break;
         case Mode::Settings: SettingsUi_Tap(x, y); break;
+        case Mode::Tools:
+        case Mode::Play: Apps_TapMenu(state.mode, x, y); break;
         default:
           if (!Gadget_Draws(state.mode)) {  // message, info, image: back home
             state.mode = Mode::Clock;
@@ -1295,16 +1335,22 @@ String Gadget_Command(const String &name, const String &arg)
   if (name == "hints") {  // "reset": every first-visit hint shows again
     if (arg == "reset") {
       hints_seen = 0;
-      prefs.putUShort("hints", 0);
+      prefs.putUInt("hints2", 0);
     }
     return "{\"hints_seen\":" + String(hints_seen) + "}";
   }
   if (name == "touch") {  // "tap,x,y" or "hold,x,y" in screen pixels: a gesture without a finger (screenshots, tests)
     int c1 = arg.indexOf(','), c2 = arg.indexOf(',', c1 + 1);
-    if (c1 < 0 || c2 < 0) return "{\"error\":\"tap|hold,x,y\"}";
+    if (c1 < 0 || c2 < 0) return "{\"error\":\"tap|hold|left|right|up|down,x,y\"}";
     String kind = arg.substring(0, c1);
-    Gesture g = kind == "hold" ? Gesture::LongPress : Gesture::Tap;
+    Gesture g = kind == "hold" ? Gesture::LongPress : kind == "left" ? Gesture::SwipeLeft : kind == "right" ? Gesture::SwipeRight
+              : kind == "up" ? Gesture::SwipeUp : kind == "down" ? Gesture::SwipeDown : Gesture::Tap;
     Gadget_Gesture(g, arg.substring(c1 + 1, c2).toInt(), arg.substring(c2 + 1).toInt());
+    return "{\"ok\":true}";
+  }
+  if (name == "app") {  // open an app by key (level | coin | breathe | score | lamp), "close" or empty = back to its menu
+    if (arg == "close" || !arg.length()) Apps_Close();
+    else if (!Apps_Open(arg.c_str())) return "{\"error\":\"unknown app\"}";
     return "{\"ok\":true}";
   }
   if (name == "radiotest") {  // settings page: play a stream before adding it
