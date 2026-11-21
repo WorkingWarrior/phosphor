@@ -8,3 +8,5 @@
 
 void Fishtank_Draw(const char *corner_text);  // advances one frame (call every ~50 ms) and draws
 void Fishtank_Feed(int screen_x);
+void Fishtank_Hold();  // night mode on/off: dark water, no light shafts, slower fish (hold)
+// Once a day, at a random time while the page is on, a turtle or a seahorse swims through.

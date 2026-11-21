@@ -1,6 +1,7 @@
 #ifdef BOARD_TOUCH349
 
 #include "Fishtank.h"
+#include <time.h>
 #include "Motion.h"
 #include "Px.h"
 #include "RetroScene.h"
@@ -93,6 +94,98 @@ static uint32_t hash32(uint32_t v)
   return v ^ (v >> 16);
 }
 
+// ---- night (hold) and the rare daily visitor ------------------------------------------------------------------------
+static bool night = false;
+static uint8_t dark[COLORS];
+
+static void initDark()
+{
+  for (int i = 0; i < COLORS; i++) dark[i] = i;
+  dark[W5] = W3, dark[W4] = W2, dark[W3] = W1, dark[W2] = W1, dark[W1] = NIGHT;
+  dark[S3] = S1, dark[S2] = S1, dark[S1] = D1;
+  dark[G3] = G2, dark[G2] = G1;
+  dark[N5] = N4, dark[N4] = N3, dark[N3] = N2, dark[N2] = N1;
+  dark[M2] = M1;
+}
+static inline uint8_t dk(uint8_t c) { return night ? dark[c] : c; }
+
+void Fishtank_Hold()
+{
+  night = !night;
+  if (night) initDark();
+}
+
+// A turtle or a seahorse swims through once a day, at a random time while the page is on.
+static const char *const TURTLE[2][7] = {
+  { ".....oooooooo.....", "...ooDdDdDdDdoo...", "..oDdDdDdDdDdDo...", ".oDdDdDdDdDdDdosss", "fooooooooooooosses", "..fff.......ffs...", ".ff...........f..." },
+  { ".....oooooooo.....", "...ooDdDdDdDdoo...", "..oDdDdDdDdDdDo...", ".oDdDdDdDdDdDdosss", "fooooooooooooosses", "...ff.......sff...", "..f..........ff..." },
+};
+static const uint8_t TURTLE_C[] = { D1, D2, D3, G3, G2, N1 };
+static const char *const HORSE[2][14] = {
+  { "..yyy...", ".yyeyyyy", ".yyyy...", "..yy....", "..yyy...", "..yyay..", "..yya...", "..yy....", "...yy...", "...yy...", "..yy....", "..yyyy..", "...yyy..", "..yy.yy." },
+  { "..yyy...", ".yyeyyyy", ".yyyy...", "..yy....", "..yyy...", "..yyyy..", "..yya...", "..yy....", "...yy...", "...yy...", "..yy....", "..yyyy..", "...yyy..", "..yy.yy." },
+};
+static const uint8_t HORSE_C[] = { O1, F4, N1 };
+// 2600 tank: one block per character
+static const char *const A_TURTLE[] = { ".ddd...", "dddddss", ".f..f.." };
+static const char *const A_HORSE[] = { ".yy", "yy.", ".y.", "yy." };
+
+static int visit_day = -1;      // day the visitor last came
+static int32_t visit_wait = 0;  // frames of watching until the next one
+static int visit_kind = -1;     // 0 turtle, 1 seahorse, -1 none swimming
+static float visit_x, visit_y;
+static int visit_dir;
+
+static int dayId()
+{
+  time_t t = time(nullptr);
+  if (t < 100000) return -1;  // no clock yet
+  struct tm lt;
+  localtime_r(&t, &lt);
+  return (lt.tm_year % 100) * 400 + lt.tm_yday;
+}
+
+static void visitorStep()
+{
+  if (visit_kind < 0) {
+    int d = dayId();
+    if (d < 0 || d == visit_day) return;
+    if (!visit_wait) visit_wait = 1200 + esp_random() % 9000;  // 1 to 10 minutes
+    if (--visit_wait > 0) return;
+    visit_wait = 0;
+    visit_day = d;
+    visit_kind = esp_random() & 1;
+    visit_dir = esp_random() & 1 ? 1 : -1;
+    visit_x = visit_dir > 0 ? -22 : W + 4;
+    visit_y = visit_kind ? 30 + esp_random() % 10 : 26 + esp_random() % 20;
+    return;
+  }
+  visit_x += visit_dir * (visit_kind ? 0.22f : 0.33f);
+  if (visit_x < -24 || visit_x > W + 6) visit_kind = -1;
+}
+
+static void visitorDraw()
+{
+  if (visit_kind < 0) return;
+  int f = (frame_no / (visit_kind ? 6 : 9)) % 2;
+  int x = lroundf(visit_x), y = lroundf(visit_y + sinf(frame_no * 0.05f) * (visit_kind ? 2.0f : 1.0f));
+  bool flip = visit_dir < 0;
+  if (blk >= 4) {  // blocks on the machine's grid
+    const char *const *rows = visit_kind ? A_HORSE : A_TURTLE;
+    int n = visit_kind ? 4 : 3, cols = strlen(rows[0]);
+    for (int j = 0; j < n; j++)
+      for (int i = 0; i < cols; i++) {
+        char ch = rows[j][i];
+        if (ch == '.') continue;
+        uint8_t c = ch == 'd' ? D2 : ch == 's' || ch == 'f' ? G3 : O1;
+        set((x & ~3) + 4 * (flip ? cols - 1 - i : i), (y & ~1) + 2 * j, c);
+      }
+    return;
+  }
+  if (visit_kind) sprite(HORSE[f], 14, x, y, "yae", HORSE_C, flip);
+  else sprite(TURTLE[f], 7, x, y, "odDsfe", TURTLE_C, flip);
+}
+
 static float surfaceAt(float x)
 {
   float t = frame_no * 0.05f;
@@ -171,7 +264,7 @@ static void swim(Fish &f, int idx)
     f.x += f.dir * k.speed * 1.7f;
     f.y += constrain(f.ty - f.y, -0.4f, 0.4f);
   } else {
-    f.x += f.dir * k.speed;
+    f.x += f.dir * k.speed * (night ? 0.6f : 1.0f);
     if (f.retarget-- == 0) {
       f.retarget = 50 + esp_random() % 160;
       f.ty = min_y + 2 + frand() * max(0.0f, max_y - min_y - 4);
@@ -272,7 +365,7 @@ static void drawTank(float t)
     if ((x + frame_no / 3) % 9 < 5) set(x, s + 1, W4);
   }
   // light shafts from the surface, drifting
-  for (int r = 0; r < 4; r++) {
+  for (int r = 0; r < (night ? 0 : 4); r++) {
     float x0 = 40 + r * 78 + sinf(t * 0.3f + r * 2) * 14;
     for (int y = (int)LEVEL + 2; y < SAND; y++) {
       int cx = lroundf(x0 + (y - LEVEL) * 0.45f);
@@ -340,11 +433,11 @@ static void drawTank(float t)
 static void drawFront(float t)
 {
   // front kelp and grass
-  plant(132, 30, t * 1.2f, G2, G3, 3);
-  plant(312, 26, t * 1.3f, G2, G3, 5);
+  plant(132, 30, t * 1.2f, dk(G2), dk(G3), 3);
+  plant(312, 26, t * 1.3f, dk(G2), dk(G3), 5);
   for (int g = 0; g < 14; g++) {
     int x = (g * 53 + 11) % W, hgt = 3 + g % 4;
-    for (int l = 0; l < hgt; l++) set(x + lroundf(sinf(t + g) * l * 0.3f), (int)sandAt(x) - l, l == hgt - 1 ? G3 : G2);
+    for (int l = 0; l < hgt; l++) set(x + lroundf(sinf(t + g) * l * 0.3f), (int)sandAt(x) - l, l == hgt - 1 ? dk(G3) : dk(G2));
   }
 
 }
@@ -356,7 +449,12 @@ void Fishtank_Draw(const char *corner_text)
   updateWater();
 
   bool art = RetroScene_Begin(RetroArt::Aquarium);  // the theme's picture of the tank; fish and bubbles on top
-  if (!art) drawTank(t);
+  if (!art) {
+    drawTank(t);
+    if (night)
+      for (int y = 0; y < H; y++)
+        for (int x = 0; x < W; x++) buf[y][x] = dark[buf[y][x]];
+  }
   blk = art ? RetroScene_Block() : 1;
   // bubbles from the rock, popping at the surface
   if (frame_no % 9 == 0) {
@@ -398,8 +496,14 @@ void Fishtank_Draw(const char *corner_text)
   }
   for (int i = 0; i < FISH_COUNT; i++) swim(fish[i], i);
   for (int i = 0; i < FISH_COUNT; i++) drawFish(fish[i], i);
+  visitorStep();
+  visitorDraw();
   if (art) {
     RetroScene_End(corner_text);
+    if (night) {  // the machine's picture, half as bright
+      uint16_t *c = vfd::canvas();
+      for (int i = 0; i < vfd::W * vfd::H; i++) c[i] = (c[i] >> 1) & 0x7BEF;
+    }
     return;
   }
   drawFront(t);
