@@ -15,6 +15,7 @@ struct Sensors {
   float humidity = NAN;
   float battery_v = 0;
   int battery_pct = -1;    // -1 when unknown
+  bool charging = false;   // on USB power / charging (inferred on boards without a charge pin)
 };
 
 class Board {

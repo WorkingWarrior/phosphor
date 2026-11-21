@@ -22,6 +22,7 @@ static const uint8_t DIGITS[10][5] = {
     { 5, 5, 7, 1, 1 }, { 7, 4, 7, 1, 7 }, { 7, 4, 7, 5, 7 }, { 7, 1, 1, 1, 1 },
     { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 }
 };
+const char *const BOLT[] = { "..##", ".##.", "####", ".##.", "##.." };
 const char *const BELL[] = { "...#...", "..###..", ".#####.", ".#####.", ".#####.", "#######", "...#..." };
 const uint16_t CHROME[] = {
   rgb(255, 255, 255), rgb(255, 255, 255), rgb(255, 255, 255), rgb(255, 255, 255),
@@ -172,6 +173,7 @@ void ClockFaces_Draw(const ClockFace &f)
       rect(446, 128, 4, 8, bright);
       rect(416, 126, (26 * pct / 100) / (atari ? 4 : 1) * (atari ? 4 : 1), 10, ink);
       label(String(pct) + "%", 412, 148, bright, amiga);
+      if (f.charging) sprite(BOLT, 5, 456, 126, 2, hot);
     }
     noClip();
     // Same 60-stop perimeter as the VFD, without the inactive marks.
@@ -199,6 +201,10 @@ void ClockFaces_Draw(const ClockFace &f)
     if (!f.ringing || f.alarm_lit) label(alarm, x, 128, f.alarm_lit ? BASIC_DIM : BASIC_OFF);
     x += MachineTextWidth(alarm);
     label(batt, x, 128, BASIC);
+    if (f.battery >= 0 && f.charging && batt.length()) {
+      int bx = x + MachineTextWidth(batt) + 6;
+      if (bx + 8 < W - (theme::def().border_w + 12)) sprite(BOLT, 5, bx, 130, 2, BASIC_DIM);
+    }
   }
   setStyle(saved);
 }

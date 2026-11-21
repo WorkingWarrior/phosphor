@@ -525,8 +525,10 @@ void Touch349Board::setTime(const DateTime &t)
 Sensors Touch349Board::readSensors()
 {
   Sensors s;  // no temperature/humidity sensor on this board
-  s.battery_v = Adc_GetBatteryVoltage(NULL);
+  Adc_Update();
+  s.battery_v = Adc_GetSmoothedVoltage();
   s.battery_pct = Adc_GetBatteryLevel();
+  s.charging = Adc_IsCharging();
   return s;
 }
 

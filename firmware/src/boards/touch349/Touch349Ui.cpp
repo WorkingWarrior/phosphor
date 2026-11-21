@@ -54,6 +54,12 @@ static void drawBattery(int x, int y)
   snprintf(text, sizeof(text), "%d%%", level);
   u8g2->setFont(u8g2_font_helvB12_te);
   u8g2->drawUTF8(x - u8g2->getUTF8Width(text) - 6, y + 14, text);
+  if (state.charging) {  // a small bolt over the cell, in the background colour so it cuts out of the fill
+    u8g2->setDrawColor(2);
+    u8g2->drawTriangle(x + 18, y + 2, x + 12, y + 9, x + 18, y + 9);
+    u8g2->drawTriangle(x + 16, y + 7, x + 22, y + 7, x + 16, y + 14);
+    u8g2->setDrawColor(1);
+  }
 }
 
 // Three bars by signal strength; a crossed box when offline. Returns the left edge.

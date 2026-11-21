@@ -7,6 +7,7 @@ struct ClockFace {
   bool alarm_lit, ringing;
   bool cursor;
   int battery;
+  bool charging;
   String weekday, short_weekday, calendar_date, period, alarm_time;
   bool alarm_on;
   int second;

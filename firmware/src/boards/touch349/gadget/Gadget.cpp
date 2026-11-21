@@ -248,20 +248,12 @@ static void eggAddMinutes(int m)
 // Pages
 // ---------------------------------------------------------------------------------------------------------------------
 
-// Battery level under the seconds: outline, fill by percent, the number; a bolt while charging. There is no charge
-// pin, so "charging" means the voltage rose over the last minutes or sits at the top (on USB).
+// Battery level under the seconds: outline, fill by percent, the number; a bolt while charging (state.charging, which
+// the battery code infers from the voltage: the board has no charge pin).
 static void drawBatteryBadge(const DateTime &now)
 {
-  static float v_ref = 0;
-  static uint32_t ref_ms = 0;
-  static bool charging = false;
-  float v = state.batt_v;
-  if (state.batt_pct < 0 || v <= 0) return;
-  if (!ref_ms || millis() - ref_ms > 120000) {
-    if (ref_ms) charging = v > v_ref + 0.01f || v >= 4.16f;
-    v_ref = v;
-    ref_ms = millis();
-  }
+  if (state.batt_pct < 0 || state.batt_v <= 0) return;
+  bool charging = state.charging;
   int pct = constrain(state.batt_pct, 0, 100);
   int x = 412, y = 122;
   uint16_t ink = pct <= 15 && !charging ? HOT : DIM;
@@ -310,7 +302,7 @@ static void drawClock(const DateTime &now)
     ClockFace face = { hhmm(now), String(weekdayName(wd)) + " " + date,
                        String(weekdayName(wd, true)) + " " + String(now.day) + " " + monthTitle(now.month),
                        ringing ? String(L("WAKE UP!", "UYAN!")) : two(alarm_h) + ":" + two(alarm_m),
-                       alarm_on && (!ringing || blinkOn(300)), ringing, now.second % 2 == 0, state.batt_pct,
+                       alarm_on && (!ringing || blinkOn(300)), ringing, now.second % 2 == 0, state.batt_pct, state.charging,
                        String(weekdayName(wd, true)), String(weekdayName(wd)), date,
                        settings::h24() ? "24H" : now.hour < 12 ? "AM" : "PM",
                        two(alarm_h) + ":" + two(alarm_m), alarm_on, now.second };

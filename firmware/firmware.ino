@@ -88,6 +88,7 @@ static void readSensors()
   }
   state.batt_v = s.battery_v;
   state.batt_pct = s.battery_pct;
+  state.charging = s.charging;
 }
 
 static void onShortPress()

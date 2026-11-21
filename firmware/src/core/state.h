@@ -23,6 +23,7 @@ struct DeviceState {
   float humi = NAN;
   float batt_v = 0;
   int batt_pct = -1;
+  bool charging = false;          // on the charger (inferred from the battery voltage)
 };
 
 extern DeviceState state;
