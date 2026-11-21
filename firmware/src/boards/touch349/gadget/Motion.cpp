@@ -86,7 +86,7 @@ static void sampleTask(void *)
     if (dev > KNOCK_G && sh < 0.3f && (int32_t)(now - knock_quiet_until) > 0) {
       knock = true;
       knock_count = knock_count + 1;
-      knock_quiet_until = now + 250;
+      knock_quiet_until = now + 120;  // short enough for a quick double knock (21: two knocks = hit), longer than the ring
     }
   }
 }

@@ -18,8 +18,10 @@ using namespace vfd;
 // are left. The dealer stands on every 17 (soft too), a blackjack pays 3:2 (rounded down), you may double on your first two
 // cards; no split, no insurance. The points are daily credits as before in Poker: 100 a day (reset at local midnight),
 // best of the day and best ever are kept in NVS ("games"). Bet 5 / 10 / 25: tap the chip.
-// HIT / STAND / DOUBLE / DEAL: the buttons on the right. A knock on the table (the motion sensor) is HIT during your turn
-// and DEAL on the betting screen (a knock that is just the finger landing on the glass is ignored).
+// HIT / STAND / DOUBLE / DEAL: the buttons on the right. Knocks on the table (the motion sensor): on your turn one knock
+// is STAND and two quick knocks (within 450 ms) are HIT; on the betting screen a knock deals. One knock waits out the
+// 450 ms (the STAND button is ringed meanwhile); a missed second knock then stands, which never busts you, where the other
+// way round it would draw a card. A knock that is just the finger landing on the glass is ignored.
 // The dealer is a character on the left: six poses per theme (assets dealer_<pose>_<theme>, see RetroSprite_Draw), a
 // placeholder drawn with rectangles and discs when the asset pack has none. Events make him talk in a speech bubble.
 
@@ -70,8 +72,11 @@ uint32_t phase_ms = 0, lock_until = 0, day_check_ms = 0, last_input_ms = 0, deal
 
 // input
 bool touching = false;
-uint32_t last_down_ms = 0, last_up_ms = 0, knock_ms = 0;
-bool knock_pending = false;
+uint32_t last_down_ms = 0, last_up_ms = 0;
+constexpr uint32_t KNOCK_PAIR_MS = 450;   // the second knock of a pair lands within this of the first
+constexpr uint32_t KNOCK_TOUCH_MS = 140;  // the touch driver reports a finger up to ~140 ms after the knock it makes
+uint32_t knock_t[2] = { 0, 0 };           // the knocks heard so far: one, or a pair
+int knock_n = 0;
 
 // the dealer
 char bubble[96] = "";
@@ -455,14 +460,15 @@ void dealAction()
   }
 }
 
-// Knock = hit on your turn, deal on the betting screen.
-void knockAction()
+// Knocks: on your turn one = stand, two = hit; on the betting screen any knock deals.
+void knockAction(int n)
 {
   uint32_t now = millis();
   if ((int32_t)(now - lock_until) < 0) return;
   last_input_ms = now;
   if (ph == Ph::Player) {
-    hit();
+    if (n >= 2) hit();
+    else stand();
   } else {
     dealAction();
   }
@@ -884,6 +890,11 @@ void drawSide(uint32_t now)
     bool mine = ph == Ph::Player && unlocked;
     button(SIDE_X, BTN_Y0, SIDE_W, BTN_H, L("HIT", "KART"), mine);
     button(SIDE_X, BTN_Y0 + BTN_PITCH, SIDE_W, BTN_H, L("STAND", "DUR"), mine);
+    if (ph == Ph::Player && knock_n == 1) {  // one knock heard: STAND unless a second comes
+      uint16_t c = theme::current() == theme::VFD ? HOT : 0xFFFF;
+      frame(SIDE_X - 3, BTN_Y0 + BTN_PITCH - 3, SIDE_W + 6, BTN_H + 6, c);
+      frame(SIDE_X - 2, BTN_Y0 + BTN_PITCH - 2, SIDE_W + 4, BTN_H + 4, c);
+    }
     if (ph == Ph::Player && pl.n == 2 && credits >= (uint32_t)hand_bet) button(SIDE_X, BTN_Y0 + 2 * BTN_PITCH, SIDE_W, BTN_H, L("DOUBLE", "2X"), mine);
   }
 }
@@ -897,7 +908,7 @@ void drawBetScreen()
   text(L("BLACKJACK PAYS 3:2", "BLACKJACK 3:2 ÖDER"), 214, 110, 2, LIT_INK);
   snprintf(b, sizeof(b), "%s %lu   %s %lu", L("TODAY", "BUGÜN"), (unsigned long)best_today, L("BEST", "REKOR"), (unsigned long)best_ever);
   text(b, 214, 132, 2, DIM_INK);
-  text(L("TAP DEAL OR KNOCK ON THE TABLE", "DAĞIT'A DOKUN YA DA MASAYA VUR"), 214, 152, 1, DIM_INK);
+  text(L("KNOCK: DEAL. IN HAND: ONCE = STAND, TWICE = HIT", "VUR: DAĞIT. ELDE: 1 VURUŞ = DUR, 2 VURUŞ = KART"), 214, 152, 1, DIM_INK);
 }
 
 void blackjackDraw(const DateTime &)
@@ -970,7 +981,7 @@ void blackjackEnter()
   }
   fitBet();
   touching = false;
-  knock_pending = false;
+  knock_n = 0;
   Motion_TakeKnock();  // forget old knocks
   jingle_n = 0;
   day_check_ms = now;
@@ -1019,8 +1030,12 @@ bool blackjackGesture(Gesture g, int x, int y)
 void blackjackTouch(bool down, int, int)
 {
   touching = down;
-  if (down) last_down_ms = millis();
-  else last_up_ms = millis();
+  if (down) {
+    last_down_ms = millis();
+    knock_n = 0;  // a finger on the glass settles it: no knock action after a tap
+  } else {
+    last_up_ms = millis();
+  }
 }
 
 // Is the touch driver's last edge within 250 ms of t?
@@ -1033,14 +1048,36 @@ bool touchNear(uint32_t t)
 void blackjackTick()
 {
   uint32_t now = millis();
-  // a knock lands slightly before the touch driver reports the finger (30 ms polling): decide 140 ms later
+  // Knocks. One that comes while a beep shakes the case, while the cards are moving or between hands' phases is dropped
+  // (a double knock on the betting screen deals once; its second knock lands in the deal and is gone). A knock lands
+  // slightly before the touch driver reports the finger (30 ms polling): a knock is acted on KNOCK_TOUCH_MS late at the
+  // earliest, so touchNear() can tell a real knock from a finger landing on the glass.
   if (Motion_TakeKnock()) {
-    knock_ms = now;
-    knock_pending = (int32_t)(now - beep_quiet_until) > 0;
+    bool listen = (int32_t)(now - beep_quiet_until) > 0 && (int32_t)(now - lock_until) >= 0 &&
+                  (ph == Ph::Player || ph == Ph::Bet || ph == Ph::Result);
+    if (listen) {
+      if (knock_n == 1 && (int32_t)(now - knock_t[0]) <= (int32_t)KNOCK_PAIR_MS) {
+        knock_t[1] = now;
+        knock_n = 2;
+      } else if (knock_n == 0) {
+        knock_t[0] = now;
+        knock_n = 1;
+      }
+      state.dirty = true;
+    }
   }
-  if (knock_pending && (int32_t)(now - knock_ms) >= 140) {
-    knock_pending = false;
-    if (!touchNear(knock_ms)) knockAction();
+  if (knock_n) {
+    uint32_t since0 = now - knock_t[0], last = knock_t[knock_n - 1];
+    bool finger = touchNear(knock_t[0]) || (knock_n == 2 && touchNear(knock_t[1]));
+    int n = 0;
+    if (ph != Ph::Player) n = since0 >= KNOCK_TOUCH_MS ? 1 : 0;            // betting / result: deal now
+    else if (knock_n == 2) n = now - last >= KNOCK_TOUCH_MS ? 2 : 0;       // a pair: hit
+    else if (since0 > KNOCK_PAIR_MS) n = 1;                              // no second knock came: stand
+    if (n) {
+      knock_n = 0;
+      state.dirty = true;
+      if (!finger) knockAction(n);
+    }
   }
 
   if (ph == Ph::Deal && (int32_t)(now - phase_ms) >= 0) {
