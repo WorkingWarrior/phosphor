@@ -1,7 +1,6 @@
 #ifdef BOARD_TOUCH349
 
 #include "GameBlackjack.h"
-#include <Preferences.h>
 #include <esp_random.h>
 #include "../../../core/Board.h"
 #include "../../../core/state.h"
@@ -14,14 +13,15 @@
 
 using namespace vfd;
 
-// Blackjack ("21") against a cartoon dealer, one player, no money. One 52-card deck, reshuffled when fewer than 15 cards
-// are left. The dealer stands on every 17 (soft too), a blackjack pays 3:2 (rounded down), you may double on your first two
-// cards; no split, no insurance. The points are daily credits as before in Poker: 100 a day (reset at local midnight),
-// best of the day and best ever are kept in NVS ("games"). Bet 5 / 10 / 25: tap the chip.
-// HIT / STAND / DOUBLE / DEAL: the buttons on the right. Knocks on the table (the motion sensor): on your turn one knock
-// is STAND and two quick knocks (within 450 ms) are HIT; on the betting screen a knock deals. One knock waits out the
-// 450 ms (the STAND button is ringed meanwhile); a missed second knock then stands, which never busts you, where the other
-// way round it would draw a card. A knock that is just the finger landing on the glass is ignored.
+// Blackjack ("21") against a cartoon dealer: a match of 10 hands, the side that wins more hands wins the match (a push
+// counts for nobody, so a match can end level). No money, no bets. One 52-card deck, reshuffled when fewer than 15 cards
+// are left. The dealer stands on every 17 (soft too); no double, no split, no insurance. A blackjack is just a won hand.
+// The match lives in RAM: leave the app and come back, it carries on (a finished one starts over).
+// HIT / STAND / DEAL: the buttons on the right, under the score and one pip per hand. Knocks on the table (the motion
+// sensor): on your turn one knock is STAND and two quick knocks (within 450 ms) are HIT; between hands a knock deals.
+// One knock waits out the 450 ms (the STAND button is ringed meanwhile); a missed second knock then stands, which never
+// busts you, where the other way round it would draw a card. A knock that is just the finger landing on the glass is
+// ignored.
 // The dealer is a character on the left: six poses per theme (assets dealer_<pose>_<theme>, see RetroSprite_Draw), a
 // placeholder drawn with rectangles and discs when the asset pack has none. Events make him talk in a speech bubble.
 
@@ -31,25 +31,26 @@ namespace {
 // State
 // ---------------------------------------------------------------------------------------------------------------------
 
-enum class Ph : uint8_t { Bet, Deal, Player, Dealer, Result, Broke };
+enum class Ph : uint8_t { Start, Deal, Player, Dealer, Result, Over };
 enum class Out : uint8_t { None, Win, Lose, Push, Blackjack, Bust, DealerBust, DealerBlackjack };
 enum Pose : uint8_t { P_IDLE, P_BLINK, P_TALK, P_SMUG, P_SAD, P_SHOCK, POSES };
-enum Ev : uint8_t { EV_DEAL, EV_HIT, EV_DOUBLE, EV_PBUST, EV_DBUST, EV_PBJ, EV_PUSH, EV_DWIN, EV_PWIN, EV_DBJ, EV_IDLE, EV_POKE, EV_SHUFFLE, EV_COUNT };
+enum Ev : uint8_t { EV_START, EV_DEAL, EV_HIT, EV_PBUST, EV_DBUST, EV_PBJ, EV_PUSH, EV_DWIN, EV_PWIN, EV_DBJ, EV_IDLE, EV_POKE, EV_SHUFFLE,
+                    EV_MWIN, EV_MLOSE, EV_MDRAW, EV_COUNT };
 
-constexpr uint32_t START_CREDITS = 100;
-constexpr int BETS[3] = { 5, 10, 25 };
+constexpr int HANDS = 10;                       // hands in a match
 constexpr int DLR_W = 150;                      // the dealer character
 constexpr int CW = 60, CH = 70;                 // a card
 constexpr int ROW_D = 7, ROW_P = 94;            // dealer row, player row (y)
 constexpr int HAND_X = 206, HAND_W = 300;       // the cards of a hand
 constexpr int TOT_X = 154;                      // hand total, left of the cards
-constexpr int SIDE_X = 514, SIDE_W = 118;       // credits, chip and the button column
-constexpr int BTN_Y0 = 62, BTN_H = 32, BTN_PITCH = 36;
-constexpr int CHIP_Y0 = 22, CHIP_Y1 = 58;       // tap here: next bet
+constexpr int SIDE_X = 514, SIDE_W = 118;       // score, pips and the button column
+constexpr int PIP_Y = 48, PIP = 9, PIP_PITCH = 11;
+constexpr int BTN_Y0 = 64, BTN_H = 48, BTN_PITCH = 54;
 constexpr int MAX_CARDS = 10;
 constexpr uint32_t BUBBLE_MS = 2000;
 constexpr uint32_t DEAL_GAP = 260;              // between the cards of the deal
 constexpr uint32_t SLIDE_MS = 200;
+constexpr uint32_t OVER_MS = 2200;              // the last hand's result shows this long before the match result
 
 struct Hand {
   int c[MAX_CARDS];
@@ -57,18 +58,17 @@ struct Hand {
   int n = 0;
 };
 
-Preferences prefs;
-bool prefs_open = false;
-Ph ph = Ph::Bet;
+Ph ph = Ph::Start;
 Out out = Out::None;
 int deck[52];
 int deck_pos = 52;  // all used: the first deal shuffles
 Hand pl, dl;
 bool hole_up = false;  // the dealer's second card is face up
-bool doubled = false;
-int bet = 10, hand_bet = 10, net = 0;
-uint32_t credits = START_CREDITS, best_today = START_CREDITS, best_ever = START_CREDITS, day_key = 0;
-uint32_t phase_ms = 0, lock_until = 0, day_check_ms = 0, last_input_ms = 0, dealer_next_ms = 0, result_ms = 0;
+uint32_t phase_ms = 0, lock_until = 0, last_input_ms = 0, dealer_next_ms = 0, result_ms = 0;
+
+// the match
+int8_t res[HANDS];  // per hand: 1 you won, -1 the dealer won, 0 push
+int hands_done = 0, p_wins = 0, d_wins = 0;
 
 // input
 bool touching = false;
@@ -88,48 +88,10 @@ int last_line[EV_COUNT];
 int jingle_hz[8], jingle_ms[8], jingle_n = 0, jingle_i = 0;
 uint32_t jingle_next = 0;
 
-uint32_t today()
+void newMatch()
 {
-  DateTime n = board().now();
-  return (uint32_t)n.year * 10000 + n.month * 100 + n.day;
-}
-
-void openPrefs()
-{
-  if (prefs_open) return;
-  prefs.begin("games", false);
-  prefs_open = true;
-}
-
-void saveAll()
-{
-  openPrefs();
-  prefs.putUInt("bj_cr", credits);
-  prefs.putUInt("bj_day", day_key);
-  prefs.putUInt("bj_bt", best_today);
-  prefs.putUInt("bj_be", best_ever);
-  prefs.putUInt("bj_bet", bet);
-}
-
-void newDay()
-{
-  credits = START_CREDITS;
-  best_today = START_CREDITS;
-  day_key = today();
-  if (best_ever < START_CREDITS) best_ever = START_CREDITS;
-  saveAll();
-}
-
-void loadAll()
-{
-  openPrefs();
-  credits = prefs.getUInt("bj_cr", START_CREDITS);
-  day_key = prefs.getUInt("bj_day", 0);
-  best_today = prefs.getUInt("bj_bt", START_CREDITS);
-  best_ever = prefs.getUInt("bj_be", START_CREDITS);
-  bet = prefs.getUInt("bj_bet", 10);
-  if (bet != 5 && bet != 10 && bet != 25) bet = 10;
-  if (day_key != today()) newDay();
+  hands_done = p_wins = d_wins = 0;
+  for (int i = 0; i < HANDS; i++) res[i] = 0;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -184,19 +146,6 @@ void addCard(Hand &h, uint32_t when)
   h.n++;
 }
 
-// The bets that fit the credits; bet drops to the biggest one that does. false = none (broke).
-bool fitBet()
-{
-  if (credits >= (uint32_t)bet) return true;
-  for (int i = 2; i >= 0; i--) {
-    if (credits >= (uint32_t)BETS[i]) {
-      bet = BETS[i];
-      return true;
-    }
-  }
-  return false;
-}
-
 // ---------------------------------------------------------------------------------------------------------------------
 // The dealer talks
 // ---------------------------------------------------------------------------------------------------------------------
@@ -205,19 +154,20 @@ struct Line {
   const char *en, *tr;
 };
 
+const Line LINES_START[] = { { "Ten hands. Most wins takes it.", "10 el. En çok kazanan alır." },
+                             { "Ten hands, you and me.", "10 el, sen ve ben." } };
 const Line LINES_DEAL[] = { { "Cards are flying. Pray.", "Kartlar uçuyor. Dua et." },
                             { "Let's see what luck brings.", "Bakalım şans ne getirecek." },
                             { "Shuffled by hand. Mine.", "Elle karıştırdım. Hem de benim elimle." } };
 const Line LINES_HIT[] = { { "Another one? Brave.", "Bir tane daha mı? Cesursun." },
                            { "Greedy. I like it.", "Açgözlü. Hoşuma gitti." },
                            { "Knock knock. Who's there? A card.", "Tık tık. Kim o? Kart." } };
-const Line LINES_DOUBLE[] = { { "Double? Bold move.", "Çifte mi? Cesur hamle." }, { "Now we're talking.", "İşte şimdi konuşuyoruz." } };
 const Line LINES_PBUST[] = { { "Busted! Delicious.", "Patladın! Nefis." }, { "The house thanks you.", "Kasa teşekkür eder." } };
 const Line LINES_DBUST[] = { { "Oh no... I busted.", "Olamaz... patladım." }, { "That was not in the plan.", "Bu planda yoktu." } };
 const Line LINES_PBJ[] = { { "Blackjack?! Who tipped you?", "Blackjack mı?! Kim söyledi sana?" }, { "Okay, okay. Take it.", "Tamam tamam. Al götür." } };
 const Line LINES_PUSH[] = { { "A tie. Nobody cries.", "Berabere. Kimse ağlamasın." }, { "Push. We call it friendship.", "Berabere. Buna dostluk deriz." } };
 const Line LINES_DWIN[] = { { "The house always wins.", "Kasa her zaman kazanır." },
-                            { "Thank you for your donation.", "Bağışın için teşekkürler." },
+                            { "One more for the house.", "Bir sayı da kasaya." },
                             { "Better luck next hand.", "Gelecek ele şans." } };
 const Line LINES_PWIN[] = { { "Beginner's luck.", "Acemi şansı." }, { "Enjoy it. It won't last.", "Tadını çıkar. Uzun sürmez." }, { "Hm. I let you win.", "Hm. Kazanmana izin verdim." } };
 const Line LINES_DBJ[] = { { "Blackjack. Sorry, not sorry.", "Blackjack. Üzgünüm, değilim." } };
@@ -226,6 +176,11 @@ const Line LINES_IDLE[] = { { "Hello? I have a family.", "Alo? Benim de ailem va
                             { "Are you shy? Don't be.", "Utandın mı? Utanma." } };
 const Line LINES_POKE[] = { { "Hands off the dealer.", "Krupiyeye dokunma." }, { "Stop it. I'm ticklish.", "Yapma. Gıdığım var." } };
 const Line LINES_SHUFFLE[] = { { "New deck. Fresh start.", "Yeni deste. Temiz sayfa." } };
+const Line LINES_MWIN[] = { { "You took the match. I need a holiday.", "Maçı aldın. Bana tatil lazım." },
+                            { "Fine. You win. This time.", "Peki. Kazandın. Bu seferlik." } };
+const Line LINES_MLOSE[] = { { "The match is mine. As always.", "Maç benim. Her zamanki gibi." },
+                             { "Better luck next match.", "Gelecek maça artık." } };
+const Line LINES_MDRAW[] = { { "A draw. Rematch?", "Berabere. Rövanş?" } };
 
 struct Table {
   const Line *l;
@@ -234,9 +189,9 @@ struct Table {
 };
 #define T(a, p) { a, (int)(sizeof(a) / sizeof(a[0])), p }
 const Table TABLES[EV_COUNT] = {
-  T(LINES_DEAL, -1), T(LINES_HIT, -1), T(LINES_DOUBLE, -1), T(LINES_PBUST, P_SMUG), T(LINES_DBUST, P_SAD), T(LINES_PBJ, P_SHOCK),
+  T(LINES_START, -1), T(LINES_DEAL, -1), T(LINES_HIT, -1), T(LINES_PBUST, P_SMUG), T(LINES_DBUST, P_SAD), T(LINES_PBJ, P_SHOCK),
   T(LINES_PUSH, -1), T(LINES_DWIN, P_SMUG), T(LINES_PWIN, P_SAD), T(LINES_DBJ, P_SMUG), T(LINES_IDLE, -1), T(LINES_POKE, -1),
-  T(LINES_SHUFFLE, -1),
+  T(LINES_SHUFFLE, -1), T(LINES_MWIN, P_SAD), T(LINES_MLOSE, P_SMUG), T(LINES_MDRAW, -1),
 };
 #undef T
 
@@ -260,6 +215,7 @@ Pose poseNow(uint32_t now)
     if (react >= 0) return (Pose)react;
     return (now / 150) % 2 ? P_IDLE : P_TALK;
   }
+  if (ph == Ph::Over && p_wins != d_wins) return p_wins > d_wins ? P_SAD : P_SMUG;  // the match result stays on his face
   if ((int32_t)(now - blink_at) >= 0) {
     if ((int32_t)(now - blink_at) < 150) return P_BLINK;
     blink_at = now + 3000 + esp_random() % 2000;
@@ -292,40 +248,24 @@ void startJingle(bool big)
   jingle_next = millis();
 }
 
-// The hand is over: pay, remember the bests, the dealer reacts.
+// The hand is over: score it, the dealer reacts.
 void settle()
 {
   hole_up = true;
   int pt = total(pl, pl.n), dt = total(dl, dl.n);
-  bool pbj = natural(pl) && !doubled, dbj = natural(dl);
-  int pay = 0;  // credits coming back (the bet is already taken)
-  if (pbj && dbj) {
-    out = Out::Push;
-    pay = hand_bet;
-  } else if (pbj) {
-    out = Out::Blackjack;
-    pay = hand_bet + (hand_bet * 3) / 2;
-  } else if (dbj) {
-    out = Out::DealerBlackjack;
-  } else if (pt > 21) {
-    out = Out::Bust;
-  } else if (dt > 21) {
-    out = Out::DealerBust;
-    pay = 2 * hand_bet;
-  } else if (pt > dt) {
-    out = Out::Win;
-    pay = 2 * hand_bet;
-  } else if (pt < dt) {
-    out = Out::Lose;
-  } else {
-    out = Out::Push;
-    pay = hand_bet;
-  }
-  net = pay - hand_bet;
-  credits += pay;
-  if (credits > best_today) best_today = credits;
-  if (credits > best_ever) best_ever = credits;
-  saveAll();
+  bool pbj = natural(pl), dbj = natural(dl);
+  if (pbj && dbj) out = Out::Push;
+  else if (pbj) out = Out::Blackjack;
+  else if (dbj) out = Out::DealerBlackjack;
+  else if (pt > 21) out = Out::Bust;
+  else if (dt > 21) out = Out::DealerBust;
+  else if (pt > dt) out = Out::Win;
+  else if (pt < dt) out = Out::Lose;
+  else out = Out::Push;
+  int8_t r = (out == Out::Blackjack || out == Out::DealerBust || out == Out::Win) ? 1 : (out == Out::Push ? 0 : -1);
+  if (hands_done < HANDS) res[hands_done++] = r;
+  if (r > 0) p_wins++;
+  else if (r < 0) d_wins++;
   ph = Ph::Result;
   result_ms = millis();
   lock_until = millis() + 350;
@@ -340,7 +280,27 @@ void settle()
   }
 }
 
-// The player is done (stand, 21, double): the dealer turns the hole card and draws.
+// The tenth hand is in: the match result.
+void endMatch()
+{
+  ph = Ph::Over;
+  result_ms = millis();
+  lock_until = millis() + 600;
+  jingle_n = 0;
+  if (p_wins > d_wins) {
+    say(EV_MWIN);
+    startJingle(true);
+  } else if (p_wins < d_wins) {
+    say(EV_MLOSE);
+    beep(165, 260);
+  } else {
+    say(EV_MDRAW);
+    beep(440, 120);
+  }
+  bubble_until = millis() + 3000;
+}
+
+// The player is done (stand, 21): the dealer turns the hole card and draws.
 void dealerTurn()
 {
   ph = Ph::Dealer;
@@ -353,16 +313,11 @@ void dealerTurn()
 void deal()
 {
   uint32_t now = millis();
-  if (!fitBet()) return;
   bool shuffled = false;
   if (52 - deck_pos < 15) {
     shuffle();
     shuffled = true;
   }
-  credits -= bet;
-  hand_bet = bet;
-  doubled = false;
-  net = 0;
   out = Out::None;
   hole_up = false;
   pl.n = dl.n = 0;
@@ -374,7 +329,6 @@ void deal()
   phase_ms = now + 80 + 3 * DEAL_GAP + SLIDE_MS + 120;  // the deal is over
   lock_until = phase_ms;
   jingle_n = 0;
-  saveAll();
   say(shuffled ? EV_SHUFFLE : EV_DEAL);
   state.dirty = true;
 }
@@ -408,59 +362,24 @@ void stand()
   beep(330, 25);
 }
 
-bool canDouble() { return ph == Ph::Player && pl.n == 2 && credits >= (uint32_t)hand_bet; }
-
-void doubleDown()
-{
-  if (!canDouble()) return;
-  credits -= hand_bet;
-  hand_bet *= 2;
-  doubled = true;
-  saveAll();
-  addCard(pl, millis());
-  beep(660, 25);
-  say(EV_DOUBLE);
-  uint32_t now = millis();
-  lock_until = now + SLIDE_MS + 150;
-  ph = Ph::Dealer;
-  phase_ms = lock_until;
-  if (total(pl, pl.n) > 21) dealer_next_ms = 0;
-  else dealer_next_ms = lock_until;
-  hole_up = false;
-}
-
-void cycleBet()
-{
-  if (ph != Ph::Bet && ph != Ph::Result) return;
-  int i = 0;
-  while (i < 3 && BETS[i] != bet) i++;
-  for (int k = 1; k <= 3; k++) {  // the next one that the credits cover
-    int j = (i + k) % 3;
-    if (credits >= (uint32_t)BETS[j]) {
-      bet = BETS[j];
-      break;
-    }
-  }
-  saveAll();
-  beep(880, 20);
-  state.dirty = true;
-}
-
-// DEAL button, and the knock on the betting screen.
+// The big button between hands, and the knock there: deal the next hand, show the match result after the tenth, or
+// start a new match.
 void dealAction()
 {
   uint32_t now = millis();
   if ((int32_t)(now - lock_until) < 0) return;
-  if (ph == Ph::Bet || ph == Ph::Result) {
-    if (credits < 5) {
-      ph = Ph::Broke;
-      return;
-    }
+  if (ph == Ph::Over) {
+    newMatch();
+    deal();
+  } else if (ph == Ph::Result && hands_done >= HANDS) {
+    endMatch();
+  } else if (ph == Ph::Start || ph == Ph::Result) {
     deal();
   }
+  state.dirty = true;
 }
 
-// Knocks: on your turn one = stand, two = hit; on the betting screen any knock deals.
+// Knocks: on your turn one = stand, two = hit; between hands any knock deals.
 void knockAction(int n)
 {
   uint32_t now = millis();
@@ -627,23 +546,6 @@ void button(int x, int y, int w, int h, const char *label, bool on)
       text(label, x + (w - tw) / 2, y + (h - th) / 2, sc, on ? LIT_INK : DIM_INK);
       break;
   }
-}
-
-// A casino chip: a disc, a dashed ring, the value.
-void drawChip(int cx, int cy, int r, int value, const Pal &p)
-{
-  Apps_Disc(cx, cy, r, theme::current() == theme::VFD ? HALO : p.chip);
-  Apps_Disc(cx, cy, r - 2, p.chip);
-  for (int a = 0; a < 8; a++) {  // the edge stripes
-    static const int8_t DX[8] = { 0, 1, 1, 1, 0, -1, -1, -1 }, DY[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
-    int sx = cx + DX[a] * (r - 2) - 1, sy = cy + DY[a] * (r - 2) - 1;
-    rect(sx, sy, 3, 3, p.chip2);
-  }
-  Apps_Disc(cx, cy, r - 5, theme::current() == theme::VFD ? BG : p.chip);
-  char b[6];
-  snprintf(b, sizeof(b), "%d", value);
-  int sc = 2, tw = textWidth(b, sc);
-  text(b, cx - tw / 2 + 1, cy - 7, sc, theme::current() == theme::VFD ? LIT_INK : Ink{ p.chip2 });
 }
 
 // The felt: the table in the theme's own look.
@@ -864,28 +766,55 @@ const char *resultText()
   }
 }
 
+// Centre a line of text over the felt.
+void feltText(const char *t, int y, int sc, Ink ink)
+{
+  int x0 = DLR_W + 2, w = SIDE_X - 6 - x0;
+  text(t, x0 + (w - textWidth(t, sc)) / 2, y, sc, ink);
+}
+
+// The score: you on the left, the dealer on the right.
+void drawScore(int x, int y, int w, int sc)
+{
+  char a[4], b[4];
+  snprintf(a, sizeof(a), "%d", p_wins);
+  snprintf(b, sizeof(b), "%d", d_wins);
+  text(a, x, y, sc, LIT_INK);
+  text(b, x + w - textWidth(b, sc), y, sc, HOT_INK);
+  text("-", x + (w - textWidth("-", sc)) / 2, y, sc, DIM_INK);
+}
+
+// One pip per hand: won (lit), lost (accent), push (a bar), the hand on the table (a lit frame), still to come (faint).
+void drawPips()
+{
+  int x0 = SIDE_X + (SIDE_W - (HANDS - 1) * PIP_PITCH - PIP) / 2;
+  bool live = ph == Ph::Deal || ph == Ph::Player || ph == Ph::Dealer;
+  for (int i = 0; i < HANDS; i++) {
+    int x = x0 + i * PIP_PITCH;
+    if (i < hands_done) {
+      if (res[i] > 0) rect(x, PIP_Y, PIP, PIP, LIT);
+      else if (res[i] < 0) rect(x, PIP_Y, PIP, PIP, HOT);
+      else rect(x, PIP_Y + 3, PIP, 3, DIM);
+    } else if (live && i == hands_done) {
+      frame(x, PIP_Y, PIP, PIP, LIT);
+    } else {
+      frame(x, PIP_Y, PIP, PIP, DIM);
+    }
+  }
+}
+
 void drawSide(uint32_t now)
 {
-  Pal p = pal();
-  char b[24];
-  snprintf(b, sizeof(b), "%s %lu", L("CRED", "KREDİ"), (unsigned long)credits);
-  text(b, SIDE_X, 7, 2, credits < 5 ? HOT_INK : LIT_INK);
-  // the chip: tap it for the next bet
-  int shown = (ph == Ph::Bet || ph == Ph::Result) ? bet : hand_bet;
-  drawChip(SIDE_X + 18, (CHIP_Y0 + CHIP_Y1) / 2, 17, shown, p);
-  if (ph == Ph::Bet || ph == Ph::Result) {
-    text(L("BET", "BAHİS"), SIDE_X + 44, CHIP_Y0 + 4, 2, DIM_INK);
-    text(L("TAP CHIP", "CHİPE DOKUN"), SIDE_X + 44, CHIP_Y0 + 20, 1, DIM_INK);
-  } else {
-    text(doubled ? L("DOUBLED", "İKİ KAT") : L("BET", "BAHİS"), SIDE_X + 44, CHIP_Y0 + 12, 2, DIM_INK);
-  }
-  uint32_t t = now;
-  bool unlocked = (int32_t)(t - lock_until) >= 0;
-  if (ph == Ph::Bet || ph == Ph::Result) {
-    bool ok = credits >= 5 && unlocked;
-    button(SIDE_X, BTN_Y0, SIDE_W, 104, credits < 5 ? L("OUT", "BİTTİ") : L("DEAL", "DAĞIT"), ok);
-  } else if (ph == Ph::Broke) {
-    button(SIDE_X, BTN_Y0, SIDE_W, 104, L("OUT", "BİTTİ"), false);
+  drawScore(SIDE_X + 6, 6, SIDE_W - 12, 4);
+  const char *you = L("YOU", "SEN"), *him = L("HOUSE", "KASA");
+  text(you, SIDE_X + 6, 37, 1, DIM_INK);
+  text(him, SIDE_X + SIDE_W - 6 - textWidth(him, 1), 37, 1, DIM_INK);
+  drawPips();
+  bool unlocked = (int32_t)(now - lock_until) >= 0;
+  int big = H - 4 - BTN_Y0;
+  if (ph == Ph::Start || ph == Ph::Result || ph == Ph::Over) {
+    const char *label = ph == Ph::Over ? L("AGAIN", "TEKRAR") : (hands_done >= HANDS ? L("RESULT", "SONUÇ") : L("DEAL", "DAĞIT"));
+    button(SIDE_X, BTN_Y0, SIDE_W, big, label, unlocked);
   } else {
     bool mine = ph == Ph::Player && unlocked;
     button(SIDE_X, BTN_Y0, SIDE_W, BTN_H, L("HIT", "KART"), mine);
@@ -895,20 +824,26 @@ void drawSide(uint32_t now)
       frame(SIDE_X - 3, BTN_Y0 + BTN_PITCH - 3, SIDE_W + 6, BTN_H + 6, c);
       frame(SIDE_X - 2, BTN_Y0 + BTN_PITCH - 2, SIDE_W + 4, BTN_H + 4, c);
     }
-    if (ph == Ph::Player && pl.n == 2 && credits >= (uint32_t)hand_bet) button(SIDE_X, BTN_Y0 + 2 * BTN_PITCH, SIDE_W, BTN_H, L("DOUBLE", "2X"), mine);
   }
 }
 
-void drawBetScreen()
+// Before the first hand: the name and the length of the match.
+void drawStartScreen()
 {
   const char *t = "21";
   text(t, 506 - textWidth(t, 7) - 6, 12, 7, HOT_INK);
-  char b[40];
-  text(L("DEALER STANDS ON 17", "KASA 17'DE DURUR"), 214, 92, 2, LIT_INK);
-  text(L("BLACKJACK PAYS 3:2", "BLACKJACK 3:2 ÖDER"), 214, 110, 2, LIT_INK);
-  snprintf(b, sizeof(b), "%s %lu   %s %lu", L("TODAY", "BUGÜN"), (unsigned long)best_today, L("BEST", "REKOR"), (unsigned long)best_ever);
-  text(b, 214, 132, 2, DIM_INK);
-  text(L("KNOCK: DEAL. IN HAND: ONCE = STAND, TWICE = HIT", "VUR: DAĞIT. ELDE: 1 VURUŞ = DUR, 2 VURUŞ = KART"), 214, 152, 1, DIM_INK);
+  const char *n = L("10 HANDS", "10 EL");
+  text(n, 506 - textWidth(n, 3) - 6, 132, 3, LIT_INK);  // low: the dealer's bubble covers the middle
+}
+
+// After the tenth hand: who took the match, and the score.
+void drawOverScreen(uint32_t now)
+{
+  const char *r = p_wins > d_wins ? L("YOU WIN", "KAZANDIN") : (p_wins < d_wins ? L("HOUSE WINS", "KASA KAZANDI") : L("DRAW", "BERABERE"));
+  bool flash = p_wins > d_wins && (int32_t)(now - result_ms) < 2400 && ((now - result_ms) / 200) % 2;
+  feltText(r, 112, 4, p_wins > d_wins ? (flash ? HOT_INK : LIT_INK) : (p_wins < d_wins ? HOT_INK : LIT_INK));
+  int x0 = DLR_W + 2, w = SIDE_X - 6 - x0;
+  drawScore(x0 + w / 2 - 90, 30, 180, 9);
 }
 
 void blackjackDraw(const DateTime &)
@@ -919,14 +854,10 @@ void blackjackDraw(const DateTime &)
   drawWall(p);
   drawDealer(now, p);
   drawFelt(p);
-  if (ph == Ph::Bet || ph == Ph::Broke) {
-    if (ph == Ph::Broke) {
-      const char *a = L("OUT OF CREDITS", "KREDİ BİTTİ"), *c = L("BACK TOMORROW", "YARIN TEKRAR");
-      text(a, 206 + (300 - textWidth(a, 3)) / 2, 44, 3, HOT_INK);
-      text(c, 206 + (300 - textWidth(c, 2)) / 2, 96, 2, LIT_INK);
-    } else {
-      drawBetScreen();
-    }
+  if (ph == Ph::Start) {
+    drawStartScreen();
+  } else if (ph == Ph::Over) {
+    drawOverScreen(now);
   } else {
     bool reveal = hole_up || ph == Ph::Result;
     drawHand(dl, ROW_D, !reveal, p, now);
@@ -935,13 +866,10 @@ void blackjackDraw(const DateTime &)
     drawTotal(pl, ROW_P, pl.n, now);
     if (ph == Ph::Result) {
       const char *r = resultText();
-      char b[40];
-      if (net > 0) snprintf(b, sizeof(b), "%s  +%d", r, net);
-      else if (net < 0) snprintf(b, sizeof(b), "%s  %d", r, net);
-      else snprintf(b, sizeof(b), "%s", r);
-      bool flash = net > 0 && (int32_t)(now - result_ms) < 1600 && ((now - result_ms) / 200) % 2;
-      int w = textWidth(b, 2);
-      text(b, HAND_X + (HAND_W - w) / 2, ROW_D + CH + 2, 2, net > 0 ? (flash ? LIT_INK : HOT_INK) : LIT_INK);
+      bool won = res[hands_done - 1] > 0;
+      bool flash = won && (int32_t)(now - result_ms) < 1600 && ((now - result_ms) / 200) % 2;
+      int w = textWidth(r, 2);
+      text(r, HAND_X + (HAND_W - w) / 2, ROW_D + CH + 2, 2, won ? (flash ? LIT_INK : HOT_INK) : LIT_INK);
     }
   }
   drawSide(now);
@@ -961,7 +889,6 @@ void blackjackDraw(const DateTime &)
 
 void blackjackEnter()
 {
-  loadAll();
   uint32_t now = millis();
   for (int i = 0; i < EV_COUNT; i++) last_line[i] = -1;
   if (ph == Ph::Deal || ph == Ph::Player || ph == Ph::Dealer) {
@@ -973,25 +900,25 @@ void blackjackEnter()
       dealer_next_ms = now + 400;
       hole_up = false;
     }
-    lock_until = now + 300;
-  } else {
-    ph = credits >= 5 ? Ph::Bet : Ph::Broke;
-    out = Out::None;
-    lock_until = now + 300;
+  } else if (ph == Ph::Over) {  // a finished match: a new one
+    newMatch();
+    ph = Ph::Start;
   }
-  fitBet();
+  lock_until = now + 300;
   touching = false;
   knock_n = 0;
   Motion_TakeKnock();  // forget old knocks
   jingle_n = 0;
-  day_check_ms = now;
   last_input_ms = now;
   nudge_ms = now;
   blink_at = now + 2000 + esp_random() % 2000;
   bubble[0] = 0;
   bubble_until = 0;
   react = -1;
-  if (ph == Ph::Bet) say(EV_DEAL);
+  if (ph == Ph::Start) {
+    say(EV_START);
+    bubble_until = now + 3000;
+  }
 }
 
 void blackjackExit() { jingle_n = 0; }
@@ -1010,19 +937,13 @@ bool blackjackGesture(Gesture g, int x, int y)
     return true;
   }
   if (x < SIDE_X - 6) return true;
-  if (y >= CHIP_Y0 - 6 && y < CHIP_Y1 + 4) {
-    cycleBet();
-    return true;
-  }
   if (y < BTN_Y0 - 2) return true;
   if ((int32_t)(now - lock_until) < 0) return true;
-  if (ph == Ph::Bet || ph == Ph::Result) {
+  if (ph == Ph::Start || ph == Ph::Result || ph == Ph::Over) {
     dealAction();
   } else if (ph == Ph::Player) {
-    int b = (y - BTN_Y0) / BTN_PITCH;
-    if (b == 0) hit();
-    else if (b == 1) stand();
-    else if (b == 2) doubleDown();
+    if (y < BTN_Y0 + BTN_H + (BTN_PITCH - BTN_H) / 2) hit();
+    else stand();
   }
   return true;
 }
@@ -1054,7 +975,7 @@ void blackjackTick()
   // earliest, so touchNear() can tell a real knock from a finger landing on the glass.
   if (Motion_TakeKnock()) {
     bool listen = (int32_t)(now - beep_quiet_until) > 0 && (int32_t)(now - lock_until) >= 0 &&
-                  (ph == Ph::Player || ph == Ph::Bet || ph == Ph::Result);
+                  (ph == Ph::Player || ph == Ph::Start || ph == Ph::Result || ph == Ph::Over);
     if (listen) {
       if (knock_n == 1 && (int32_t)(now - knock_t[0]) <= (int32_t)KNOCK_PAIR_MS) {
         knock_t[1] = now;
@@ -1109,15 +1030,12 @@ void blackjackTick()
       state.dirty = true;
     }
   }
-  if (ph == Ph::Result && (int32_t)(now - result_ms) > 8000) {  // back to the betting screen
-    ph = credits >= 5 ? Ph::Bet : Ph::Broke;
-    out = Out::None;
-    pl.n = dl.n = 0;
-    nudge_ms = now;
+  if (ph == Ph::Result && hands_done >= HANDS && (int32_t)(now - result_ms) > (int32_t)OVER_MS) {  // the match is over
+    endMatch();
     state.dirty = true;
   }
   // the dealer gets bored
-  if ((ph == Ph::Bet || ph == Ph::Player) && (int32_t)(now - last_input_ms) > 20000 && (int32_t)(now - nudge_ms) > 20000 && !bubbleOn(now)) {
+  if ((ph == Ph::Start || ph == Ph::Player || (ph == Ph::Result && hands_done < HANDS)) && (int32_t)(now - last_input_ms) > 20000 && (int32_t)(now - nudge_ms) > 20000 && !bubbleOn(now)) {
     say(EV_IDLE);
     state.dirty = true;
   }
@@ -1126,21 +1044,12 @@ void blackjackTick()
     jingle_next = now + jingle_ms[jingle_i] + 35;
     jingle_i++;
   }
-  if ((int32_t)(now - day_check_ms) > 5000) {  // midnight passed while it was open
-    day_check_ms = now;
-    if (day_key != today() && (ph == Ph::Bet || ph == Ph::Result || ph == Ph::Broke)) {
-      newDay();
-      ph = Ph::Bet;
-      pl.n = dl.n = 0;
-      state.dirty = true;
-    }
-  }
 }
 
 uint32_t blackjackFrameMs()
 {
   uint32_t now = millis();
-  bool anim = ph == Ph::Deal || ph == Ph::Dealer || bubbleOn(now) || (ph == Ph::Result && (int32_t)(now - result_ms) < 1700);
+  bool anim = ph == Ph::Deal || ph == Ph::Dealer || bubbleOn(now) || ((ph == Ph::Result || ph == Ph::Over) && (int32_t)(now - result_ms) < 2500);
   for (int i = 0; i < pl.n && !anim; i++) anim = (int32_t)(now - pl.born[i]) < (int32_t)SLIDE_MS + 50;
   for (int i = 0; i < dl.n && !anim; i++) anim = (int32_t)(now - dl.born[i]) < (int32_t)SLIDE_MS + 50;
   return anim ? 40 : 70;  // 70: still fine enough for the 150 ms blink
