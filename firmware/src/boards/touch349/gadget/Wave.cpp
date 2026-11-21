@@ -3,6 +3,7 @@
 #include "Wave.h"
 #include "Motion.h"
 #include "Px.h"
+#include "Radio.h"
 #include "RetroScene.h"
 #include "Theme.h"
 #include "Vfd.h"
@@ -862,6 +863,106 @@ static void updateParticles()
   }
 }
 
+// ---------------------------------------------------------------------------------------------------------------
+// Hold: the fog horn and a puff of smoke from a funnel. Rarely a whale surfaces and spouts. Drawn in screen pixels
+// over whatever renderer the theme uses, in the scene palette so every theme recolors it.
+// ---------------------------------------------------------------------------------------------------------------
+
+struct Puff {
+  float x, y, vx, vy;
+  uint8_t age;  // frames, 0 = unused
+};
+static Puff puffs[14];
+static int horn_t = -1;         // frames since the horn sounded
+static int whale_t = -1;        // frames since the whale surfaced
+static uint32_t whale_next = 0; // frame_no of the next visit
+static float whale_x = 160;
+static int whale_dir = 1;
+
+void Wave_Hold()
+{
+  horn_t = 0;
+  if (Radio_Ready() && !Radio_On()) Radio_Beep(98, 1100);  // a long low blast, only if nothing else is playing
+}
+
+static void extrasStep()
+{
+  if (horn_t >= 0) {
+    if (horn_t % 3 == 0) {  // a puff from the second funnel, raked and tilted with the ship
+      float c = cosf(ship_ang), s = sinf(ship_ang), dx = -24, dy = -68;
+      for (auto &p : puffs)
+        if (!p.age) {
+          p = { ship_x + dx * c - dy * s, ship_y + dx * s + dy * c, 0.5f + frand() * 0.3f, -(1.4f + frand() * 0.5f), 1 };
+          break;
+        }
+    }
+    if (++horn_t > 24) horn_t = -1;
+  }
+  for (auto &p : puffs) {
+    if (!p.age) continue;
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy *= 0.985f;
+    p.vx += 0.01f;
+    if (++p.age > 90) p.age = 0;
+  }
+  if (!whale_next) whale_next = frame_no + 3600 + esp_random() % 7200;  // 3 to 9 minutes
+  if (whale_t < 0 && frame_no >= whale_next) {
+    whale_t = 0;
+    whale_dir = esp_random() & 1 ? 1 : -1;
+    whale_x = (esp_random() & 1 ? 130 : 510) + frand() * 60;  // clear of the ship in the middle
+  } else if (whale_t >= 0 && ++whale_t > 110) {
+    whale_t = -1;
+    whale_next = frame_no + 3600 + esp_random() % 7200;
+  }
+}
+
+static void extrasDraw()
+{
+  using namespace px;
+  for (auto &p : puffs) {
+    if (!p.age) continue;
+    int r = 2 + p.age / 14, x = (int)p.x, y = (int)p.y;
+    uint16_t c = ink(p.age < 40 ? N5 : N4);
+    if (p.age < 55) {
+      vfd::rect(x - r, y - r, 2 * r, 2 * r, c);
+    } else {  // thinning out: a checker of 2x2 cells
+      for (int yy = -r; yy < r; yy += 2)
+        for (int xx = -r; xx < r; xx += 2)
+          if (((xx + yy) / 2) % 2 == 0) vfd::rect(x + xx, y + yy, 2, 2, c);
+    }
+  }
+  if (whale_t < 0) return;
+  float hf = whale_t < 25 ? whale_t / 25.0f : whale_t < 85 ? 1.0f : max(0.0f, (110 - whale_t) / 25.0f);
+  hf = hf * hf * (3 - 2 * hf);
+  const float HW = 50, HH = 26 * hf;
+  uint16_t body = ink(N3), back = ink(N4), shine = ink(N5), foam = ink(N6), eye = ink(N1);
+  int blow_x = (int)(whale_x + 0.35f * whale_dir * HW), blow_y = 0;
+  for (int x = (int)(whale_x - HW); x <= (int)(whale_x + HW); x++) {
+    float u = (x - whale_x) / HW;
+    float h = HH * sqrtf(max(0.0f, 1 - u * u)) * (1 + 0.15f * u * whale_dir);
+    if (fabsf(u + 0.45f * whale_dir) < 0.08f) h += 8 * hf * (1 - fabsf(u + 0.45f * whale_dir) / 0.08f);  // the dorsal fin
+    int ix = constrain(x, 0, FW - 1), top = (int)(sy[ix] - h), n = (int)h + 1;
+    if (n < 2) continue;
+    vfd::rect(x, top, 1, n, body);
+    vfd::rect(x, top, 1, 3, back);
+    vfd::rect(x, top, 1, 1, shine);
+    if (x == blow_x) blow_y = top;
+  }
+  int ex = (int)(whale_x + 0.72f * whale_dir * HW);
+  vfd::rect(ex, (int)(sy[constrain(ex, 0, FW - 1)] - HH * 0.6f), 2, 2, eye);
+  vfd::rect((int)(whale_x - HW) - 2, (int)sy[constrain((int)(whale_x - HW), 0, FW - 1)] - 1, 5, 2, foam);
+  vfd::rect((int)(whale_x + HW) - 2, (int)sy[constrain((int)(whale_x + HW), 0, FW - 1)] - 1, 5, 2, foam);
+  if (whale_t > 20 && whale_t < 85 && blow_y) {  // the spout: drops up and back down in a fan
+    int n = whale_t < 40 ? (whale_t - 20) * 14 / 20 : whale_t > 70 ? (85 - whale_t) * 14 / 15 : 14;
+    for (int i = 0; i < n; i++) {
+      float tt = fmodf(whale_t * 0.9f + i * 3, 28.0f);
+      int x = blow_x + (int)(((i % 5) - 2) * tt * 0.3f), y = blow_y - (int)(tt * (1.3f - tt * 0.024f));
+      vfd::rect(x, y, 2, 2, i % 3 ? foam : ink(W5));
+    }
+  }
+}
+
 void Wave_Draw(const char *corner_text)
 {
   if (!inited) waveInit();
@@ -876,6 +977,8 @@ void Wave_Draw(const char *corner_text)
   } else if (id == theme::VFD || !drawMachine(corner_text, id == theme::C64 ? M_C64 : (id == theme::AMIGA ? M_AMIGA : M_ATARI))) {
     drawPixels(corner_text);
   }
+  extrasStep();
+  extrasDraw();
 }
 
 #endif  // BOARD_TOUCH349

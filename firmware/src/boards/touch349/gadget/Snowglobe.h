@@ -9,5 +9,6 @@
 
 void Snowglobe_Draw(const char *corner_text);  // advances one frame (call every ~50 ms) and draws
 void Snowglobe_Stir(float strength);            // 0..1
+void Snowglobe_Tap(int screen_x, int screen_y); // the cabin window: lamp on/off; anywhere else Snowglobe_Stir(0.6)
 void Snowglobe_Hold();                          // cabin <-> snow globe
 void Snowglobe_Show(const char *what);          // "sleigh" | "star": now, for screenshots

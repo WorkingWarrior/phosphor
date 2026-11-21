@@ -1,6 +1,7 @@
 #ifdef BOARD_TOUCH349
 
 #include "Snowglobe.h"
+#include <time.h>
 #include "Motion.h"
 #include "Px.h"
 #include "RetroScene.h"
@@ -64,6 +65,35 @@ static void pine(int cx, int base, int h)
   (void)tiers;
 }
 
+static uint8_t hillColor(int x, int y, int top)
+{
+  uint8_t c = y == top ? N6 : (y > top + 6 && ((x + y) & 1) ? N4 : N5);
+  if (hash32(x * 977 + y * 131) % 41 == 0) c = N6;
+  return c;
+}
+
+static bool cabin_lit = true;  // tap the window: the lamp inside on or off
+
+// The cabin's window and, when it is lit, the warm light spilling on the snow under it (written into the cabin picture).
+static void paintLight(bool on)
+{
+  int base = lroundf(groundAt(139));
+  for (int y = base - 11; y <= base - 4; y++)
+    for (int x = 125; x <= 136; x++) {
+      bool bar = x == 130 || x == 131 || y == base - 8;
+      uint8_t c = bar ? D1 : on ? (y < base - 8 ? F5 : F4) : (x == 127 && y == base - 10) ? N3 : (y < base - 8 ? N2 : N1);
+      put(x, y, c, true);
+    }
+  for (int y = base + 1; y < base + 9; y++)
+    for (int x = 116 + (y - base); x <= 146 - (y - base); x++) {
+      if (on) {
+        if ((x + y) % 2 == 0 || y < base + 4) put(x, y, y < base + 4 ? F4 : F3, true);
+      } else {
+        put(x, y, hillColor(x, y, lroundf(groundAt(x))), true);
+      }
+    }
+}
+
 static void build()
 {
   scene = (uint8_t *)ps_malloc(W * H);
@@ -88,12 +118,7 @@ static void build()
   // the hill
   for (int x = 0; x < W; x++) {
     int top = lroundf(groundAt(x));
-    for (int y = top; y < H; y++) {
-      uint32_t h = hash32(x * 977 + y * 131);
-      uint8_t c = y == top ? N6 : (y > top + 6 && ((x + y) & 1) ? N4 : N5);
-      if (h % 41 == 0) c = N6;
-      put(x, y, c, true);
-    }
+    for (int y = top; y < H; y++) put(x, y, hillColor(x, y, top), true);
   }
   // the cabin
   int cx0 = 118, cx1 = 160, base = lroundf(groundAt(139));
@@ -107,14 +132,9 @@ static void build()
   }
   for (int y = base - 34; y <= base - 22; y++) put(150, y, R2, true), put(151, y, R2, true), put(152, y, R1, true);
   put(150, base - 35, N6, true), put(151, base - 35, N6, true), put(152, base - 35, N6, true);
-  for (int y = base - 11; y <= base - 4; y++)  // window
-    for (int x = 125; x <= 136; x++) put(x, y, (x == 130 || x == 131 || y == base - 8) ? D1 : (y < base - 8 ? F5 : F4), true);
+  paintLight(true);  // the window and the warm light spilling on the snow under it
   for (int y = base - 12; y <= base; y++)  // door
     for (int x = 146; x <= 153; x++) put(x, y, x == 146 || x == 153 || y == base - 12 ? D1 : D2, true);
-  // warm light spilling on the snow under the window
-  for (int y = base + 1; y < base + 9; y++)
-    for (int x = 116 + (y - base); x <= 146 - (y - base); x++)
-      if ((x + y) % 2 == 0 || y < base + 4) put(x, y, y < base + 4 ? F4 : F3, true);
   // pines on the hill, standing in the snow
   const int PINES[][2] = { { 22, 26 }, { 52, 34 }, { 82, 22 }, { 190, 30 }, { 222, 38 }, { 256, 24 }, { 292, 32 } };
   for (auto &p : PINES) pine(p[0], lroundf(groundAt(p[0])), p[1]);
@@ -339,6 +359,68 @@ static void sleigh()
   int x = lroundf(sleigh_x), leg = (frame_no / 3) % 2;
   for (int d = 0; d < 2; d++) sprite(DEER[leg ^ d], 7, x + d * 12, 11 + lroundf(2 * sinf(t * 1.7f + d * 0.8f)), "ab", DEER_C);
   sprite(SLEIGH, 7, x + 25, 11 + lroundf(2 * sinf(t * 1.7f + 1.9f)), "wrlscRn", SLEIGH_C);
+}
+
+// At dawn (local 06-08) a deer now and then walks across the snow in front of the cabin.
+static uint32_t deer_next_ms = 0;
+static float deer_x = -1000;
+static int deer_dir = 1;
+
+static bool dawnNow()
+{
+  time_t t = time(nullptr);
+  if (t < 100000) return false;  // no clock yet
+  struct tm lt;
+  localtime_r(&t, &lt);
+  return lt.tm_hour >= 6 && lt.tm_hour < 8;
+}
+
+static void deer()
+{
+  static const char *const DEER[2][9] = {
+    { "..........a.a.", "...........aa.", "..........bbb.", "..........bbk.", "wbbbbbbbbbbbb.", ".bbbbbbbbbbb..", ".bbbbbbbbbbb..", "..b.b...b.b...", "..b.b...b.b..." },
+    { "..........a.a.", "...........aa.", "..........bbb.", "..........bbk.", "wbbbbbbbbbbbb.", ".bbbbbbbbbbb..", ".bbbbbbbbbbb..", "...b.b.b..b...", "...b.b.b..b..." },
+  };
+  static const uint8_t DEER_C[] = { S3, D3, N6, N1 };
+  uint32_t now = millis();
+  if (deer_x < -100) {  // not walking
+    if (!dawnNow()) {
+      deer_next_ms = 0;
+      return;
+    }
+    if (!deer_next_ms) deer_next_ms = now + 15000 + esp_random() % 60000;
+    if ((int32_t)(now - deer_next_ms) < 0) return;
+    if (esp_random() % 100 < 55) {  // sometimes
+      deer_dir = esp_random() & 1 ? 1 : -1;
+      deer_x = deer_dir > 0 ? -16 : W + 2;
+    } else {
+      deer_next_ms = now + 60000 + esp_random() % 60000;
+      return;
+    }
+  }
+  deer_x += deer_dir * 0.28f;
+  if (deer_x > W + 4 || deer_x < -18) {
+    deer_x = -1000;
+    deer_next_ms = now + 90000 + esp_random() % 90000;
+    return;
+  }
+  int x = lroundf(deer_x), leg = (frame_no / 6) % 2;
+  int y = lroundf(groundAt(x + 7)) + 4 - 8;
+  sprite(DEER[leg], 9, x, y, "abwk", DEER_C, deer_dir < 0);
+}
+
+// Tap: on the cabin's window the lamp inside goes on or off; anywhere else it stirs the snow.
+void Snowglobe_Tap(int sx, int sy)
+{
+  int base = lroundf(groundAt(139));
+  if (!globe && scene && sx >= 2 * 125 - 14 && sx <= 2 * 137 + 14 && sy >= 2 * (base - 11) - 14 && sy <= 2 * (base - 4) + 14) {
+    cabin_lit = !cabin_lit;
+    t_scene = scene;
+    t_solid = solid;
+    paintLight(cabin_lit);
+    return;
+  }
+  Snowglobe_Stir(0.6f);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -715,12 +797,13 @@ void Snowglobe_Draw(const char *corner_text)
     if (ph < 0.6f) set(x, y - 1, c);
   }
   // the window flickers a little, like a fire inside
-  if ((frame_no / 3) % 7 == 0)
+  if (cabin_lit && (frame_no / 3) % 7 == 0)
     for (int y = base - 11; y <= base - 9; y++)
       for (int x = 126; x <= 129; x++) set(x, y, F4);
   bool holidays = SettingsUi_Holidays();
   if (holidays) holidayCabin(base);
   shootingStar();
+  deer();
   if (holidays) sleigh();
   // far, slow flakes behind the forest line
   for (int i = 0; i < FAR_FLAKES && spawned > i * 5; i++) {

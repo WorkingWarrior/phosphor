@@ -9,3 +9,6 @@
 
 void Wave_Draw(const char *corner_text);  // advances one frame (call every ~50 ms) and draws
 void Wave_Tap(int screen_x);              // kicks a wave at that x (screen 0..639)
+// Hold: the ship's fog horn (a low Radio_Beep, only when the radio is not playing) and a puff of smoke from a funnel.
+// Now and then, rarely, a whale surfaces and spouts.
+void Wave_Hold();

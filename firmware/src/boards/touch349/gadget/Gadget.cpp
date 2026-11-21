@@ -11,6 +11,7 @@
 #include "../../../core/UpdateCheck.h"
 #include "Fireplace.h"
 #include "Fishtank.h"
+#include "Forecast.h"
 #include "Hourglass.h"
 #include "Lava.h"
 #include "Motion.h"
@@ -762,9 +763,18 @@ static void skyIcon(Sky s, int x, int y)
 static int sky_force = -1;   // /cmd sky: preview a sky (Sky index), -1 = the real one
 static bool sky_night = false;
 
+static uint32_t forecast_until = 0;  // tap on the weather page: the next days, for a while
+
 static void drawWeather()
 {
   WeatherNow w = Weather_Get();
+  if (forecast_until && (int32_t)(millis() - forecast_until) < 0) {
+    const char *days[3];
+    for (int i = 0; i < 3; i++) days[i] = w.next[i].weekday < 0 ? "--" : weekdayName(w.next[i].weekday);
+    Forecast_Draw(w, days);
+    return;
+  }
+  forecast_until = 0;
   if (theme::current() != theme::VFD) {
     WeatherFace f;
     f.weather = w; f.day = sky_force >= 0 ? !sky_night : w.day; f.sky = sky_force >= 0 ? (Sky)sky_force : w.valid ? w.sky : Sky::Unknown;
@@ -1240,6 +1250,14 @@ void Gadget_Gesture(Gesture g, int x, int y)
         Hourglass_Reset();
       } else if (state.mode == Mode::Snow) {
         Snowglobe_Hold();
+      } else if (state.mode == Mode::Aquarium) {
+        Fishtank_Hold();
+      } else if (state.mode == Mode::Fire) {
+        Fireplace_Hold();
+      } else if (state.mode == Mode::Sea) {
+        Seaside_Hold();
+      } else if (state.mode == Mode::Wave) {
+        Wave_Hold();
       } else if (state.mode == Mode::Radio) {
         RadioFace_Hold(x, y);
       }
@@ -1248,10 +1266,13 @@ void Gadget_Gesture(Gesture g, int x, int y)
       switch (state.mode) {
         case Mode::Clock: tapClock(x, y); break;
         case Mode::Radio: tapRadio(x, y); break;
+        case Mode::Weather:  // the next days for 12 s; a second tap goes back
+          forecast_until = forecast_until && (int32_t)(millis() - forecast_until) < 0 ? 0 : millis() + 12000;
+          break;
         case Mode::Aquarium: Fishtank_Feed(x); break;
-        case Mode::Snow: Snowglobe_Stir(0.6f); break;
-        case Mode::Fire: Fireplace_Tap(); break;
-        case Mode::Sea: Seaside_Tap(); break;
+        case Mode::Snow: Snowglobe_Tap(x, y); break;
+        case Mode::Fire: Fireplace_Tap(x, y); break;
+        case Mode::Sea: Seaside_Tap(x, y); break;
         case Mode::Study: Study_Tap(); break;
         case Mode::Wave: Wave_Tap(x); break;
         case Mode::Lava: Lava_Tap(); break;

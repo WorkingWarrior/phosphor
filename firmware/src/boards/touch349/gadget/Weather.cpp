@@ -12,7 +12,7 @@ static String weatherUrl()
   return "http://api.open-meteo.com/v1/forecast?latitude=" + String(settings::lat(), 4) +
          "&longitude=" + String(settings::lon(), 4) +
          "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code,is_day"
-         "&daily=weather_code,temperature_2m_max&timezone=auto&forecast_days=4" +
+         "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=auto&forecast_days=4" +
          (settings::fahrenheit() ? "&temperature_unit=fahrenheit&wind_speed_unit=mph" : "");
 }
 #define REFRESH_MS (20 * 60 * 1000UL)
@@ -118,14 +118,18 @@ static bool fetch()
   if (numberAfter(body, cur, "\"weather_code\":", v)) w.sky = skyFromCode((int)v);
   if (numberAfter(body, cur, "\"is_day\":", v)) w.day = v > 0.5f;
 
-  String dates[4], codes[4], maxes[4];
+  String dates[4], codes[4], maxes[4], mins[4], rains[4];
   const char *daily = "\"daily\":{";
   int n = arrayAfter(body, daily, "\"time\":", dates, 4);
   arrayAfter(body, daily, "\"weather_code\":", codes, 4);
   arrayAfter(body, daily, "\"temperature_2m_max\":", maxes, 4);
+  int n_min = arrayAfter(body, daily, "\"temperature_2m_min\":", mins, 4);
+  int n_rain = arrayAfter(body, daily, "\"precipitation_probability_max\":", rains, 4);
   for (int i = 1; i < n && i <= 3; i++) {  // tomorrow and the two days after
     w.next[i - 1].weekday = weekdayOf(dates[i]);
     w.next[i - 1].t_max = lroundf(maxes[i].toFloat());
+    if (i < n_min) w.next[i - 1].t_min = lroundf(mins[i].toFloat());
+    if (i < n_rain && rains[i] != "null") w.next[i - 1].rain = lroundf(rains[i].toFloat());
     w.next[i - 1].sky = skyFromCode(codes[i].toInt());
   }
   w.valid = true;

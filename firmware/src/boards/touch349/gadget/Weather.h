@@ -9,6 +9,8 @@ enum class Sky { Unknown, Clear, PartCloud, Cloud, Fog, Drizzle, Rain, Shower, S
 struct WeatherDay {
   int weekday = -1;  // 0 = Sunday
   int t_max = 0;
+  int t_min = 0;
+  int rain = -1;  // chance of precipitation in %, -1 = not known
   Sky sky = Sky::Unknown;
 };
 
