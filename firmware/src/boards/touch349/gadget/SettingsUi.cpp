@@ -6,6 +6,7 @@
 #include <WiFi.h>
 #include "../../../core/Board.h"
 #include "../../../core/state.h"
+#include "../../../core/UpdateCheck.h"
 #include "Settings.h"
 #include "Theme.h"
 #include "Vfd.h"
@@ -439,8 +440,14 @@ void SettingsUi_Draw()
     drawLines(L("NETWORK", "AĞ"), p, 4, true);
   } else if (sel == ABOUT) {
     String host = state.name + ".local/settings";
+    String news = String(L("NEW: ", "YENİ: ")) + UpdateCheck_Newer();
     const char *p[4] = { "PHOSPHOR " FW_VERSION, L("MORE ON YOUR PHONE:", "TELEFONDAN DAHA FAZLASI:"), host.c_str(),
                          "github.com/melihkoray/phosphor" };
+    if (*UpdateCheck_Newer()) {  // a newer release is out: say so, with where to get it (the device never installs it)
+      p[1] = news.c_str();
+      p[2] = UpdateCheck_Site();
+      p[3] = host.c_str();
+    }
     drawLines(L("ABOUT", "HAKKINDA"), p, 4, true);
   } else {
     drawValue();

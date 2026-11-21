@@ -31,6 +31,7 @@
 #include "Improv.h"
 #include "Watchdog.h"
 #include "state.h"
+#include "UpdateCheck.h"
 #if __has_include("../../secrets.h")
 #include "../../secrets.h"
 #endif
@@ -134,17 +135,19 @@ $('info').textContent=`${s.ip} · ${s.temp_c.toFixed(1)}° · ${Math.round(s.hum
 
 static void sendStatus()
 {
-  char json[640];
+  char json[800];
   static const char *MODE_NAMES[] = { "clock", "info", "message", "image", "aquarium", "aquarium-night", "radio", "weather", "timer", "snow", "fire", "sea", "study", "wave", "lava", "hourglass", "settings" };
   const char *mode = MODE_NAMES[(int)state.mode];
+  uint32_t uh0, uh1;
+  UpdateCheck_Heap(uh0, uh1);
   snprintf(json, sizeof(json),
            "{\"name\":\"%s\",\"fw\":\"%s\",\"ip\":\"%s\",\"rssi\":%d,\"mode\":\"%s\","
            "\"temp_c\":%.2f,\"humidity\":%.1f,\"battery_v\":%.2f,\"uptime_s\":%lu,"
-           "\"heap_free\":%u,\"psram_free\":%u,"
+           "\"heap_free\":%u,\"psram_free\":%u,\"update\":\"%s\",\"update_heap\":[%u,%u],"
            "\"model\":\"%s\",\"width\":%d,\"height\":%d,\"format\":\"%s\",\"speaker\":%s,\"volume\":%d,\"inverted\":%s,\"display\":%d,\"brightness\":%d,\"reset\":\"%s\"}",
            state.name.c_str(), FW_VERSION, Net_Ip().c_str(), Net_Rssi(), mode,
            isnan(state.temp_c) ? 0.0 : state.temp_c, isnan(state.humi) ? 0.0 : state.humi, state.batt_v,
-           (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getFreePsram(),
+           (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getFreePsram(), UpdateCheck_Newer(), (unsigned)uh0, (unsigned)uh1,
            board().model(), board().width(), board().height(), board().frameFormat(),
            Audio_Ready() ? "true" : "false", Audio_Volume(), state.inverted ? "true" : "false", board().displayOn(), board().brightness(),
            Watchdog_ResetReason());

@@ -23,6 +23,7 @@ static const uint8_t DIGITS[10][5] = {
     { 7, 5, 7, 5, 7 }, { 7, 5, 7, 1, 7 }
 };
 const char *const BOLT[] = { "..##", ".##.", "####", ".##.", "##.." };
+const char *const ARROW[] = { "..#..", ".###.", "#.#.#", "..#..", "..#.." };  // "new version" mark
 const char *const BELL[] = { "...#...", "..###..", ".#####.", ".#####.", ".#####.", "#######", "...#..." };
 const uint16_t CHROME[] = {
   rgb(255, 255, 255), rgb(255, 255, 255), rgb(255, 255, 255), rgb(255, 255, 255),
@@ -161,6 +162,10 @@ void ClockFaces_Draw(const ClockFace &f)
     label(f.calendar_date, 492, 54, bright, amiga, 2,
           MachineTextWidth(f.calendar_date) > 138 ? 14 : 0);
     rect(492, 80, 132, atari ? 2 : 1, dim);
+    if (f.update.length()) {
+      sprite(ARROW, 5, 412, 88, 2, hot);
+      label(L("NEW", "YENİ"), 428, 88, hot, amiga);
+    }
     sprite(BELL, 7, 492, 94, 2, alarm);
     label(f.ringing ? L("WAKE UP!", "UYAN!") : "ALARM", 512, 96, alarm, amiga, 2,
           f.ringing && amiga ? 14 : 0);
@@ -188,6 +193,10 @@ void ClockFaces_Draw(const ClockFace &f)
     else rect((x - 4) / 4 * 4, (y - 2) / 2 * 2, 8, 4, hot);
   } else {
     label("READY.", 30, 16, BASIC);
+    if (f.update.length()) {  // top right, where the cursor line is empty
+      String u = String(L("NEW ", "YENİ ")) + f.update;
+      label(u, W - theme::def().border_w - 24 - MachineTextWidth(u), 16, BASIC_DIM);
+    }
     if (f.cursor) rect(30, 32, 16, 16, BASIC);
     MachineBlockText(f.time, (W - MachineBlockText(f.time, 0, 0, false)) / 2, 56);
     String date = f.date, alarm = f.ringing ? f.alarm : "ALARM " + f.alarm;

@@ -8,6 +8,7 @@
 #include "../../../core/Assets.h"
 #include "../../../core/net.h"
 #include "../../../core/state.h"
+#include "../../../core/UpdateCheck.h"
 #include "Fireplace.h"
 #include "Fishtank.h"
 #include "Hourglass.h"
@@ -305,7 +306,8 @@ static void drawClock(const DateTime &now)
                        alarm_on && (!ringing || blinkOn(300)), ringing, now.second % 2 == 0, state.batt_pct, state.charging,
                        String(weekdayName(wd, true)), String(weekdayName(wd)), date,
                        settings::h24() ? "24H" : now.hour < 12 ? "AM" : "PM",
-                       two(alarm_h) + ":" + two(alarm_m), alarm_on, now.second };
+                       two(alarm_h) + ":" + two(alarm_m), alarm_on, now.second,
+                       UpdateCheck_Newer() };
     ClockFaces_Draw(face);
     return;
   }
@@ -330,6 +332,11 @@ static void drawClock(const DateTime &now)
     sprite(BELL, 7, 492, 94, 2, HOT);
   } else {
     sprite(BELL, 7, 492, 94, 2, GHOST);
+  }
+  if (*UpdateCheck_Newer()) {  // a newer release exists (Settings > About has the details)
+    static const char *const ARROW[] = { "..#..", ".###.", "#.#.#", "..#..", "..#.." };
+    sprite(ARROW, 5, 412, 88, 2, HOT);
+    text(L("NEW", "YENİ"), 428, 88, 2, DIM_INK);
   }
   text(ringing ? L("WAKE UP!", "UYAN!") : "ALARM", 512, 96, 2, alarm_lit ? HOT_INK : GHOST_INK);
   String at = two(alarm_h) + ":" + two(alarm_m);
@@ -866,6 +873,7 @@ void Gadget_Begin(uint16_t *canvas, I2cMasterBus *bus, void (*amp)(bool))
     Radio_Stop();
   }
   Weather_Begin();
+  UpdateCheck_Begin([]() { return Radio_On(); });  // check only; waits while the radio plays
   Motion_Begin(bus);
 }
 

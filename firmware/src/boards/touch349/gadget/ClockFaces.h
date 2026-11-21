@@ -11,6 +11,7 @@ struct ClockFace {
   String weekday, short_weekday, calendar_date, period, alarm_time;
   bool alarm_on;
   int second;
+  String update;  // newer release tag ("v1.2.0") or empty: a small notice
 };
 void ClockFaces_Draw(const ClockFace &face);
 
