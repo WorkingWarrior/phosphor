@@ -441,7 +441,7 @@ const RetroSprite *RetroSprite_Get(const char *name)
     uint8_t *buf;
     uint32_t cap;
   };
-  static Slot slots[3];
+  static Slot slots[8];  // a game character has six poses
   static int victim = 0;
   if (!name || !*name || strlen(name) >= sizeof(slots[0].name) || !assets::ok()) return nullptr;
   for (auto &sl : slots)
@@ -467,8 +467,36 @@ const RetroSprite *RetroSprite_Get(const char *name)
   if (p != n) return nullptr;
   sl.s = { im.w, im.h, im.sx, im.sy, bool(im.flags & 1), im.pal, sl.buf };
   strlcpy(sl.name, name, sizeof(sl.name));
-  victim = (victim + 1) % 3;
+  victim = (victim + 1) % 8;
   return &sl.s;
+}
+
+bool RetroSprite_Draw(const char *name, int x, int y, bool bottom_left)
+{
+  const RetroSprite *sp = RetroSprite_Get(name);
+  if (!sp) return false;
+  uint16_t *cv = vfd::canvas();
+  int sx = sp->sx ? sp->sx : 1, sy = sp->sy ? sp->sy : 1;
+  if (bottom_left) y -= int(sp->h) * sy;
+  for (int r = 0; r < sp->h; r++) {
+    int y0 = y + r * sy;
+    if (y0 + sy <= 0 || y0 >= vfd::H) continue;
+    const uint8_t *row = sp->idx + uint32_t(r) * sp->w;
+    for (int c = 0; c < sp->w;) {
+      uint8_t v = row[c];
+      int e = c + 1;
+      while (e < sp->w && row[e] == v) e++;
+      if (!(sp->keyed && v == 0)) {
+        int xa = max(x + c * sx, 0), xb = min(x + e * sx, int(vfd::W));
+        int ya = max(y0, 0), yb = min(y0 + sy, int(vfd::H));
+        uint16_t col = sp->pal[v];
+        for (int yy = ya; yy < yb; yy++)
+          for (int xx = xa; xx < xb; xx++) cv[yy * vfd::W + xx] = col;
+      }
+      c = e;
+    }
+  }
+  return true;
 }
 
 bool RetroWorld_Draw()

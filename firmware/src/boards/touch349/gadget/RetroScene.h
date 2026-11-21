@@ -46,3 +46,7 @@ struct RetroSprite {
   const uint8_t *idx;
 };
 const RetroSprite *RetroSprite_Get(const char *name);
+
+// Draws a named sprite from the asset pack at (x, y), top left; with bottom_left, (x, y) is its bottom left corner. Index 0
+// is skipped when the sprite is keyed. Clipped to the screen. false = no asset pack or no such sprite: nothing is drawn.
+bool RetroSprite_Draw(const char *name, int x, int y, bool bottom_left = false);
