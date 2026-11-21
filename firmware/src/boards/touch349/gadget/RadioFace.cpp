@@ -4,6 +4,7 @@
 #include <Preferences.h>
 #include <math.h>
 #include "Radio.h"
+#include "Theme.h"
 #include "Vfd.h"
 
 using namespace vfd;
@@ -229,7 +230,7 @@ static void drawCells()
   int x0 = RADIO_SLOT_X, y0 = RADIO_SLOT_Y;
   for (int j = 0; j < CH; j++)
     for (int i = 0; i < CW; i++)
-      if (!cells.v[j][i]) rect(x0 + i * PITCH, y0 + j * PITCH, 2, 2, FAINT);
+      if (theme::current() == theme::VFD && !cells.v[j][i]) rect(x0 + i * PITCH, y0 + j * PITCH, 2, 2, FAINT);
   for (int j = 0; j < CH; j++)
     for (int i = 0; i < CW; i++) {
       uint8_t k = cells.v[j][i];
@@ -344,8 +345,10 @@ static void cassette()
 void RadioFace_DrawSlot()
 {
   load();
+  if (theme::current() == theme::ATARI) clip(RADIO_SLOT_X - 1, 34, RADIO_SLOT_X + 79, 126);
   if (slot == DANCERS) dancers();
   else if (slot == CASSETTE) cassette();
+  noClip();
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -446,7 +449,7 @@ static void eqVu()
     needle[c] += (target - needle[c]) * (target > needle[c] ? 0.35f : 0.12f);
 
     int x = EQ_X + c * 101, w = 94, cx = x + w / 2, py = 136, R = 80;
-    frame(x, EQ_TOP - 4, w, EQ_BOT - EQ_TOP + 6, GHOST);
+    if (theme::current() != theme::ATARI) frame(x, EQ_TOP - 4, w, EQ_BOT - EQ_TOP + 6, GHOST);
     clip(x + 1, EQ_TOP - 3, x + w - 1, EQ_BOT + 1);
     const float A = 0.56f;  // half the swing, radians
     for (int k = 0; k <= 10; k++) {  // scale: the last three marks are the red zone
@@ -474,7 +477,7 @@ static void eqScope()
   int8_t tr[RADIO_TRACE];
   Radio_Trace(tr);
   int mid = (EQ_TOP + EQ_BOT) / 2;
-  frame(EQ_X, EQ_TOP - 4, EQ_W - 1, EQ_BOT - EQ_TOP + 6, GHOST);
+  if (theme::current() != theme::ATARI) frame(EQ_X, EQ_TOP - 4, EQ_W - 1, EQ_BOT - EQ_TOP + 6, GHOST);
   for (int x = EQ_X + 4; x < EQ_X + EQ_W - 4; x += 4) {
     rect(x, mid, 1, 1, DIM);
     rect(x, mid - 22, 1, 1, GHOST);

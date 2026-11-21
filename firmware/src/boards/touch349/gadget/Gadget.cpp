@@ -300,38 +300,20 @@ static void drawSecondDot(int second)
   rect(x - 4, y - 4, 8, 8, HOT);
 }
 
-// C64-style: a rainbow sash across the top right corner, five stripes on the machine's wide pixels.
-static void drawRainbow()
-{
-  static const uint16_t BAND[] = { px::rgb(214, 72, 56), px::rgb(226, 140, 52), px::rgb(232, 212, 92),
-                                   px::rgb(104, 180, 80), px::rgb(96, 160, 230) };
-  const int right = W - theme::def().border_w, top = theme::def().border_w, first = 26, bw = 7;
-  for (int y = top; y < top + first + 5 * bw; y += 2) {
-    for (int k = 0; k < 5; k++) {
-      int lo = first + k * bw - (y - top), hi = lo + bw;  // distance in from the right edge on this row
-      lo = max(lo, 0);
-      if (hi <= 0) continue;
-      int x0 = (right - hi) & ~1, x1 = (right - lo) & ~1;
-      rect(x0, y, x1 - x0, 2, BAND[k]);
-    }
-  }
-}
-
 static void drawClock(const DateTime &now)
 {
-  if (theme::current() != theme::VFD && RetroWorld_Draw()) {
+  if (theme::current() == theme::C64 || (theme::current() != theme::VFD && RetroWorld_Draw())) {
+    if (theme::current() == theme::C64) clear();
     int wd = weekday(now.year, now.month, now.day);
     String date = String(now.day) + " " + monthName(now.month);
     ClockFace face = { hhmm(now), String(weekdayName(wd)) + " " + date,
                        String(weekdayName(wd, true)) + " " + String(now.day) + " " + monthTitle(now.month),
                        ringing ? String(L("WAKE UP!", "UYAN!")) : two(alarm_h) + ":" + two(alarm_m),
-                       alarm_on && (!ringing || blinkOn(300)), ringing, state.batt_pct };
+                       alarm_on && (!ringing || blinkOn(300)), ringing, blinkOn(), state.batt_pct };
     ClockFaces_Draw(face);
-    if (theme::current() == theme::C64) drawRainbow();
     return;
   }
   clear();
-  if (theme::current() == theme::C64) drawRainbow();
   String hm = hhmm(now);
   // VFD draws ghost 8s, so the digits fill their cells; the machines show only the lit ones, which leaves a gap on the left
   seg(hm.c_str(), theme::current() == theme::VFD ? 20 : 10, 24, 78, 124, 12, 12, { LIT, HALO, GHOST });
@@ -370,15 +352,37 @@ static void drawVolumeBar(int x, int y)
   }
 }
 
+static bool radio_world = false;
+
 static void drawRadio(const DateTime &now)
 {
-  clear();
+  radio_world = false;
   int st = constrain(Radio_Station(), 0, settings::stationCount() - 1);
   const RadioStation &s = settings::station(st);
   RadioState rs = Radio_State();
   String gname = settings::group(s.group).name;
   gname.toUpperCase();
 
+  if (theme::current() == theme::C64 || (theme::current() != theme::VFD && RetroWorld_Draw())) {
+    if (theme::current() == theme::C64) clear();
+    RadioFaceData f;
+    f.channel = "CH " + two(st + 1); f.genre = gname; f.station = s.name; f.time = hhmm(now);
+    f.playing = rs == RadioState::Playing; f.state = int(rs); f.cursor = blinkOn();
+    f.show_volume = volume_shown_ms && millis() - volume_shown_ms < VOLUME_SHOW_MS;
+    f.volume = Radio_Volume(); f.volume_label = L("VOL", "SES");
+    f.group = s.group; f.groups = settings::groupCount();
+    for (int i = 0; i < f.groups; i++) { f.genres[i] = settings::group(i).key; f.genres[i].toUpperCase(); }
+    switch (rs) {
+      case RadioState::Off: f.line = L("STOPPED · TAP TO PLAY", "DURDU · ÇALMAK İÇİN DOKUN"); break;
+      case RadioState::Connecting: f.line = String(L("CONNECTING", "BAĞLANIYOR")) + String("...").substring(0, (millis() / 400) % 4); break;
+      case RadioState::Failed: f.line = L("NO SIGNAL · TAP TO RETRY", "BAĞLANAMADI · TEKRAR DOKUN"); break;
+      case RadioState::Playing: f.line = Radio_Title(); if (!f.line.length()) f.line = L("LIVE", "CANLI YAYIN"); break;
+    }
+    radio_world = true;
+    RadioFaces_Draw(f);
+    return;
+  }
+  clear();
   text(("CH " + two(st + 1)).c_str(), 16, 10, 2, DIM_INK);
   text(gname.c_str(), 96, 10, 2, LIT_INK);
   text("STEREO", 440, 10, 2, rs == RadioState::Playing ? HOT_INK : GHOST_INK);
@@ -718,8 +722,19 @@ static bool sky_night = false;
 
 static void drawWeather()
 {
-  clear();
   WeatherNow w = Weather_Get();
+  if (theme::current() == theme::C64 || (theme::current() != theme::VFD && RetroWorld_Draw())) {
+    if (theme::current() == theme::C64) clear();
+    WeatherFace f;
+    f.weather = w; f.sky = sky_force >= 0 ? (Sky)sky_force : w.valid ? w.sky : Sky::Unknown;
+    f.condition = f.sky != Sky::Unknown ? Weather_SkyName(f.sky) : L("WAIT", "BEKLE");
+    f.humidity = String(L("HUM ", "NEM ")) + (settings::tr() ? "%" + String(w.humidity) : String(w.humidity) + "%");
+    f.wind = String(L("WIND ", "RÜZGAR ")) + String(w.wind) + (settings::fahrenheit() ? " MPH" : L(" KM/H", " KM/SA"));
+    for (int i = 0; i < 3; i++) f.days[i] = weekdayName(w.next[i].weekday);
+    WeatherFaces_Draw(f);
+    return;
+  }
+  clear();
 
   // temperature: two 7-segment cells, right aligned, the empty one ghosted
   char tbuf[6];
@@ -935,6 +950,7 @@ void Gadget_Render(const DateTime &now)
     drawVolumeBar(158, 78);
   }
   theme::decorate();
+  if (state.mode == Mode::Radio && radio_world) RadioFaces_Border();
 }
 
 uint32_t Gadget_FrameMs(Mode m)
