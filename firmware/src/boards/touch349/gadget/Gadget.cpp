@@ -1326,6 +1326,8 @@ void Gadget_Gesture(Gesture g, int x, int y)
         Wave_Hold();
       } else if (state.mode == Mode::Radio) {
         RadioFace_Hold(x, y);
+      } else if (state.mode == Mode::Settings) {
+        SettingsUi_Hold();
       }
       break;
     case Gesture::Tap:

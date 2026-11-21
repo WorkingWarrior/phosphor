@@ -4,6 +4,9 @@
 #include <HTTPClient.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <ricmoo_qrcode.h>
+#include "ClockFaces.h"
+#include "../../../core/net.h"
 #include "../../../core/Board.h"
 #include "../../../core/state.h"
 #include "../../../core/UpdateCheck.h"
@@ -120,6 +123,7 @@ static int cycle_min = -1;  // -1 = not read yet
 static int xmas = -1;       // holidays: 0 = by the date, 1 = always, 2 = never; -1 = not read yet
 
 static int city_idx = -1;          // city picked from the list, -1 = the saved one
+static uint32_t wifi_confirm_until = 0;  // "hold again to forget Wi-Fi" is waiting for the second hold until then
 static uint32_t city_save_at = 0;  // when to save it (stepping stopped), 0 = nothing pending
 
 enum class Look : uint8_t { Idle, Running, Found, Failed };
@@ -272,9 +276,11 @@ void SettingsUi_Tick()
   }
 }
 
+static bool wifiConfirming() { return wifi_confirm_until && (int32_t)(wifi_confirm_until - millis()) > 0; }
+
 bool SettingsUi_Busy()
 {
-  return look == Look::Running || ((look == Look::Found || look == Look::Failed) && millis() - look_done_ms < NOTE_MS + 200);
+  return wifiConfirming() || look == Look::Running || ((look == Look::Found || look == Look::Failed) && millis() - look_done_ms < NOTE_MS + 200);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -446,6 +452,22 @@ static void drawValue()
   }
 }
 
+// A QR code of the text at the right end of the panel: dark modules on a light square even in the dark themes, 5 px per
+// module (a phone camera reads that off this panel from arm's length), with a quiet zone of the rest of the 172 px.
+static void drawQr(const String &url)
+{
+  QRCode qr;
+  static uint8_t modules[160];
+  if (qrcode_getBufferSize(3) > sizeof(modules) || qrcode_initText(&qr, modules, 3, ECC_MEDIUM, url.c_str()) != 0) return;
+  const int M = 5, SIDE = 172, X0 = PX1 - SIDE, off = (SIDE - qr.size * M) / 2;
+  rect(X0, 0, SIDE, SIDE, 0xFFFF);
+  for (int y = 0; y < qr.size; y++) {
+    for (int x = 0; x < qr.size; x++) {
+      if (qrcode_getModule(&qr, x, y)) rect(X0 + off + x * M, off + y * M, M, M, 0x0000);
+    }
+  }
+}
+
 void SettingsUi_Draw()
 {
   clear();
@@ -460,11 +482,13 @@ void SettingsUi_Draw()
     String l[4];
     bool up = WiFi.status() == WL_CONNECTED;
     l[0] = up ? WiFi.SSID() : String(L("NOT CONNECTED", "BAĞLI DEĞİL"));
-    l[1] = up ? "IP " + WiFi.localIP().toString() : String();
+    if (up && l[0].length() > 17) l[0] = l[0].substring(0, 17);  // the QR code takes the right side
+    l[1] = up ? WiFi.localIP().toString() : String();
     l[2] = up ? String(L("SIGNAL ", "SİNYAL ")) + WiFi.RSSI() + " DBM" : String();
-    l[3] = L("HOLD BOOT 5 S: NEW WI-FI", "BOOT 5 SN BASILI: YENİ WI-FI");
+    l[3] = L("HOLD: NEW WI-FI", "TUT: YENİ WI-FI");
     const char *p[4] = { l[0].c_str(), l[1].c_str(), l[2].c_str(), l[3].c_str() };
-    drawLines(L("NETWORK", "AĞ"), p, 4, true);
+    drawLines(up ? L("SCAN FOR SETTINGS", "AYARLAR İÇİN OKUT") : L("NETWORK", "AĞ"), p, 4, true);
+    if (up) drawQr("http://" + l[1] + "/settings");  // the IP: Android often cannot resolve .local
   } else if (sel == ABOUT) {
     String host = state.name + ".local/settings";
     String news = String(L("NEW: ", "YENİ: ")) + UpdateCheck_Newer();
@@ -480,6 +504,9 @@ void SettingsUi_Draw()
     drawValue();
   }
   noClip();
+  if (sel == WIFI && wifiConfirming()) {
+    ClockFaces_Banner(L("HOLD AGAIN: FORGET WI-FI + SETUP", "TEKRAR BASILI TUT: WI-FI UNUT + KURULUM"));
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -489,6 +516,21 @@ void SettingsUi_Draw()
 void SettingsUi_Step(int dir)
 {
   sel = constrain(sel + dir, 0, ITEM_COUNT - 1);
+}
+
+// Same path as holding BOOT for 5 s: notice, then forget the network and open the setup portal.
+void SettingsUi_Hold()
+{
+  if (sel != WIFI) return;
+  if (!wifiConfirming()) {
+    wifi_confirm_until = millis() + 5000;
+    return;
+  }
+  wifi_confirm_until = 0;
+  board().setDisplayOn(true);
+  board().showNotice(L("Resetting Wi-Fi", "Wi-Fi sıfırlanıyor"), L("The setup network will open", "Kurulum ağı açılacak"));
+  delay(1500);
+  Net_ResetWifi();
 }
 
 void SettingsUi_Select(int item, int page)

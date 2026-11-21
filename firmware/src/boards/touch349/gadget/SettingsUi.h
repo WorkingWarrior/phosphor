@@ -11,6 +11,7 @@ void SettingsUi_Draw();
 void SettingsUi_Tap(int x, int y);
 void SettingsUi_Step(int dir);  // +1 = next item, -1 = previous
 void SettingsUi_Select(int item, int help_page = 0);  // HTTP /cmd menu: for screenshots
+void SettingsUi_Hold();         // long press: on the Wi-Fi view, "change Wi-Fi" (asks to hold again within 5 s)
 bool SettingsUi_Busy();         // something changes on its own (a lookup, a note): redraw often
 void SettingsUi_Tick();         // main loop: saves a city picked from the list once the stepping stops
 
