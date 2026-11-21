@@ -1382,6 +1382,10 @@ String Gadget_Command(const String &name, const String &arg)
     int c1 = arg.indexOf(','), c2 = arg.indexOf(',', c1 + 1);
     if (c1 < 0 || c2 < 0) return "{\"error\":\"tap|hold|left|right|up|down,x,y\"}";
     String kind = arg.substring(0, c1);
+    if (kind == "press" || kind == "release") {  // bare finger edges (the runner jumps on these)
+      Apps_Touch(kind == "press", arg.substring(c1 + 1, c2).toInt(), arg.substring(c2 + 1).toInt());
+      return "{\"ok\":true}";
+    }
     Gesture g = kind == "hold" ? Gesture::LongPress : kind == "left" ? Gesture::SwipeLeft : kind == "right" ? Gesture::SwipeRight
               : kind == "up" ? Gesture::SwipeUp : kind == "down" ? Gesture::SwipeDown : Gesture::Tap;
     Gadget_Gesture(g, arg.substring(c1 + 1, c2).toInt(), arg.substring(c2 + 1).toInt());

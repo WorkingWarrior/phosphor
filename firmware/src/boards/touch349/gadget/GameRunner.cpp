@@ -401,9 +401,9 @@ void panel(int y0, int y1)
     case theme::ATARI: fill = 0, edge = px::rgb(160, 160, 200); break;
     default: break;
   }
-  rect(100, y0, 440, y1 - y0, fill);
-  frame(100, y0, 440, y1 - y0, edge);
-  frame(101, y0 + 1, 438, y1 - y0 - 2, edge);
+  rect(142, y0, 356, y1 - y0, fill);
+  frame(142, y0, 356, y1 - y0, edge);
+  frame(143, y0 + 1, 354, y1 - y0 - 2, edge);
 }
 
 void centered(const char *s, int p, int yy, const Ink &ink) { text(s, (W - textWidth(s, p)) / 2, yy, p, ink); }
