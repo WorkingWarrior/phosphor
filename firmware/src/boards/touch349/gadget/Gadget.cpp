@@ -1119,6 +1119,8 @@ void Gadget_Gesture(Gesture g, int x, int y)
         Fishtank_Hold();
       } else if (state.mode == Mode::Fire) {
         Fireplace_Hold();
+      } else if (state.mode == Mode::Sea) {
+        Seaside_Hold();
       } else if (state.mode == Mode::Radio) {
         RadioFace_Hold(x, y);
       }
@@ -1130,7 +1132,7 @@ void Gadget_Gesture(Gesture g, int x, int y)
         case Mode::Aquarium: Fishtank_Feed(x); break;
         case Mode::Snow: Snowglobe_Tap(x, y); break;
         case Mode::Fire: Fireplace_Tap(x, y); break;
-        case Mode::Sea: Seaside_Tap(); break;
+        case Mode::Sea: Seaside_Tap(x, y); break;
         case Mode::Study: Study_Tap(); break;
         case Mode::Wave: Wave_Tap(x); break;
         case Mode::Lava: Lava_Tap(); break;

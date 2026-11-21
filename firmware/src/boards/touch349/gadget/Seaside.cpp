@@ -2,6 +2,7 @@
 
 #include "Seaside.h"
 #include <time.h>
+#include "Motion.h"
 #include "Px.h"
 #include "RetroScene.h"
 #include "Vfd.h"
@@ -14,6 +15,7 @@ static uint32_t frame_no = 0;
 static float big_wave = 0, boat_x = 60;
 static uint32_t gull_t0 = 0;
 
+static float frand01() { return (esp_random() & 0xffff) / 65535.0f; }
 static uint32_t hash32(uint32_t v)
 {
   v ^= v >> 16;
@@ -21,12 +23,6 @@ static uint32_t hash32(uint32_t v)
   v ^= v >> 15;
   v *= 0x846ca68b;
   return v ^ (v >> 16);
-}
-
-void Seaside_Tap()
-{
-  big_wave = 1;
-  RetroScene_Stir(0.6f);  // with the theme's picture: the sea gets rougher for a moment
 }
 
 enum class Light { Day, Dusk, Night };
@@ -41,6 +37,106 @@ static Light lightNow()
   if (h >= 20 || h < 6) return Light::Night;
   if (h >= 17 || h < 8) return Light::Dusk;
   return Light::Day;
+}
+
+// ---- storm (hold), shooting star (tap on the night sky), the boat rocking with the tilt -----------------------------------
+
+static bool retro = false;     // the theme's own picture is showing: only the old tap and a rougher sea apply
+static bool storm = false;
+static uint32_t storm_end = 0; // frame_no when the storm blows over by itself
+static int flash_t = 0;        // lightning: frames left of the flash
+static uint32_t flash_next = 0;
+static int bolt_x[20];
+struct Drop {
+  float x, y;
+};
+static Drop rain[110];
+static int star_t = -1;
+static float star_x, star_y, star_dx, star_dy;
+static float roll = 0, roll_v = 0;  // the boat's lean, radians
+
+static void lightning()
+{
+  flash_t = 6;
+  bolt_x[0] = 30 + esp_random() % 260;
+  for (int i = 1; i < 20; i++) bolt_x[i] = constrain(bolt_x[i - 1] + (int)(esp_random() % 9) - 4, 2, W - 3);
+}
+
+void Seaside_Hold()
+{
+  storm = !storm;
+  storm_end = frame_no + 1800;  // 90 s
+  flash_next = frame_no + 20 + esp_random() % 40;
+  if (storm)
+    for (auto &d : rain) d = { (float)(esp_random() % (W + 40)), (float)(esp_random() % HORIZON) };
+  RetroScene_Stir(1.5f);  // with the theme's picture: the sea gets rough
+}
+
+void Seaside_Tap(int sx, int sy)
+{
+  if (!retro && sy < 2 * HORIZON - 2) {
+    if (storm) {  // a bolt right now
+      lightning();
+      return;
+    }
+    if (lightNow() == Light::Night) {  // a shooting star from where you tapped
+      star_t = 0;
+      star_x = constrain(sx / 2, 6, W - 6);
+      star_y = constrain(sy / 2, 2, HORIZON - 12);
+      star_dx = (star_x < W / 2 ? 1 : -1) * (2.0f + frand01() * 0.8f);
+      star_dy = 0.7f + frand01() * 0.5f;
+      return;
+    }
+  }
+  big_wave = 1;
+  RetroScene_Stir(0.6f);  // with the theme's picture: the sea gets rougher for a moment
+}
+
+// Dark cloud deck, rain and flashes instead of the sky of the hour.
+static void stormSky()
+{
+  static const uint8_t DARK[] = { NIGHT, N1, N1, N2 }, FLASH[] = { N3, N4, N5, N5 };
+  bool lit = flash_t == 6 || flash_t == 5 || flash_t == 3;
+  gradient(0, HORIZON, lit ? FLASH : DARK, 4);
+  for (int x = 0; x < W; x++) {
+    int deck = 7 + (int)(4 * sinf(x * 0.03f + frame_no * 0.004f) + 3 * sinf(x * 0.08f - frame_no * 0.01f));
+    for (int y = 0; y < deck; y++) set(x, y, lit ? N4 : N2);
+    set(x, deck, ((x + deck) & 1) ? (lit ? N4 : N2) : (lit ? N5 : N3));
+    int low = 20 + (int)(3 * sinf(x * 0.05f + 1 - frame_no * 0.006f));
+    if (((x + low) & 1) == 0) set(x, low, lit ? N5 : N1);
+  }
+  if (lit && flash_t != 5)  // the bolt, forking once
+    for (int y = 8; y < HORIZON; y++) {
+      int n = (y - 8) * 19 / (HORIZON - 8), fr = (y - 8) * 19 % (HORIZON - 8);
+      int x = bolt_x[n] + (bolt_x[n + 1] - bolt_x[n]) * fr / (HORIZON - 8);
+      set(x, y, N6);
+      if (y > 17 && y < 28) set(x + (y - 17) * 2 / 3 + 1, y, N5);
+    }
+}
+
+static void stormRain()
+{
+  for (auto &d : rain) {
+    d.y += 3.6f;
+    d.x -= 1.3f;
+    if (d.y > SHORE + 18 || d.x < -2) d = { (float)(esp_random() % (W + 40)), -(float)(esp_random() % 12) };
+    int x = (int)d.x, y = (int)d.y;
+    set(x, y, N4);
+    set(x + 1, y - 2, N3);
+  }
+}
+
+static void shootingStar()
+{
+  if (star_t < 0) return;
+  const int LIFE = 20;
+  float hx = star_x + star_dx * star_t, hy = star_y + star_dy * star_t;
+  for (int k = 9; k >= 0; k--) {
+    int x = lroundf(hx - star_dx * k * 0.55f), y = lroundf(hy - star_dy * k * 0.55f);
+    if ((unsigned)x >= (unsigned)W || y < 0 || y >= HORIZON) continue;
+    set(x, y, k == 0 ? N6 : k < 3 ? N5 : k < 6 ? N4 : N3);
+  }
+  if (++star_t > LIFE) star_t = -1;
 }
 
 static void sky(Light l)
@@ -162,21 +258,40 @@ static void lighthouse(Light l)
   }
 }
 
+// The boat's colour at (sx, sy) from its waterline centre, 0 = nothing there.
+static uint8_t boatPixel(int sx, int sy, Light l)
+{
+  uint8_t hull = l == Light::Night ? N1 : D2, sail = l == Light::Night ? N4 : N6;
+  if (sy >= 0 && sy <= 1 && sx >= -7 && sx <= 6) return hull;
+  if (sy == 2 && sx >= -5 && sx <= 4) return hull;
+  if (sy >= -11 && sy <= -1) {
+    int y = -1 - sy;  // 0 at the deck, up the mast
+    if (y == 10) return l == Light::Night && sx == 0 ? F4 : CLR;
+    if (sx == 0) return N2;
+    if (sx > 0 && sx <= (10 - y) * 6 / 10) return sail;
+    if (sx < 0 && y < 7 && -sx <= (7 - y) / 2) return sail;
+  }
+  return CLR;
+}
+
+// It rocks on its own, a lot in a storm, and swings with the board's tilt like a spring.
 static void boat(Light l)
 {
   boat_x += 0.04f;
   if (boat_x > W + 20) boat_x = -20;
-  int bx = (int)boat_x, by = HORIZON + 4 + (int)(sinf(frame_no * 0.08f) * 0.8f);
-  uint8_t hull = l == Light::Night ? N1 : D2, sail = l == Light::Night ? N4 : N6;
-  rect(bx - 7, by, 14, 2, hull);
-  rect(bx - 5, by + 2, 10, 1, hull);
-  for (int y = 0; y < 10; y++) {
-    set(bx, by - 1 - y, N2);
-    int w = (10 - y) * 6 / 10;
-    for (int x = 1; x <= w; x++) set(bx + x, by - 1 - y, sail);
-    if (y < 7) for (int x = 1; x <= (7 - y) / 2; x++) set(bx - x, by - 1 - y, sail);
-  }
-  if (l == Light::Night) set(bx, by - 11, F4);
+  float gx = 0, gy = 1, gz = 0;
+  if (Motion_Ok()) Motion_Gravity(gx, gy, gz);
+  float target = -constrain(gx, -0.7f, 0.7f) * 0.6f + sinf(frame_no * 0.08f) * (storm ? 0.2f : 0.03f);
+  roll_v += (target - roll) * 0.1f - roll_v * 0.07f;
+  roll += roll_v;
+  int bx = (int)boat_x, by = HORIZON + 4 + (int)(sinf(frame_no * 0.08f) * (storm ? 2.4f : 0.8f));
+  float c = cosf(roll), sn = sinf(roll);
+  for (int dy = -14; dy <= 5; dy++)
+    for (int dx = -13; dx <= 13; dx++) {
+      int sx = lroundf(dx * c + (dy - 1) * sn), sy = lroundf(-dx * sn + (dy - 1) * c) + 1;
+      uint8_t col = boatPixel(sx, sy, l);
+      if (col) set(bx + dx, by + dy, col);
+    }
 }
 
 static void gulls()
@@ -293,10 +408,24 @@ static void palm(Light l)
 
 void Seaside_Draw(const char *corner_text)
 {
-  if (RetroScene_Draw(RetroArt::Sea, corner_text)) return;  // the theme's own picture of this scene
+  retro = RetroScene_Draw(RetroArt::Sea, corner_text);
+  if (retro) return;  // the theme's own picture of this scene
   frame_no++;
   Light l = lightNow();
-  sky(l);
+  if (storm && (int32_t)(frame_no - storm_end) > 0) storm = false;
+  if (storm) {
+    l = Light::Night;
+    big_wave = max(big_wave, 0.7f);  // a rough sea
+    if (flash_t > 0) flash_t--;
+    else if (frame_no >= flash_next) {
+      lightning();
+      flash_next = frame_no + 40 + esp_random() % 120;
+    }
+    stormSky();
+  } else {
+    flash_t = 0;
+    sky(l);
+  }
   sea(l);
   lighthouse(l);
   boat(l);
@@ -304,6 +433,8 @@ void Seaside_Draw(const char *corner_text)
   dog(l);
   palm(l);
   if (l != Light::Night) gulls();
+  if (storm) stormRain();
+  else shootingStar();
   present();
   if (corner_text && *corner_text) {
     int w = vfd::textWidth(corner_text, 2);
