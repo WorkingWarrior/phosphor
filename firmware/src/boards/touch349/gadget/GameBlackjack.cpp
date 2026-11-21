@@ -266,6 +266,15 @@ Pose poseNow(uint32_t now)
 // Game
 // ---------------------------------------------------------------------------------------------------------------------
 
+// The speaker shakes the case: knocks are ignored while a beep plays and just after it.
+uint32_t beep_quiet_until = 0;
+
+void beep(int hz, int ms)
+{
+  Radio_Beep(hz, ms);
+  beep_quiet_until = millis() + ms + 250;
+}
+
 void startJingle(bool big)
 {
   static const int NOTES[8] = { 523, 659, 784, 1046, 1175, 1318, 1568, 2093 };
@@ -319,10 +328,10 @@ void settle()
     case Out::Blackjack: say(EV_PBJ); startJingle(true); break;
     case Out::DealerBust: say(EV_DBUST); startJingle(false); break;
     case Out::Win: say(EV_PWIN); startJingle(false); break;
-    case Out::Push: say(EV_PUSH); Radio_Beep(440, 90); break;
-    case Out::Bust: say(EV_PBUST); Radio_Beep(196, 140); break;
-    case Out::DealerBlackjack: say(EV_DBJ); Radio_Beep(196, 140); break;
-    default: say(EV_DWIN); Radio_Beep(196, 140); break;
+    case Out::Push: say(EV_PUSH); beep(440, 90); break;
+    case Out::Bust: say(EV_PBUST); beep(196, 140); break;
+    case Out::DealerBlackjack: say(EV_DBJ); beep(196, 140); break;
+    default: say(EV_DWIN); beep(196, 140); break;
   }
 }
 
@@ -369,7 +378,7 @@ void hit()
 {
   uint32_t now = millis();
   addCard(pl, now);
-  Radio_Beep(520, 18);
+  beep(520, 18);
   int t = total(pl, pl.n);
   lock_until = now + SLIDE_MS + 100;
   if (t > 21) {
@@ -391,7 +400,7 @@ void hit()
 void stand()
 {
   dealerTurn();
-  Radio_Beep(330, 25);
+  beep(330, 25);
 }
 
 bool canDouble() { return ph == Ph::Player && pl.n == 2 && credits >= (uint32_t)hand_bet; }
@@ -404,7 +413,7 @@ void doubleDown()
   doubled = true;
   saveAll();
   addCard(pl, millis());
-  Radio_Beep(660, 25);
+  beep(660, 25);
   say(EV_DOUBLE);
   uint32_t now = millis();
   lock_until = now + SLIDE_MS + 150;
@@ -428,7 +437,7 @@ void cycleBet()
     }
   }
   saveAll();
-  Radio_Beep(880, 20);
+  beep(880, 20);
   state.dirty = true;
 }
 
@@ -621,10 +630,10 @@ void drawChip(int cx, int cy, int r, int value, const Pal &p)
   Apps_Disc(cx, cy, r - 2, p.chip);
   for (int a = 0; a < 8; a++) {  // the edge stripes
     static const int8_t DX[8] = { 0, 1, 1, 1, 0, -1, -1, -1 }, DY[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
-    int sx = cx + DX[a] * (r - 3) - 2, sy = cy + DY[a] * (r - 3) - 2;
-    rect(sx, sy, 4, 4, p.chip2);
+    int sx = cx + DX[a] * (r - 2) - 1, sy = cy + DY[a] * (r - 2) - 1;
+    rect(sx, sy, 3, 3, p.chip2);
   }
-  Apps_Disc(cx, cy, r - 7, theme::current() == theme::VFD ? BG : p.chip);
+  Apps_Disc(cx, cy, r - 5, theme::current() == theme::VFD ? BG : p.chip);
   char b[6];
   snprintf(b, sizeof(b), "%d", value);
   int sc = 2, tw = textWidth(b, sc);
@@ -853,7 +862,7 @@ void drawSide(uint32_t now)
 {
   Pal p = pal();
   char b[24];
-  snprintf(b, sizeof(b), "%s %lu", L("CREDITS", "KREDİ"), (unsigned long)credits);
+  snprintf(b, sizeof(b), "%s %lu", L("CRED", "KREDİ"), (unsigned long)credits);
   text(b, SIDE_X, 7, 2, credits < 5 ? HOT_INK : LIT_INK);
   // the chip: tap it for the next bet
   int shown = (ph == Ph::Bet || ph == Ph::Result) ? bet : hand_bet;
@@ -882,8 +891,7 @@ void drawSide(uint32_t now)
 void drawBetScreen()
 {
   const char *t = "21";
-  int tw = textWidth(t, 9);
-  text(t, 206 + (300 - tw) / 2 - 40, 14, 9, HOT_INK);
+  text(t, 506 - textWidth(t, 7) - 6, 12, 7, HOT_INK);
   char b[40];
   text(L("DEALER STANDS ON 17", "KASA 17'DE DURUR"), 214, 92, 2, LIT_INK);
   text(L("BLACKJACK PAYS 3:2", "BLACKJACK 3:2 ÖDER"), 214, 110, 2, LIT_INK);
@@ -903,8 +911,8 @@ void blackjackDraw(const DateTime &)
   if (ph == Ph::Bet || ph == Ph::Broke) {
     if (ph == Ph::Broke) {
       const char *a = L("OUT OF CREDITS", "KREDİ BİTTİ"), *c = L("BACK TOMORROW", "YARIN TEKRAR");
-      text(a, 206 + (300 - textWidth(a, 4)) / 2, 40, 4, HOT_INK);
-      text(c, 206 + (300 - textWidth(c, 3)) / 2, 96, 3, LIT_INK);
+      text(a, 206 + (300 - textWidth(a, 3)) / 2, 44, 3, HOT_INK);
+      text(c, 206 + (300 - textWidth(c, 2)) / 2, 96, 2, LIT_INK);
     } else {
       drawBetScreen();
     }
@@ -920,9 +928,9 @@ void blackjackDraw(const DateTime &)
       if (net > 0) snprintf(b, sizeof(b), "%s  +%d", r, net);
       else if (net < 0) snprintf(b, sizeof(b), "%s  %d", r, net);
       else snprintf(b, sizeof(b), "%s", r);
-      bool flash = net > 0 && now - result_ms < 1600 && ((now - result_ms) / 200) % 2;
+      bool flash = net > 0 && (int32_t)(now - result_ms) < 1600 && ((now - result_ms) / 200) % 2;
       int w = textWidth(b, 2);
-      text(b, HAND_X + (HAND_W - w) / 2, ROW_D + CH + 6, 2, net > 0 ? (flash ? LIT_INK : HOT_INK) : (net < 0 ? DIM_INK : LIT_INK));
+      text(b, HAND_X + (HAND_W - w) / 2, ROW_D + CH + 2, 2, net > 0 ? (flash ? LIT_INK : HOT_INK) : LIT_INK);
     }
   }
   drawSide(now);
@@ -1028,9 +1036,9 @@ void blackjackTick()
   // a knock lands slightly before the touch driver reports the finger (30 ms polling): decide 140 ms later
   if (Motion_TakeKnock()) {
     knock_ms = now;
-    knock_pending = true;
+    knock_pending = (int32_t)(now - beep_quiet_until) > 0;
   }
-  if (knock_pending && now - knock_ms >= 140) {
+  if (knock_pending && (int32_t)(now - knock_ms) >= 140) {
     knock_pending = false;
     if (!touchNear(knock_ms)) knockAction();
   }
@@ -1051,11 +1059,11 @@ void blackjackTick()
     } else if (dealer_next_ms && (int32_t)(now - dealer_next_ms) >= 0) {
       if (!hole_up) {  // turn the hole card
         hole_up = true;
-        Radio_Beep(440, 18);
+        beep(440, 18);
         dealer_next_ms = now + 650;
       } else if (total(dl, dl.n) < 17) {  // stands on every 17
         addCard(dl, now);
-        Radio_Beep(520, 18);
+        beep(520, 18);
         dealer_next_ms = now + 700;
       } else {
         dealer_next_ms = 0;
@@ -1064,7 +1072,7 @@ void blackjackTick()
       state.dirty = true;
     }
   }
-  if (ph == Ph::Result && now - result_ms > 8000) {  // back to the betting screen
+  if (ph == Ph::Result && (int32_t)(now - result_ms) > 8000) {  // back to the betting screen
     ph = credits >= 5 ? Ph::Bet : Ph::Broke;
     out = Out::None;
     pl.n = dl.n = 0;
@@ -1072,16 +1080,16 @@ void blackjackTick()
     state.dirty = true;
   }
   // the dealer gets bored
-  if ((ph == Ph::Bet || ph == Ph::Player) && now - last_input_ms > 20000 && now - nudge_ms > 20000 && !bubbleOn(now)) {
+  if ((ph == Ph::Bet || ph == Ph::Player) && (int32_t)(now - last_input_ms) > 20000 && (int32_t)(now - nudge_ms) > 20000 && !bubbleOn(now)) {
     say(EV_IDLE);
     state.dirty = true;
   }
   if (jingle_n && jingle_i < jingle_n && (int32_t)(now - jingle_next) >= 0) {
-    Radio_Beep(jingle_hz[jingle_i], jingle_ms[jingle_i]);
+    beep(jingle_hz[jingle_i], jingle_ms[jingle_i]);
     jingle_next = now + jingle_ms[jingle_i] + 35;
     jingle_i++;
   }
-  if (now - day_check_ms > 5000) {  // midnight passed while it was open
+  if ((int32_t)(now - day_check_ms) > 5000) {  // midnight passed while it was open
     day_check_ms = now;
     if (day_key != today() && (ph == Ph::Bet || ph == Ph::Result || ph == Ph::Broke)) {
       newDay();
@@ -1095,7 +1103,7 @@ void blackjackTick()
 uint32_t blackjackFrameMs()
 {
   uint32_t now = millis();
-  bool anim = ph == Ph::Deal || ph == Ph::Dealer || bubbleOn(now) || (ph == Ph::Result && now - result_ms < 1700);
+  bool anim = ph == Ph::Deal || ph == Ph::Dealer || bubbleOn(now) || (ph == Ph::Result && (int32_t)(now - result_ms) < 1700);
   for (int i = 0; i < pl.n && !anim; i++) anim = (int32_t)(now - pl.born[i]) < (int32_t)SLIDE_MS + 50;
   for (int i = 0; i < dl.n && !anim; i++) anim = (int32_t)(now - dl.born[i]) < (int32_t)SLIDE_MS + 50;
   return anim ? 40 : 70;  // 70: still fine enough for the 150 ms blink
