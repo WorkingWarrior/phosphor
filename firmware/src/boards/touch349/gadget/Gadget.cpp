@@ -1368,7 +1368,7 @@ String Gadget_Command(const String &name, const String &arg)
   } else if (name == "snow") {
     // snow page: "globe" toggles the snow globe; "auto" | "on" | "off" = holiday lights; "sleigh" | "star" = now
     if (arg == "globe") Snowglobe_Hold();
-    else if (arg == "sleigh" || arg == "star") Snowglobe_Show(arg.c_str());
+    else if (arg == "sleigh" || arg == "star" || arg == "deer") Snowglobe_Show(arg.c_str());
     else if (arg == "auto" || arg == "on" || arg == "off") SettingsUi_SetHolidays(arg == "auto" ? 0 : arg == "on" ? 1 : 2);
     state.mode = Mode::Snow;
   } else if (name == "radioface") {

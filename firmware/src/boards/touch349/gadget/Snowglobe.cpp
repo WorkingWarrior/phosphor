@@ -6,6 +6,7 @@
 #include "Px.h"
 #include "RetroScene.h"
 #include "SettingsUi.h"
+#include "Theme.h"
 #include "Vfd.h"
 
 using namespace px;
@@ -366,6 +367,9 @@ static uint32_t deer_next_ms = 0;
 static float deer_x = -1000;
 static int deer_dir = 1;
 
+static bool deer_force = false;  // Snowglobe_Show("deer"): walks now, whatever the hour
+static int deer_ground = -1;     // the feet's row in a theme's painted picture (Px rows), -1 = the drawn cabin's hill
+
 static bool dawnNow()
 {
   time_t t = time(nullptr);
@@ -384,13 +388,13 @@ static void deer()
   static const uint8_t DEER_C[] = { S3, D3, N6, N1 };
   uint32_t now = millis();
   if (deer_x < -100) {  // not walking
-    if (!dawnNow()) {
+    if (!dawnNow() && !deer_force) {
       deer_next_ms = 0;
       return;
     }
     if (!deer_next_ms) deer_next_ms = now + 15000 + esp_random() % 60000;
     if ((int32_t)(now - deer_next_ms) < 0) return;
-    if (esp_random() % 100 < 55) {  // sometimes
+    if (deer_force || esp_random() % 100 < 55) {  // sometimes
       deer_dir = esp_random() & 1 ? 1 : -1;
       deer_x = deer_dir > 0 ? -16 : W + 2;
     } else {
@@ -401,17 +405,30 @@ static void deer()
   deer_x += deer_dir * 0.28f;
   if (deer_x > W + 4 || deer_x < -18) {
     deer_x = -1000;
+    deer_force = false;
     deer_next_ms = now + 90000 + esp_random() % 90000;
     return;
   }
   int x = lroundf(deer_x), leg = (frame_no / 6) % 2;
-  int y = lroundf(groundAt(x + 7)) + 4 - 8;
+  int y = deer_ground >= 0 ? deer_ground - 8 : lroundf(groundAt(x + 7)) + 4 - 8;
   sprite(DEER[leg], 9, x, y, "abwk", DEER_C, deer_dir < 0);
 }
 
 // Tap: on the cabin's window the lamp inside goes on or off; anywhere else it stirs the snow.
+static bool snow_retro = false;  // the theme's painted picture is showing
+
 void Snowglobe_Tap(int sx, int sy)
 {
+  if (snow_retro && !globe) {  // the picture's window: where its lamp glows
+    const int16_t *p = RetroScene_Params(RetroArt::Snow);
+    if (p && sx >= p[0] - 16 && sx <= p[2] + 16 && sy >= p[1] - 16 && sy <= p[3] + 16) {
+      cabin_lit = !cabin_lit;
+      RetroScene_WindowLit(cabin_lit);
+      return;
+    }
+    Snowglobe_Stir(0.6f);
+    return;
+  }
   int base = lroundf(groundAt(139));
   if (!globe && scene && sx >= 2 * 125 - 14 && sx <= 2 * 137 + 14 && sy >= 2 * (base - 11) - 14 && sy <= 2 * (base - 4) + 14) {
     cabin_lit = !cabin_lit;
@@ -753,7 +770,8 @@ static void drawGlobe(const char *corner_text)
 
 void Snowglobe_Show(const char *what)
 {
-  if (!strcmp(what, "sleigh")) sleigh_next_ms = millis(), sleigh_x = -1000;
+  if (!strcmp(what, "deer")) deer_force = true, deer_next_ms = millis(), deer_x = -1000;
+  else if (!strcmp(what, "sleigh")) sleigh_next_ms = millis(), sleigh_x = -1000;
   else if (!strcmp(what, "star")) star_next_ms = millis(), star_t = -1;
 }
 
@@ -769,7 +787,17 @@ void Snowglobe_Draw(const char *corner_text)
     drawGlobe(corner_text);
     return;
   }
-  if (RetroScene_Draw(RetroArt::Snow, corner_text)) return;  // the theme has its own art for this scene
+  if (RetroScene_Begin(RetroArt::Snow)) {  // the theme has its own art for this scene; the deer walks over it
+    snow_retro = true;
+    frame_no++;
+    RetroScene_WindowLit(cabin_lit);
+    deer_ground = theme::current() == theme::C64 ? 83 : theme::current() == theme::AMIGA ? 82 : 80;
+    deer();
+    RetroScene_End(corner_text);
+    return;
+  }
+  snow_retro = false;
+  deer_ground = -1;
   if (!scene) build();
   t_scene = scene;
   t_solid = solid;

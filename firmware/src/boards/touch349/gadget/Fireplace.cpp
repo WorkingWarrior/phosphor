@@ -8,7 +8,7 @@
 
 using namespace px;
 
-static constexpr int FX = 54, FY = 36, FW = 92, FH = 36;  // the firebox opening
+static int FX = 54, FY = 36, FW = 92, FH = 36;  // the firebox opening (a theme's painted picture moves it)
 static uint32_t frame_no = 0, awake_until = 0, flick_at = 0;
 static float glow = 0.6f;
 
@@ -92,12 +92,12 @@ static void logDraw()
 {
   if (log_t < 0) return;
   int rest = FY + FH - 12, ly = log_t < LOG_FALL ? rest - 20 + log_t * 20 / LOG_FALL : rest;
-  int lx = FX + 29;
-  rect(lx, ly, 34, 5, D2);
-  rect(lx, ly, 34, 1, D3);
-  rect(lx, ly + 4, 34, 1, D1);
+  int lw = min(34, FW * 6 / 10), lx = FX + (FW - lw) / 2;
+  rect(lx, ly, lw, 5, D2);
+  rect(lx, ly, lw, 1, D3);
+  rect(lx, ly + 4, lw, 1, D1);
   if (log_t >= LOG_FALL)
-    for (int x = lx + 2; x < lx + 34; x += 5) set(x, ly + 2, (hash32(x + frame_no / 4) & 1) ? F4 : F3);  // catching fire
+    for (int x = lx + 2; x < lx + lw; x += 5) set(x, ly + 2, (hash32(x + frame_no / 4) & 1) ? F4 : F3);  // catching fire
 }
 
 // The yarn ball rolls with the board's tilt; a kitten comes out to chase it, and leaves when the board is level again.
@@ -412,10 +412,19 @@ static void cat()
 
 void Fireplace_Draw(const char *corner_text)
 {
-  if (RetroScene_Draw(RetroArt::Fire, corner_text)) {  // the theme's own picture of this scene
-    log_t = -1;
+  if (RetroScene_Begin(RetroArt::Fire)) {  // the theme's own picture of this scene; the new things go over it
+    const int16_t *p = RetroScene_Params(RetroArt::Fire);
+    if (p) FX = p[0] / 2, FY = p[1] / 2, FW = (p[2] - p[0]) / 2, FH = (p[3] - p[1]) / 2;
+    frame_no++;
+    logStep();
+    yarnStep();
+    logDraw();
+    sparksStep();
+    yarnDraw();
+    RetroScene_End(corner_text);
     return;
   }
+  FX = 54, FY = 36, FW = 92, FH = 36;
   frame_no++;
   logStep();
   yarnStep();
