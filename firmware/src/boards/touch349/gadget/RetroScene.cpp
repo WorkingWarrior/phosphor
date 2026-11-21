@@ -374,6 +374,41 @@ bool RetroScene_Draw(RetroArt scene, const char *corner_text)
   return true;
 }
 
+bool RetroPicture_Draw(const char *name)
+{
+  static art::Image picture;
+  static char cached[24] = {};
+  if (!name || !*name || strlen(name) >= sizeof(cached) || !assets::ok()) return false;
+  if (strcmp(cached, name)) {
+    uint32_t size = 0, len = 0;
+    const uint8_t *b = assets::find(name, &size);
+    if (!b || size < 12) return false;
+    art::Image next = {};
+    memcpy(&next.w, b, 2); memcpy(&next.h, b + 2, 2); memcpy(&len, b + 8, 4);
+    next.sx = b[4]; next.sy = b[5]; next.ncolors = b[6];
+    if (!next.w || !next.h || !next.sx || !next.sy || !next.ncolors ||
+        next.w * next.sx != vfd::W || next.h * next.sy != vfd::H ||
+        uint64_t(12) + next.ncolors * 2 + len > size || (len & 1)) return false;
+    next.pal = (const uint16_t *)(b + 12);
+    next.rle = b + 12 + next.ncolors * 2; next.rle_len = len;
+    uint32_t pixels = 0;
+    for (uint32_t i = 0; i < len; i += 2) {
+      if (!next.rle[i] || next.rle[i + 1] >= next.ncolors) return false;
+      pixels += next.rle[i];
+    }
+    if (pixels != uint32_t(next.w) * next.h) return false;
+    // The descriptor address stays the same when its name changes: force a fresh decode.
+    if (decoded == &picture) decoded = nullptr;
+    picture = next;
+    strlcpy(cached, name, sizeof(cached));
+  }
+  if (decoded != &picture) decode(&picture);
+  if (!bg || decoded != &picture) return false;
+  vfd::noClip();
+  memcpy(vfd::canvas(), bg, vfd::W * vfd::H * sizeof(uint16_t));
+  return true;
+}
+
 bool RetroWorld_Draw()
 {
   const art::Image *img = nullptr;

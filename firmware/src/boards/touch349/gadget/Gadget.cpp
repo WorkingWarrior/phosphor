@@ -2,6 +2,7 @@
 
 #include "Gadget.h"
 #include "ClockFaces.h"
+#include "TimerFaces.h"
 #include "RetroScene.h"
 #include <Preferences.h>
 #include "../../../core/Assets.h"
@@ -363,11 +364,13 @@ static void drawRadio(const DateTime &now)
   String gname = settings::group(s.group).name;
   gname.toUpperCase();
 
-  if (theme::current() == theme::C64 || (theme::current() != theme::VFD && RetroWorld_Draw())) {
-    if (theme::current() == theme::C64) clear();
+  if (theme::current() != theme::VFD) {
+    const char *picture = theme::current() == theme::C64 ? "radio_c64" :
+                          theme::current() == theme::AMIGA ? "radio_amiga" : "radio_atari";
+    if (!RetroPicture_Draw(picture) && !RetroWorld_Draw()) clear();
     RadioFaceData f;
     f.channel = "CH " + two(st + 1); f.genre = gname; f.station = s.name; f.time = hhmm(now);
-    f.playing = rs == RadioState::Playing; f.state = int(rs); f.cursor = blinkOn();
+    f.playing = rs == RadioState::Playing; f.cursor = blinkOn();
     f.show_volume = volume_shown_ms && millis() - volume_shown_ms < VOLUME_SHOW_MS;
     f.volume = Radio_Volume(); f.volume_label = L("VOL", "SES");
     f.group = s.group; f.groups = settings::groupCount();
@@ -723,10 +726,9 @@ static bool sky_night = false;
 static void drawWeather()
 {
   WeatherNow w = Weather_Get();
-  if (theme::current() == theme::C64 || (theme::current() != theme::VFD && RetroWorld_Draw())) {
-    if (theme::current() == theme::C64) clear();
+  if (theme::current() != theme::VFD) {
     WeatherFace f;
-    f.weather = w; f.sky = sky_force >= 0 ? (Sky)sky_force : w.valid ? w.sky : Sky::Unknown;
+    f.weather = w; f.day = sky_force >= 0 ? !sky_night : w.day; f.sky = sky_force >= 0 ? (Sky)sky_force : w.valid ? w.sky : Sky::Unknown;
     f.condition = f.sky != Sky::Unknown ? Weather_SkyName(f.sky) : L("WAIT", "BEKLE");
     f.humidity = String(L("HUM ", "NEM ")) + (settings::tr() ? "%" + String(w.humidity) : String(w.humidity) + "%");
     f.wind = String(L("WIND ", "RÜZGAR ")) + String(w.wind) + (settings::fahrenheit() ? " MPH" : L(" KM/H", " KM/SA"));
@@ -784,7 +786,6 @@ static const char *const COUNT_LABELS_EN[] = { "-1 MIN", "+1 MIN", "+5 MIN", "+1
 
 static void drawTimer()
 {
-  clear();
   bool running = phase == Phase::Running, done = phase == Phase::Done;
 
   int32_t left_s = (eggLeftMs() + 999) / 1000;
@@ -793,6 +794,20 @@ static void drawTimer()
   if (!show || (done && !blinkOn(300))) big = Ink{ GHOST, NONE, GHOST };
   String digits = mss(left_s);
   if (digits.length() < 5) digits = " " + digits;
+  if (theme::current() != theme::VFD) {
+    TimerFace f;
+    f.digits = mss(left_s);
+    f.setting = String(L("TIMER  SET ", "SAYAÇ  AYAR ")) + mss(egg_set_s);
+    f.running = running; f.paused = phase == Phase::Paused; f.done = done;
+    f.visible = show && (!done || blinkOn(300));
+    f.state = running ? L("RUNNING", "SAYIYOR") : f.paused ? L("PAUSED", "DURDU") :
+              done ? L("TIME'S UP!", "SÜRE DOLDU!") : egg_set_s ? L("TAP: START", "DOKUN: BAŞLA") : L("PICK A TIME", "SÜRE SEÇ");
+    int32_t total = max<int32_t>(1, egg_set_s * 1000);
+    f.progress = phase == Phase::Idle ? 0 : done ? 608 : constrain((int)(608 * (1 - (float)eggLeftMs()/total)),0,608);
+    for (int i=0;i<5;i++) f.buttons[i] = (settings::tr() ? COUNT_LABELS_TR : COUNT_LABELS_EN)[i];
+    if (TimerFaces_Draw(f)) return;
+  }
+  clear();
   seg(digits.c_str(), 20, 12, 70, 100, 12, 12, big);
 
   text(L("TIMER", "SAYAÇ"), 470, 16, 3, 2, LIT_INK);

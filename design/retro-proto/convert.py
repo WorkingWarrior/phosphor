@@ -9,6 +9,9 @@
 #   atari_vivid  the same on the real NTSC table (Stella); for flat banded art
 #   lcd    320x86, 2x2 px, flat printed inks (12 colors), no dither
 #
+# A portrait source (taller than wide) is turned a quarter clockwise first: Px draws portrait scenes with their top at
+# the screen's right edge.
+#
 # usage: python3 convert.py <machine> <in.png> <name> <out_dir> <out.img> [crop|-] [c64 dither]
 #
 # .img (little endian): u16 w, u16 h, u8 sx, u8 sy, u8 colors, u8 0, u32 rle bytes, then colors x u16 RGB565 and the RLE
@@ -89,6 +92,8 @@ CROP = None  # optional 'y0:y1' fractions: take that band and squash it to the b
 
 def load(path, w, h):
     im = Image.open(path).convert('RGB')
+    if im.height > im.width:  # portrait scenes (hourglass) are stored turned a quarter, the way Px draws them
+        im = im.rotate(-90, expand=True)
     iw, ih = im.size
     if CROP:
         y0, y1 = (float(v) for v in CROP.split(':'))

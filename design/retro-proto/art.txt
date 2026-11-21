@@ -15,3 +15,35 @@ sea_atari      atari    gen/seaside_atari_raw.png     0.00:1.00
 world_amiga    amiga        gen/world_amiga.png    0.03:0.98
 world_c64      c64_free     gen/world_c64.png     0.00:1.00  0
 world_atari    atari_vivid  gen/world_atari.png    -
+# app backdrops: weather in 7 skies, radio, timer, hourglass (portrait, turned by convert.py); the two *_fit night
+# skies are re-cut by fit_band.py (commands in its header)
+wx_clear_c64    c64_free     gen/wx_clear_c64.png         - 20
+wx_night_c64    c64_free     gen/wx_night_c64_fit.png     - 20
+wx_part_c64     c64_free     gen/wx_part_c64.png          - 20
+wx_cloud_c64    c64_free     gen/wx_cloud_c64.png         - 20
+wx_rain_c64     c64_free     gen/wx_rain_c64.png          - 20
+wx_snow_c64     c64_free     gen/wx_snow_c64.png          - 0
+wx_storm_c64    c64_free     gen/wx_storm_c64.png         - 0
+radio_c64       c64_free     gen/radio_c64.png            - 20
+timer_c64       c64_free     gen/timer_c64.png            - 20
+sand_c64        c64_free     gen/sand_c64.png             - 20
+wx_clear_amiga  amiga        gen/wx_clear_amiga.png       -
+wx_night_amiga  amiga        gen/wx_night_amiga.png       -
+wx_part_amiga   amiga        gen/wx_part_amiga.png        -
+wx_cloud_amiga  amiga        gen/wx_cloud_amiga.png       -
+wx_rain_amiga   amiga        gen/wx_rain_amiga.png        -
+wx_snow_amiga   amiga        gen/wx_snow_amiga.png        -
+wx_storm_amiga  amiga        gen/wx_storm_amiga.png       -
+radio_amiga     amiga        gen/radio_amiga.png          -
+timer_amiga     amiga        gen/timer_amiga.png          -
+sand_amiga      amiga        gen/sand_amiga.png           -
+wx_clear_atari  atari_vivid  gen/wx_clear_atari.png       -
+wx_night_atari  atari_vivid  gen/wx_night_atari_fit.png   -
+wx_part_atari   atari_vivid  gen/wx_part_atari.png        -
+wx_cloud_atari  atari_vivid  gen/wx_cloud_atari.png       -
+wx_rain_atari   atari_vivid  gen/wx_rain_atari.png        -
+wx_snow_atari   atari_vivid  gen/wx_snow_atari.png        -
+wx_storm_atari  atari        gen/wx_storm_atari.png       -
+radio_atari     atari_vivid  gen/radio_atari.png          -
+timer_atari     atari_vivid  gen/timer_atari.png          -
+sand_atari      atari_vivid  gen/sand_atari.png           -

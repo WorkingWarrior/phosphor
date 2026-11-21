@@ -20,3 +20,6 @@ void RetroScene_Stir(float strength);  // 0..1, a tap or a shake: whirls the sno
 
 // Shares the scene background cache; false asks the clock to use its plain layout.
 bool RetroWorld_Draw();
+
+// Named app backdrop, sharing the single decoded PSRAM picture.
+bool RetroPicture_Draw(const char *name);

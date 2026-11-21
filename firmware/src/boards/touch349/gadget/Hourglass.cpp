@@ -5,6 +5,8 @@
 #include "Px.h"
 #include "Settings.h"
 #include "Radio.h"
+#include "Theme.h"
+#include "RetroScene.h"
 
 using namespace px;
 
@@ -130,6 +132,72 @@ static void text(const char *s, int y, uint8_t c)
   }
 }
 
+// Portrait canvas coordinates, matching pset(..., true), without another scene buffer.
+static void portraitRect(int x, int y, int w, int h, uint16_t color)
+{
+  int x0 = max(0, x), y0 = max(0, y);
+  int x1 = min(vfd::H, x + w), y1 = min(vfd::W, y + h);
+  if (x1 > x0 && y1 > y0) vfd::rect(vfd::W - y1, x0, y1 - y0, x1 - x0, color);
+}
+
+static void portraitText(const char *s, int y, uint16_t color)
+{
+  const vfd::Font &font = *vfd::style().font;
+  const int p = 2;
+  int x = (vfd::H - vfd::textWidth(s, p)) / 2;
+  // These labels contain only digits, colon and MIN/DK, all native font glyphs.
+  for (; *s; s++, x += font.adv * p) {
+    const uint8_t *rows = font.rows((uint8_t)*s);
+    if (!rows) continue;
+    for (int pass = 0; pass < 2; pass++)
+      for (int r = 0; r < font.h; r++)
+        for (int c = 0; c < font.w; c++)
+          if (rows[r] & (1 << (font.w - 1 - c))) {
+            int d = pass ? 0 : 1;
+            portraitRect(x + c * p - d, y + r * p - d, p + d * 2, p + d * 2, pass ? color : 0);
+          }
+  }
+}
+
+static void machineGlass(uint32_t secs, bool flowing)
+{
+  const theme::Id id = theme::current();
+  const char *picture = id == theme::C64 ? "sand_c64" : id == theme::AMIGA ? "sand_amiga" : "sand_atari";
+  if (!RetroPicture_Draw(picture)) vfd::clear(px::ink(NIGHT));
+  uint16_t light, dark, glass, wood;
+  if (id == theme::C64) {
+    light = rgb(184, 199, 111); dark = rgb(111, 79, 37);
+    glass = rgb(149, 149, 149); wood = rgb(154, 103, 89);
+  } else if (id == theme::AMIGA) {
+    light = rgb(238, 204, 119); dark = rgb(204, 153, 68);
+    glass = rgb(187, 221, 238); wood = rgb(187, 119, 68);
+  } else {
+    light = rgb(236, 200, 120); dark = rgb(220, 180, 104);
+    glass = rgb(236, 236, 236); wood = rgb(208, 128, 92);
+  }
+  for (int y = 0; y < CH; y++) {
+    int left = CW / 2 - half[y] - 1, right = CW / 2 + half[y] + 1;
+    portraitRect((OX + left * S) * 2, (OY + y * S) * 2, S * 2, S * 2, glass);
+    portraitRect((OX + right * S) * 2, (OY + y * S) * 2, S * 2, S * 2, glass);
+  }
+  // Caps and posts sit outside the cells, so the simulation remains untouched.
+  portraitRect(0, (OY - S) * 2, PW * 2, S * 2, wood);
+  portraitRect(0, (OY + CH * S) * 2, PW * 2, S * 2, wood);
+  portraitRect(0, OY * 2, 2, CH * S * 2, wood);
+  portraitRect(PW * 2 - 2, OY * 2, 2, CH * S * 2, wood);
+  for (int y = 0; y < CH; y++)
+    for (int x = 0; x < CW; x++) {
+      uint8_t g = grid[y][x];
+      if (g) portraitRect((OX + x * S) * 2, (OY + y * S) * 2, S * 2, S * 2,
+                          (g & 0x80) || (g & 0x7f) != 2 ? light : dark);
+    }
+  char label[12];
+  snprintf(label, sizeof(label), "%lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
+  portraitText(label, 4, flowing ? glass : dark);
+  snprintf(label, sizeof(label), L("%d MIN", "%d DK"), DURATIONS[dur_idx]);
+  portraitText(label, PH * 2 - 20, light);
+}
+
 void Hourglass_Draw(const char *)
 {
   if (!ready) hgInit();
@@ -157,6 +225,12 @@ void Hourglass_Draw(const char *)
     Radio_Beep(1318, 110, 2, 90);
   }
 
+  uint32_t secs = total ? (uint32_t)(up * DURATIONS[dur_idx] * 60.0f / total + 0.5f) : 0;
+  if (theme::current() != theme::VFD) {
+    machineGlass(secs, flowing);
+    return;
+  }
+
   clear(NIGHT);
   for (int y = 0; y < CH; y++)
     for (int x = 0; x < CW; x++) {
@@ -168,7 +242,6 @@ void Hourglass_Draw(const char *)
 
   // time left at the top, the chosen duration at the bottom (viewer's frame)
   char buf[12];
-  uint32_t secs = total ? (uint32_t)(up * DURATIONS[dur_idx] * 60.0f / total + 0.5f) : 0;
   snprintf(buf, sizeof(buf), "%lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
   text(buf, 3, flowing ? C3 : C1);
   snprintf(buf, sizeof(buf), settings::tr() ? "%d DK" : "%d MIN", DURATIONS[dur_idx]);

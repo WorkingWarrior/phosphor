@@ -16,11 +16,11 @@ struct RadioFaceData {
   String genres[7];
   int group, groups, volume;
   bool playing, show_volume, cursor;
-  int state;
 };
 struct WeatherFace {
   WeatherNow weather;
   Sky sky;
+  bool day;
   String condition, humidity, wind;
   String days[3];
 };
@@ -35,4 +35,8 @@ void MachineReading(const String &s, int x, int y, int w, uint16_t color, bool s
 
 String MachineFit(const String &s, int cells);
 int MachineTextWidth(const String &s);
+// A font row for the big digits: the 0 loses its slash (rows 2..5 become row 1), it reads as an O-shaped zero.
+uint8_t MachineGlyphRow(const uint8_t *rows, uint32_t ch, int r);
 int MachineBlockText(const String &s, int x, int y, bool draw = true);
+
+void MachineWashText(const String &s, int x, int y, uint16_t colorOverride = 0);

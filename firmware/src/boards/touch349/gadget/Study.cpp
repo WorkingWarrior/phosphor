@@ -5,6 +5,7 @@
 #include "Radio.h"
 #include "Vfd.h"
 #include "Weather.h"
+#include "Theme.h"
 
 using namespace px;
 
@@ -346,6 +347,8 @@ void Study_Draw(const char *corner_text)
   const int px0 = PANEL_X * 2 + 14, pw = vfd::W - px0 - 12;
   uint16_t phase_c = on_break ? px::ink(C3) : HOT;
   uint16_t phase_h = on_break ? HALO : HOTH;
+  const bool machine = theme::current() != theme::VFD;
+  if (machine) phase_c = theme::current() == theme::C64 ? rgb(184, 199, 111) : rgb(236, 236, 236);
   const char *label = on_break ? (done_count % 4 == 0 ? L("LONG BREAK", "UZUN MOLA") : L("BREAK", "MOLA")) : L("FOCUS", "ODAK");
   int lx = text(label, px0, 10, 2, Ink{ phase_c, phase_h });
   if (running) {  // play triangle
@@ -366,7 +369,7 @@ void Study_Draw(const char *corner_text)
   int fill = (int)((uint64_t)(total - min(left_ms, total)) * pw / total);
   rect(px0, 104, pw, 6, GHOST);
   rect(px0, 104, fill, 6, phase_c);
-  int tx = text(L("ROUND", "TUR"), px0, 122, 2, Ink{ DIM });
+  int tx = text(L("ROUND", "TUR"), px0, 122, 2, Ink{ machine ? phase_c : DIM });
   for (int i = 0; i < 4; i++) {  // focus blocks done in this round of four
     bool filled = i < done_count % 4 || (done_count > 0 && done_count % 4 == 0 && on_break);
     rect(tx + 10 + i * 22, 122, 16, 14, filled ? HOT : GHOST);

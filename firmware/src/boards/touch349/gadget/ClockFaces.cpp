@@ -93,7 +93,7 @@ void bigTime(const String &s)
       const uint8_t *rows = font.rows(ch);
       int gx = ch == ':' ? x - 2 * sx : x;
       if (rows) for (int r = 0; r < 8; r++) {
-        uint8_t bits = ch == '0' && r >= 2 && r <= 5 ? rows[1] : rows[r];
+        uint8_t bits = MachineGlyphRow(rows, ch, r);
         for (int c = 0; c < 8; c++) {
           if (!(bits & (0x80 >> c))) continue;
           int xx = gx + c * sx, yy = y + r * sy;
@@ -207,6 +207,8 @@ int MachineTextWidth(const String &s)
   return n * 16;
 }
 
+uint8_t MachineGlyphRow(const uint8_t *rows, uint32_t ch, int r) { return ch == '0' && r >= 2 && r <= 5 ? rows[1] : rows[r]; }
+
 int MachineBlockText(const String &s, int x, int y, bool draw)
 {
   const char *p = s.c_str(); int advance = 0, right = 0;
@@ -215,7 +217,7 @@ int MachineBlockText(const String &s, int x, int y, bool draw)
     const uint8_t *rows = C64_FONT.rows(ch);
     int shift = ch == ':' ? -16 : 0;
     if (rows) for (int r = 0; r < 7; r++) {
-      uint8_t bits = ch == '0' && r >= 2 && r <= 5 ? rows[1] : rows[r];
+      uint8_t bits = MachineGlyphRow(rows, ch, r);
       for (int c = 0; c < 8; c++) if (bits & (0x80 >> c)) {
         right = max(right, advance + shift + (c + 1) * 8);
         if (draw) rect(x + advance + shift + c * 8, y + r * 8, 8, 8, BASIC);
@@ -237,11 +239,11 @@ void MachineTemperature(const String &s, int x, int y, bool amiga, bool atari)
       const uint8_t *rows = atari ? nullptr : font.rows(ch);
       for (int r = 0; r < (atari ? 5 : 8); r++) for (int c = 0; c < (atari ? 3 : 8); c++) {
         bool on = atari ? (ch == '-' ? r == 2 : ch >= '0' && ch <= '9' && (DIGITS[ch-'0'][r] & (4 >> c)))
-                        : rows && (rows[r] & (0x80 >> c));
+                        : rows && (MachineGlyphRow(rows, ch, r) & (0x80 >> c));
         if (!on) continue;
         int xx = cx + c*sx, yy = y + r*sy;
         if (pass == 0) rect(xx+4, yy+4, sx, sy, 0);
-        else if (pass == 1 && !atari) rect(xx-2, yy-2, sx+4, sy+4, 0);
+        else if (pass == 1) rect(xx-2, yy-2, sx+4, sy+4, 0);
         else if (pass == 2) for (int j=0;j<sy;j+=2)
           rect(xx, yy+j, sx, 2, atari ? rgb(164-r*15,224-r*17,252-r*15) : CHROME[min((r*sy+j)/2,35)]);
       }
@@ -249,10 +251,12 @@ void MachineTemperature(const String &s, int x, int y, bool amiga, bool atari)
     }
     int dx = cx + 4;
     uint16_t col = atari ? rgb(236,236,236) : WHITE;
-    if (pass == 2) {
-      rect(dx, y, 16, 4, col); rect(dx, y+12, 16, 4, col);
-      rect(dx, y, 4, 16, col); rect(dx+12, y, 4, 16, col);
-    }
+    int d = pass == 0 ? 4 : 0, edge = pass == 1 ? 2 : 0;
+    uint16_t ink = pass == 2 ? col : 0;
+    rect(dx+d-edge, y+d-edge, 16+2*edge, 4+2*edge, ink);
+    rect(dx+d-edge, y+12+d-edge, 16+2*edge, 4+2*edge, ink);
+    rect(dx+d-edge, y+d-edge, 4+2*edge, 16+2*edge, ink);
+    rect(dx+12+d-edge, y+d-edge, 4+2*edge, 16+2*edge, ink);
   }
 }
 
@@ -274,47 +278,67 @@ void MachineReading(const String &s, int x, int y, int w, uint16_t col, bool scr
   noClip();
 }
 
+// Timer glyphs reuse the clock's chrome and 2600 scanline colors at a smaller pitch.
+void MachineTimerDigits(const String &s, bool hot)
+{
+  if (theme::current() == theme::C64) {
+    MachineWashText(s, 24, 12, hot ? rgb(184,105,98) : 0);
+    return;
+  }
+  bool atari = theme::current() == theme::ATARI;
+  for (int pass = 0; pass < 3; pass++) {
+    int x = 24;
+    for (unsigned i = 0; i < s.length(); i++) {
+      char ch = s[i];
+      const uint8_t *rows = AMIGA_FONT.rows(ch);
+      int sx = atari ? 20 : 8, sy = atari ? 14 : 8;
+      for (int r = 0; r < (atari ? 5 : 8); r++) for (int c = 0; c < (atari ? 3 : 8); c++) {
+        bool on = atari ? (ch == ':' ? c == 0 && (r == 1 || r == 3) :
+                         ch >= '0' && ch <= '9' && (DIGITS[ch-'0'][r] & (4 >> c))) :
+                         rows && (MachineGlyphRow(rows, ch, r) & (0x80 >> c));
+        if (!on) continue;
+        int xx = (ch == ':' && !atari ? x - 2*sx : x) + c*sx, yy = 12 + r*sy;  // the font's colon sits in columns 2..3
+        if (pass == 0) rect(xx+4, yy+4, sx, sy, 0);
+        else if (pass == 1) rect(xx-2, yy-2, sx+4, sy+4, 0);
+        else for (int j=0;j<sy;j+=2)
+          rect(xx, yy+j, sx, min(2,sy-j), hot ? (atari ? (r < 3 ? rgb(252,188,148) : rgb(208,128,92)) : ORANGE) :
+               atari ? rgb(164-r*15,224-r*17,252-r*15) : CHROME[min((r*sy+j)/2,35)]);
+      }
+      x += ch == ':' ? (atari ? 24 : 32) : (atari ? 72 : 64);
+    }
+  }
+}
+
 void RadioFaces_Draw(const RadioFaceData &f)
 {
   Style saved=style();
   bool amiga=theme::current()==theme::AMIGA, atari=theme::current()==theme::ATARI;
   setStyle({atari ? &VFD_FONT : amiga ? &AMIGA_FONT : &C64_FONT,false,false,false});
   if (!amiga && !atari) {
-    String name = MachineFit(f.station, 19 - 10);  // 19 cells reach x 334, just short of the companion at 343
-    label("LOAD\"" + name + "\",8,1", 30, 12, BASIC);
-    String top = f.channel + " " + f.time;
-    label(top, 610 - MachineTextWidth(top), 12, BASIC_DIM);
-    int last = 44;
-    switch (RadioState(f.state)) {
-      case RadioState::Off:
-        if (f.cursor) rect(30, 28, 16, 16, BASIC);
-        MachineReading(f.line, 30, last, 300, BASIC_DIM);
-        break;
-      case RadioState::Connecting:
-        MachineReading("SEARCHING FOR " + f.station, 30, 28, 300, BASIC);
-        label("LOADING" + String("...").substring(0, (millis() / 400) % 4), 30, last, BASIC);
-        break;
-      case RadioState::Playing:
-        label("LOADING", 30, 28, BASIC);
-        MachineReading(f.line, 30, last, 300, BASIC);
-        break;
-      case RadioState::Failed:
-        MachineReading("?FILE NOT FOUND  ERROR", 30, 28, 300, BASIC);
-        MachineReading(f.line, 30, last, 300, BASIC_DIM);
-        break;
-    }
+    const int b = theme::def().border_w;
+    const uint16_t CYAN = rgb(112, 164, 178), GREY = rgb(149, 149, 149);
+    rect(b, b, 336 - b, 62 - b, 0);
+    int channel_x = 330 - MachineTextWidth(f.channel);
+    MachineReading(f.station, 16, 10, channel_x - 24, CYAN);
+    label(f.channel, channel_x, 10, YELLOW);
     if (f.show_volume) {
-      rect(30, last, 300, 16, rgb(53, 40, 121));
-      label("VOL", 30, last, BASIC);
+      label(f.volume_label, 16, 32, WHITE);
       for (int i = 0; i < 20; i++)
-        rect(94 + i * 11, last, 8, 14, f.volume >= (i + 1) * 5 ? BASIC : BASIC_OFF);
+        rect(94 + i * 11, 32, 8, 14, f.volume >= (i + 1) * 5 ? YELLOW : GREY);
+    } else {
+      const int width = MachineTextWidth(f.line);
+      MachineReading(f.line, 16, 32, 314, WHITE);
+      if (width <= 306 && f.cursor) rect(16 + width, 32, 8, 14, WHITE);
     }
+    MachineReading(f.time, 630 - MachineTextWidth(f.time), 8, MachineTextWidth(f.time), WHITE, false, true);
+    rect(422, 30, 208, 96, 0);
     RadioFace_DrawSlot(); RadioFace_DrawEq();
+    rect(b, 132, W - 2 * b, H - b - 132, 0);
     for (int i = 0; i < f.groups; i++) {
       int x = 16 + i * 87; bool cur = i == f.group;
-      if (cur) rect(x, 140, 83, 22, BASIC);
+      if (cur) rect(x, 136, 83, 24, rgb(154, 210, 132));
       String key = MachineFit(f.genres[i], 5);
-      label(key, x + (83 - MachineTextWidth(key)) / 2, 143, cur ? rgb(53, 40, 121) : BASIC);
+      label(key, x + (83 - MachineTextWidth(key)) / 2, 140, cur ? 0 : GREY);
     }
     setStyle(saved);
     return;
@@ -349,7 +373,6 @@ void RadioFaces_Draw(const RadioFaceData &f)
     label(f.time,atari ? 560 : 548,atari ? 8 : 10,WHITE);
     rect(422,30,208,96,0);
     if(atari) rect(16,34,320,22,0);
-    MachineReading(atari ? genre : f.channel+" "+genre,16,106,316,peach);
   }
   int ly=amiga ? 54 : atari ? 38 : 28;
   if(f.show_volume) {
