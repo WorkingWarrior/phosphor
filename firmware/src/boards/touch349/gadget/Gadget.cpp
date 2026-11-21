@@ -82,6 +82,7 @@ static void showBanner(const char *en, const char *tr, uint32_t ms)
   banner_until_ms = millis() + ms;
   state.dirty = true;
 }
+static bool banner_prompt = false;  // the banner is the low-battery question: a tap answers yes
 static bool bannerOn() { return banner_until_ms && (int32_t)(banner_until_ms - millis()) > 0; }
 
 // First-visit hints: each page of the ring shows one line the first time it is entered, then never again. The seen
@@ -964,12 +965,59 @@ static void hintTick()
     banner_until_ms = 0;
     state.dirty = true;
   }
+  if (!banner_until_ms) banner_prompt = false;
+}
+
+// Night dim and the low-battery question. Both use the board's temporary dimming, so the saved brightness is never
+// touched, and a manual brightness change (which ends the dimming) wins until the next night window / the next charge.
+#define LOW_BATT_PCT 20
+#define LOW_BATT_DIM_PCT 20
+#define LOW_BATT_PROMPT_MS 8000
+static bool night_in = false;     // inside the night window (edge detection: dim once per window)
+static bool lowbatt_armed = true; // ask again only after a charge
+static bool lowbatt_dim = false;  // the user said yes: stay dim until charging
+
+static void applyDim()
+{
+  board().setDim(lowbatt_dim ? LOW_BATT_DIM_PCT : night_in ? settings::NIGHT_DIM_PCT : -1);
+}
+
+static void dimTick(const DateTime &now)
+{
+  static int last_sec = -1;
+  if (now.second == last_sec) return;
+  last_sec = now.second;
+
+  int a, b, m = now.hour * 60 + now.minute;
+  bool in = settings::nightWindow(settings::nightMode(), a, b) && (a < b ? m >= a && m < b : m >= a || m < b);
+  if (in != night_in) {
+    night_in = in;
+    if (in) {
+      board().setDim(lowbatt_dim ? LOW_BATT_DIM_PCT : settings::NIGHT_DIM_PCT);
+    } else if (board().dimLevel() >= 0) {  // still dim from the night (not a hand change): back to the saved level
+      applyDim();
+    }
+  }
+
+  if (state.charging) {
+    lowbatt_armed = true;
+    if (lowbatt_dim) {  // charged (or plugged in): the low-battery dimming ends
+      lowbatt_dim = false;
+      if (board().dimLevel() >= 0) applyDim();
+    }
+  } else if (lowbatt_armed && state.batt_pct >= 0 && state.batt_pct < LOW_BATT_PCT && state.batt_v >= 3.2f &&
+             millis() > 30000 && !ringing && !bannerOn() && board().displayOn() != 0) {
+    lowbatt_armed = false;  // one question per battery session
+    banner_prompt = true;
+    showBanner("LOW BATTERY: DIM SCREEN? TAP = YES", "PİL AZ: EKRAN KISILSIN MI? DOKUN = EVET", LOW_BATT_PROMPT_MS);
+  }
 }
 
 void Gadget_Tick(const DateTime &now)
 {
   settings::tick();
   hintTick();
+  dimTick(now);
   SettingsUi_Tick();
   autoPage();
   int day = now.year * 400 + now.month * 32 + now.day;
@@ -1145,6 +1193,14 @@ static void tapTimer(int x, int y)
 void Gadget_Gesture(Gesture g, int x, int y)
 {
   last_touch_ms = millis();
+  if (banner_prompt && bannerOn() && g == Gesture::Tap) {  // yes to "dim the screen?"
+    banner_prompt = false;
+    banner_until_ms = 0;
+    lowbatt_dim = true;
+    applyDim();
+    state.dirty = true;
+    return;
+  }
   if (ringing) {
     stopAlarm();
     return;

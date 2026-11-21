@@ -63,6 +63,8 @@ class Touch349Board : public Board {
   bool keyDown() override;
   void setBrightness(int pct, bool show_level = true) override;
   int brightness() const override { return brightness_pct_; }
+  void setDim(int pct) override;
+  int dimLevel() const override { return dim_pct_; }
   void setDisplayOn(bool on) override;
   int displayOn() const override { return display_on_ ? 1 : 0; }
   bool snapshot(uint8_t *out) override;
@@ -123,6 +125,8 @@ class Touch349Board : public Board {
   static constexpr int FLUSH_TIMEOUT_MS = 500;
   static constexpr int FLUSH_MAX_FAILS = 2;
   int flush_fails_ = 0;
+  int dim_pct_ = -1;         // temporary dimming on top of it, -1 = none
+  int lightPct() const { return dim_pct_ >= 0 ? min(dim_pct_, brightness_pct_) : brightness_pct_; }
   int brightness_pct_ = 78;  // the factory duty (200 of 255) until someone sets it; kept across restarts
 
   bool display_on_ = true;

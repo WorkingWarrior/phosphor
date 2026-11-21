@@ -41,6 +41,11 @@ uint32_t version();                          // goes up on every apply (weather 
 bool tr();  // Turkish texts on screen, else English
 bool h24();
 bool fahrenheit();
+// Night dim: 0 = off, 1 = 22:00-07:00, 2 = 23:00-07:00, 3 = 00:00-08:00. The screen goes down to NIGHT_DIM_PCT.
+constexpr int NIGHT_MODES = 4;
+constexpr int NIGHT_DIM_PCT = 15;
+int nightMode();
+bool nightWindow(int mode, int &start_min, int &end_min);  // false for "off"
 String city();
 float lat();
 float lon();

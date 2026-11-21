@@ -55,6 +55,11 @@ class Board {
   // Backlight, optional (backlit panels only). brightness() is -1 without a control.
   virtual void setBrightness(int pct, bool show_level = true) {}  // show_level: the level overlay
   virtual int brightness() const { return -1; }
+  // Temporary dimming (night mode, low battery): the backlight follows min(pct, brightness) without touching the saved
+  // level; pct -1 ends it. Any manual brightness change ends it too (dimLevel() is -1 again). Boards without a
+  // backlight control ignore it.
+  virtual void setDim(int pct) {}
+  virtual int dimLevel() const { return -1; }
   // Screen off/on without cutting power (backlight dark, nothing drawn). displayOn() is -1 without a control.
   virtual void setDisplayOn(bool on) {}
   virtual int displayOn() const { return -1; }

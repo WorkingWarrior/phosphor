@@ -19,6 +19,7 @@ struct Values {
   bool h24 = true;
   bool fahr = false;
   int focus = 25, short_b = 5, long_b = 15;
+  int night = 0;  // night dim window, index into NIGHTS (0 = off)
   RadioGroup groups[MAX_GROUPS];
   int n_groups = 0;
   RadioStation stations[MAX_STATIONS];
@@ -61,6 +62,7 @@ static String serialize(const Values &v)
   out += String("lang=") + (v.tr ? "tr" : "en") + "\n";
   out += String("h24=") + (v.h24 ? "1" : "0") + "\n";
   out += String("unit=") + (v.fahr ? "f" : "c") + "\n";
+  out += "night=" + String(v.night) + "\n";
   out += "focus=" + String(v.focus) + "\n";
   out += "short=" + String(v.short_b) + "\n";
   out += "long=" + String(v.long_b) + "\n";
@@ -91,6 +93,7 @@ static bool parse(const String &body, Values &v, String &err)
     else if (k == "lang") v.tr = val.startsWith("tr");
     else if (k == "h24") v.h24 = val.toInt() != 0;
     else if (k == "unit") v.fahr = val.startsWith("f");
+    else if (k == "night") v.night = constrain(val.toInt(), 0, NIGHT_MODES - 1);
     else if (k == "focus") v.focus = val.toInt();
     else if (k == "short") v.short_b = val.toInt();
     else if (k == "long") v.long_b = val.toInt();
@@ -229,6 +232,16 @@ uint32_t version() { return ver; }
 bool tr() { return cur.tr; }
 bool h24() { return cur.h24; }
 bool fahrenheit() { return cur.fahr; }
+int nightMode() { return cur.night; }
+// Window of each night mode as start and end minute of the day (it wraps past midnight when start > end).
+bool nightWindow(int mode, int &start_min, int &end_min)
+{
+  static const int W[NIGHT_MODES][2] = { { 0, 0 }, { 22 * 60, 7 * 60 }, { 23 * 60, 7 * 60 }, { 0, 8 * 60 } };
+  mode = constrain(mode, 0, NIGHT_MODES - 1);
+  start_min = W[mode][0];
+  end_min = W[mode][1];
+  return mode > 0;
+}
 String city() { return cur.city; }
 float lat() { return cur.lat; }
 float lon() { return cur.lon; }

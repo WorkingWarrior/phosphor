@@ -17,7 +17,7 @@ using namespace vfd;
 // Items and texts
 // ---------------------------------------------------------------------------------------------------------------------
 
-enum Item : uint8_t { THEME, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HOLIDAYS, HELP, WIFI, ABOUT, ITEM_COUNT };
+enum Item : uint8_t { THEME, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HOLIDAYS, NIGHT, HELP, WIFI, ABOUT, ITEM_COUNT };
 
 struct ItemText {
   const char *en, *tr;            // in the list
@@ -33,6 +33,7 @@ static const ItemText ITEMS[ITEM_COUNT] = {
   { "CITY", "ŞEHİR", "WEATHER AND TIME ZONE", "HAVA DURUMU VE SAAT DİLİMİ" },
   { "AUTO PAGE", "OTO SAYFA", "AMBIENT PAGES TURN BY THEMSELVES", "SAHNELER KENDİLİĞİNDEN DÖNER" },
   { "HOLIDAYS", "YILBAŞI", "WINTER LIGHTS ON THE SNOW PAGE", "KAR SAYFASINDA YILBAŞI IŞIKLARI" },
+  { "NIGHT DIM", "GECE KISMA", "SCREEN DIMS AT NIGHT", "EKRAN GECE KISILIR" },
   { "HELP", "YARDIM", nullptr, nullptr },
   { "WI-FI", "WI-FI", nullptr, nullptr },
   { "ABOUT", "HAKKINDA", nullptr, nullptr },
@@ -306,6 +307,7 @@ static void change(int dir)
       break;
     }
     case HOLIDAYS: SettingsUi_SetHolidays((xmasMode() + dir + 3) % 3); break;
+    case NIGHT: apply((String("night=") + (settings::nightMode() + dir + settings::NIGHT_MODES) % settings::NIGHT_MODES + "\n").c_str()); break;
     case HELP: help_page = (help_page + dir + HELP_COUNT) % HELP_COUNT; break;
     default: return;
   }
@@ -401,6 +403,18 @@ static void drawValue()
       static const char *const EN[] = { "BY DATE", "ALWAYS", "OFF" }, *const TR[] = { "TARİHE GÖRE", "HEP AÇIK", "KAPALI" };
       value = L(EN[xmasMode()], TR[xmasMode()]);
       if (xmasMode() == 0) note = L("DEC 1 - JAN 6", "1 ARALIK - 6 OCAK");
+      break;
+    }
+    case NIGHT: {
+      int a, b;
+      if (!settings::nightWindow(settings::nightMode(), a, b)) {
+        value = L("OFF", "KAPALI");
+      } else {
+        char w[16];
+        snprintf(w, sizeof(w), "%02d:%02d-%02d:%02d", a / 60, a % 60, b / 60, b % 60);
+        value = w;
+        note = String(L("SCREEN TO ", "EKRAN %")) + settings::NIGHT_DIM_PCT + L("%", "");
+      }
       break;
     }
     default: break;

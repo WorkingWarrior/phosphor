@@ -88,6 +88,8 @@ button.warn:hover { border-color: var(--hot); color: var(--hot); }
         <div class="seg" id="h24"><button data-v="1">24 h</button><button data-v="0">12 h</button></div></div>
       <div class="shrink"><label id="t-unit">Temperature</label>
         <div class="seg" id="unit"><button data-v="c">°C</button><button data-v="f">°F</button></div></div>
+      <div class="shrink"><label id="t-night">Night dim (screen at 15%)</label>
+        <div class="seg" id="night"><button data-v="0">Off</button><button data-v="1">22:00-07:00</button><button data-v="2">23:00-07:00</button><button data-v="3">00:00-08:00</button></div></div>
     </div>
   </section>
 
@@ -137,11 +139,11 @@ button.warn:hover { border-color: var(--hot); color: var(--hot); }
 
 <script>
 const $ = s => document.querySelector(s);
-let S = { city: '', lat: 0, lon: 0, lang: 'en', h24: '1', unit: 'c', focus: 25, short: 5, long: 15, groups: [], stations: [] };
+let S = { city: '', lat: 0, lon: 0, lang: 'en', h24: '1', unit: 'c', night: '0', focus: 25, short: 5, long: 15, groups: [], stations: [] };
 
 const TR = {
   't-title': 'Ayarlar', 't-sub': 'Kaydet’e basınca cihazda hemen geçerli olur.', 't-loc': 'Konum', 't-now': 'Hava ve saat:',
-  't-disp': 'Ekran', 't-lang': 'Dil', 't-clock': 'Saat', 't-unit': 'Sıcaklık', 't-pomo': 'Odak sayacı (dakika)', 't-focus': 'Odak',
+  't-disp': 'Ekran', 't-lang': 'Dil', 't-clock': 'Saat', 't-unit': 'Sıcaklık', 't-night': 'Gece kısma (ekran %15)', 't-pomo': 'Odak sayacı (dakika)', 't-focus': 'Odak',
   't-short': 'Kısa mola', 't-long': 'Uzun mola', 't-radio': 'Radyo',
   't-radio-hint': 'Her grup radyo ekranında bir buton (en çok 7). Aynı butona tekrar dokununca gruptaki sonraki istasyona geçer.',
   't-st-name': 'Ad (16 harf)', 't-into': 'Eklenecek grup', 't-codec': 'Cihaz sadece MP3 ve AAC yayınları çalar. ? işaretli istasyonlar biçimini bildirmiyor: önce deneyin.'
@@ -170,7 +172,7 @@ function parse(text) {
   return s;
 }
 function serialize() {
-  let t = `city=${S.city}\nlat=${S.lat}\nlon=${S.lon}\nlang=${S.lang}\nh24=${S.h24}\nunit=${S.unit}\nfocus=${$('#focus').value}\nshort=${$('#short').value}\nlong=${$('#long').value}\n`;
+  let t = `city=${S.city}\nlat=${S.lat}\nlon=${S.lon}\nlang=${S.lang}\nh24=${S.h24}\nunit=${S.unit}\nnight=${S.night || 0}\nfocus=${$('#focus').value}\nshort=${$('#short').value}\nlong=${$('#long').value}\n`;
   S.groups.forEach(g => t += `group=${g.key}|${g.name}\n`);
   S.stations.forEach(s => t += `station=${s.g}|${s.name}|${s.url}\n`);
   return t;
@@ -200,6 +202,7 @@ function render() {
   seg('lang', S.lang, v => { S.lang = v; render(); dirty(); });
   seg('h24', String(S.h24), v => { S.h24 = v; render(); dirty(); });
   seg('unit', S.unit || 'c', v => { S.unit = v; render(); dirty(); });
+  seg('night', String(S.night || '0'), v => { S.night = v; render(); dirty(); });
   texts();
   const box = $('#groups'); box.innerHTML = '';
   S.groups.forEach((g, gi) => {

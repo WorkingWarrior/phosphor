@@ -266,19 +266,28 @@ void Touch349Board::fadeBacklight(int from_pct, int to_pct, int ms)
 // With the screen off it only stores it.
 void Touch349Board::setBrightness(int pct, bool show_level)
 {
-  int from = brightness_pct_;
+  int from = lightPct();
+  dim_pct_ = -1;  // a hand on the brightness wins over night mode / low-battery dimming
   brightness_pct_ = constrain(pct, BRIGHTNESS_MIN_PCT, 100);
   if (display_on_) {
     if (show_level) {
       level_until_ms_ = millis() + LEVEL_SHOW_MS;
       render(now());
     }
-    fadeBacklight(from, brightness_pct_, 90);
+    fadeBacklight(from, lightPct(), 90);
   }
   Preferences prefs;
   prefs.begin("rlcd", false);
   prefs.putUChar("bright", brightness_pct_);
   prefs.end();
+}
+
+// Dims (or ends the dimming) without saving: night mode and the low-battery prompt. Never below the panel's minimum.
+void Touch349Board::setDim(int pct)
+{
+  int from = lightPct();
+  dim_pct_ = pct < 0 ? -1 : constrain(pct, BRIGHTNESS_MIN_PCT, 100);
+  if (display_on_) fadeBacklight(from, lightPct(), 400);
 }
 
 // One step along LEVELS from the nearest one; at either end the direction turns, so a dark room never jumps
@@ -315,7 +324,7 @@ void Touch349Board::setDisplayOn(bool on)
   if (shown_ && anim_) {
     collapse(shown_);
   }
-  fadeBacklight(brightness_pct_, 0, 100);
+  fadeBacklight(lightPct(), 0, 100);
   setDuty(0);
   display_on_ = false;
 }
@@ -401,7 +410,7 @@ void Touch349Board::unfold(const uint16_t *to)
 {
   drawLine(anim_, WIDTH, HEIGHT, 6, BG, INK);
   pushAnim(anim_);
-  fadeBacklight(0, brightness_pct_, 60);
+  fadeBacklight(0, lightPct(), 60);
   for (int f = 1; f <= SHRINK_FRAMES; f++) {
     float t = easeOutQuart((float)f / SHRINK_FRAMES);
     drawLine(anim_, WIDTH, HEIGHT, max(6, (int)lroundf(WIDTH * t)), BG, INK);
@@ -429,7 +438,7 @@ void Touch349Board::show(const uint16_t *landscape)
   if (unfold_next_ && anim_) {
     unfold(out);
   } else if (unfold_next_) {
-    setDuty(brightness_pct_);
+    setDuty(lightPct());
   }
   unfold_next_ = false;
   push(out);

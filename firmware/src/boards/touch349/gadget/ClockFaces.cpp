@@ -223,7 +223,9 @@ void ClockFaces_Banner(const String &line)
   theme::Id t = theme::current();
   if (t != theme::VFD) setStyle({ t == theme::ATARI ? &VFD_FONT : t == theme::AMIGA ? &AMIGA_FONT : &C64_FONT, false, false, false });
   bool vfdFont = style().font == &VFD_FONT && t == theme::VFD;
-  int w = vfdFont ? textWidth(line.c_str(), 2) : MachineTextWidth(line), bw = min(W - 40, w + 40), bx = (W - bw) / 2, by = 128, bh = 32;
+  int pitch = 2, w = vfdFont ? textWidth(line.c_str(), 2) : MachineTextWidth(line);
+  if (!vfdFont && w > W - 80) pitch = 1, w /= 2;  // a long line in the machine fonts: half-size glyphs
+  int bw = min(W - 40, w + 40), bx = (W - bw) / 2, by = 128, bh = 32;
   uint16_t ink;
   noClip();
   if (t == theme::VFD) {
@@ -242,7 +244,7 @@ void ClockFaces_Banner(const String &line)
     frame(bx, by, bw, bh, BASIC);
     ink = BASIC_DIM;
   }
-  label(line, bx + (bw - w) / 2, by + 9, ink, t == theme::AMIGA);
+  label(line, bx + (bw - w) / 2, by + (pitch == 1 ? 12 : 9), ink, t == theme::AMIGA && pitch == 2, pitch);
   setStyle(saved);
 }
 void MachineLabel(const String &s, int x, int y, uint16_t color, bool shadow) { label(s, x, y, color, shadow); }
