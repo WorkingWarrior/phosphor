@@ -3,6 +3,7 @@
 #include "Fishtank.h"
 #include "Motion.h"
 #include "Px.h"
+#include "RetroScene.h"
 #include "Vfd.h"
 
 using namespace px;
@@ -229,12 +230,8 @@ static void plant(int x, int h, float t, uint8_t dark, uint8_t lit, int seed)
   }
 }
 
-void Fishtank_Draw(const char *corner_text)
+static void drawTank(float t)
 {
-  frame_no++;
-  float t = frame_no * 0.05f;
-  updateWater();
-
   // water, deep at the bottom; dark air above the surface
   static const uint8_t WATER[] = { W4, W3, W2, W2, W1 };
   gradient(0, H, WATER, 5);
@@ -310,6 +307,28 @@ void Fishtank_Draw(const char *corner_text)
       if (l % 4 == 2) set(x + (b % 2 ? 1 : -1), y, M2);
     }
   }
+}
+
+static void drawFront(float t)
+{
+  // front kelp and grass
+  plant(132, 30, t * 1.2f, G2, G3, 3);
+  plant(312, 26, t * 1.3f, G2, G3, 5);
+  for (int g = 0; g < 14; g++) {
+    int x = (g * 53 + 11) % W, hgt = 3 + g % 4;
+    for (int l = 0; l < hgt; l++) set(x + lroundf(sinf(t + g) * l * 0.3f), (int)sandAt(x) - l, l == hgt - 1 ? G3 : G2);
+  }
+
+}
+
+void Fishtank_Draw(const char *corner_text)
+{
+  frame_no++;
+  float t = frame_no * 0.05f;
+  updateWater();
+
+  bool art = RetroScene_Begin(RetroArt::Aquarium);  // the theme's picture of the tank; fish and bubbles on top
+  if (!art) drawTank(t);
   // bubbles from the rock, popping at the surface
   if (frame_no % 9 == 0) {
     for (auto &b : bubbles) {
@@ -347,14 +366,11 @@ void Fishtank_Draw(const char *corner_text)
   }
   for (int i = 0; i < FISH_COUNT; i++) swim(fish[i], i);
   for (int i = 0; i < FISH_COUNT; i++) drawFish(fish[i], i);
-  // front kelp and grass
-  plant(132, 30, t * 1.2f, G2, G3, 3);
-  plant(312, 26, t * 1.3f, G2, G3, 5);
-  for (int g = 0; g < 14; g++) {
-    int x = (g * 53 + 11) % W, hgt = 3 + g % 4;
-    for (int l = 0; l < hgt; l++) set(x + lroundf(sinf(t + g) * l * 0.3f), (int)sandAt(x) - l, l == hgt - 1 ? G3 : G2);
+  if (art) {
+    RetroScene_End(corner_text);
+    return;
   }
-
+  drawFront(t);
   present();
   if (corner_text && *corner_text) {
     int w = vfd::textWidth(corner_text, 2);

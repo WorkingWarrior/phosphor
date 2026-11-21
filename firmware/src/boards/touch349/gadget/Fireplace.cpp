@@ -2,6 +2,7 @@
 
 #include "Fireplace.h"
 #include "Px.h"
+#include "RetroScene.h"
 #include "Vfd.h"
 
 using namespace px;
@@ -20,7 +21,11 @@ static uint32_t hash32(uint32_t v)
   return v ^ (v >> 16);
 }
 
-void Fireplace_Tap() { awake_until = millis() + 4500; }
+void Fireplace_Tap()
+{
+  awake_until = millis() + 4500;
+  RetroScene_Stir(0.6f);  // with the theme's picture: the fire flares up
+}
 
 // Flame tongues, thick at the base and thin at the tip, three layers (outer, body, hot core) that flicker and sway.
 static constexpr int TONGUES = 7;
@@ -260,6 +265,7 @@ static void cat()
 
 void Fireplace_Draw(const char *corner_text)
 {
+  if (RetroScene_Draw(RetroArt::Fire, corner_text)) return;  // the theme's own picture of this scene
   frame_no++;
   room();
   lights();

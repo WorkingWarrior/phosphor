@@ -227,6 +227,24 @@ void present()
   }
 }
 
+void overlay(bool wide, uint16_t solid)
+{
+  if (!pairs_ready) setTheme(cur);
+  if (!buf) begin();
+  uint16_t *cv = vfd::canvas();
+  int mask = wide ? ~1 : ~0;
+  for (int y = 0; y < H; y++) {
+    uint16_t *r0 = cv + (2 * y) * vfd::W, *r1 = r0 + vfd::W;
+    const uint8_t *src = buf[y];
+    for (int x = 0; x < W; x++) {
+      uint8_t i = src[x & mask];
+      if (i == CLR) continue;
+      uint16_t c = solid ? solid : ((((x & mask) ^ y) & 1) ? pair_b[i] : pair_a[i]);
+      r0[2 * x] = r0[2 * x + 1] = r1[2 * x] = r1[2 * x + 1] = c;
+    }
+  }
+}
+
 }  // namespace px
 
 #endif

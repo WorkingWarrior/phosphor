@@ -3,6 +3,7 @@
 #include "Seaside.h"
 #include <time.h>
 #include "Px.h"
+#include "RetroScene.h"
 #include "Vfd.h"
 
 using namespace px;
@@ -22,7 +23,11 @@ static uint32_t hash32(uint32_t v)
   return v ^ (v >> 16);
 }
 
-void Seaside_Tap() { big_wave = 1; }
+void Seaside_Tap()
+{
+  big_wave = 1;
+  RetroScene_Stir(0.6f);  // with the theme's picture: the sea gets rougher for a moment
+}
 
 enum class Light { Day, Dusk, Night };
 
@@ -288,6 +293,7 @@ static void palm(Light l)
 
 void Seaside_Draw(const char *corner_text)
 {
+  if (RetroScene_Draw(RetroArt::Sea, corner_text)) return;  // the theme's own picture of this scene
   frame_no++;
   Light l = lightNow();
   sky(l);

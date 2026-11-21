@@ -687,7 +687,7 @@ void Snowglobe_Draw(const char *corner_text)
     drawGlobe(corner_text);
     return;
   }
-  if (RetroScene_Snow(corner_text)) return;  // the theme has its own art for this scene
+  if (RetroScene_Draw(RetroArt::Snow, corner_text)) return;  // the theme has its own art for this scene
   if (!scene) build();
   t_scene = scene;
   t_solid = solid;

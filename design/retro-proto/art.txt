@@ -1,0 +1,17 @@
+# name             machine  source                        crop (y0:y1 fractions of the source)
+art_snow_amiga     amiga    gen/amiga_raw.png             0.04:0.88
+art_snow_c64       c64      gen/c64_raw.png               0.05:0.80
+art_snow_atari     atari    gen/atari_raw.png             0.06:0.92
+art_snow_lcd       lcd      gen/lcd_raw.png               0.04:0.92
+art_tank_amiga     amiga    gen/aquarium_amiga_raw.png    0.10:0.98
+art_tank_c64       c64      gen/aquarium_c64_raw.png      0.02:0.95
+art_tank_atari     atari    gen/aquarium_atari_raw.png    0.00:1.00
+art_tank_lcd       lcd      gen/aquarium_lcd_raw.png      0.00:1.00
+art_fire_amiga     amiga    gen/fireplace_amiga_raw.png   0.00:1.00
+art_fire_c64       c64      gen/fireplace_c64_raw.png     0.05:1.00
+art_fire_atari     atari    gen/fireplace_atari_raw.png   0.02:0.98
+art_fire_lcd       lcd      gen/fireplace_lcd_raw.png     0.00:1.00
+art_sea_amiga      amiga    gen/seaside_amiga_raw.png     0.04:0.98
+art_sea_c64        c64      gen/seaside_c64_raw.png       0.08:0.98
+art_sea_atari      atari    gen/seaside_atari_raw.png     0.00:1.00
+art_sea_lcd        lcd      gen/seaside_lcd_raw.png       0.00:1.00
