@@ -306,7 +306,7 @@ void drawCard(int i, const Pal &p, uint32_t now)
     return;
   }
   drawFace(hand[i], x, y, p);
-  if (held[i]) {
+  if (held[i] && ph != Ph::Result) {
     uint16_t hc = p.hold;
     frame(x, y, CW, CH, hc);
     frame(x + 1, y + 1, CW - 2, CH - 2, hc);
@@ -328,15 +328,16 @@ void drawPayTable()
     int col = i / 5, row = i % 5;
     int x = CX0 + col * 252, y = 34 + row * 22, w = 240;
     bool lit = ORDER[i] == last_win;
-    if (lit) rect(x - 4, y - 3, w + 8, 20, style().glow ? GHOST : HALO);
+    if (lit) {
+      uint16_t hl = theme::current() == theme::C64 ? HALO : theme::current() == theme::AMIGA ? px::rgb(0, 0, 34) : theme::current() == theme::ATARI ? px::rgb(24, 26, 80) : GHOST;
+      rect(x - 4, y - 3, w + 8, 20, hl);
+    }
     const Ink &ink = lit ? HOT_INK : LIT_INK;
     text(handName(ORDER[i]), x, y, 2, ink);
     char b[8];
     snprintf(b, sizeof(b), "%d", poker::payout(ORDER[i]));
     text(b, x + w - textWidth(b, 2), y, 2, ink);
   }
-  // the tenth cell: how to start
-  text(L("KNOCK ON THE TABLE", "MASAYA VUR"), CX0 + 252, 34 + 4 * 22, 2, DIM_INK);
 }
 
 void button(int x, int y, int w, int h, const char *label, bool on)
@@ -383,9 +384,9 @@ void drawSide(uint32_t now)
   int p = textWidth(b, 4) <= SIDE_W ? 4 : 3;
   text(b, SIDE_X, 26, p, credits == 0 ? HOT_INK : LIT_INK);
   snprintf(b, sizeof(b), "%s %lu", L("TODAY", "BUGÜN"), (unsigned long)best_today);
-  text(b, SIDE_X, 64, 2, DIM_INK);
+  text(b, SIDE_X, 62, 2, DIM_INK);
   snprintf(b, sizeof(b), "%s %lu", L("BEST", "REKOR"), (unsigned long)best_ever);
-  text(b, SIDE_X, 80, 2, DIM_INK);
+  text(b, SIDE_X, 79, 2, DIM_INK);
   const char *label;
   bool on = true;
   if (ph == Ph::Hold && allRevealed(now)) {

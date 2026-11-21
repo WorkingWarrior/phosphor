@@ -14,23 +14,23 @@ using namespace vfd;
 // Endless runner. A small courier runs right over a scrolling ground; tap = short hop, hold = high jump (the jump starts
 // the moment the finger lands and is cut short when it lifts: the press length sets the height). Score = distance.
 //
-// World units: everything (speed, jump, obstacle sizes) is in sprite cells, drawn sc pixels per cell (3, the C64 theme 4),
+// World units: everything (speed, jump, obstacle sizes) is in sprite cells, drawn sc pixels per cell (4, the C64 theme 5),
 // so the game plays the same in every theme.
 //   jump: v0 = 82 cells/s, gravity 220 -> 15.3 cells high, 0.75 s in the air. Lifting the finger cuts the climb to
-//         38 cells/s, but not before 60 ms: shortest hop ~7.8 cells (air time 0.5 s), a press of ~0.15 s or more gets
+//         46 cells/s, but not before 60 ms: shortest hop ~9.3 cells (air time 0.56 s), a press of ~0.1 s or more gets
 //         over the tall crate.
-//   obstacles: puddle 1.5 high, crate 6, tall crate 12, low bird 2..6.5; each needs the box of the runner (feet at y + 1)
-//         above its top while it passes.
+//   obstacles: puddle 1.5 high, crate 6, tall crate 13, low bird 1.5..7.5 (hit box 2..6.5, 5 narrower); each needs the
+//         box of the runner (feet at y + 1) above its top while it passes.
 //   spacing rule: the edge-to-edge gap between two obstacles is at least 0.80 s of running at the current speed
 //         (x1.05 for the speed gained while it scrolls in), 0.95 s next to a tall crate, plus a random 0..0.9 s.
 //         0.80 s is landing from the shortest hop (0.31 s after clearing) plus reaction and the next take-off.
-//   speed: 52 cells/s, +0.4 per second of running, at most 108.
+//   speed: 60 cells/s, +0.35 per second of running, at most 108.
 
 namespace {
 
-constexpr float G = 220.0f, V0 = 82.0f, V_CUT = 38.0f;
+constexpr float G = 220.0f, V0 = 82.0f, V_CUT = 46.0f;
 constexpr uint32_t MIN_HOLD_MS = 60;
-constexpr float SPEED0 = 52.0f, SPEED_GAIN = 0.4f, SPEED_MAX = 108.0f;
+constexpr float SPEED0 = 60.0f, SPEED_GAIN = 0.35f, SPEED_MAX = 108.0f;
 constexpr float GAP_MIN_S = 0.80f, GAP_TALL_S = 0.95f, GAP_RAND_S = 0.9f, GAP_SPEEDUP = 1.05f;
 constexpr int GROUND_Y = 146;     // feet, in pixels
 constexpr int RUNNER_SX = 44;     // the runner's left edge, in pixels
@@ -45,20 +45,21 @@ const char *const RUN_B[] = { "...####..", "..######.", "..#####o.", "..######."
 const char *const RUN_J[] = { "...####..", "..######.", "..#####o.", "..######.", "...####..", "oo.####..", ".o#####.#", "..#####.#", "..#####..", ".#######.", ".##...##.", "........." };
 const char *const PUDDLE_S[] = { "...########...", ".############." };
 const char *const CRATE_S[] = { "########", "#oo..oo#", "#.oooo.#", "#.oooo.#", "#oo..oo#", "########" };
-const char *const TALL_S[] = { "########", "#oo..oo#", "#.oooo.#", "#.oooo.#", "#oo..oo#", "########", "########", "#oo..oo#", "#.oooo.#", "#.oooo.#", "#oo..oo#", "########" };
-const char *const BIRD_A[] = { "o.......o", "oo.###.oo", ".#######.", "o.#####..", "...#.#..." };
-const char *const BIRD_B[] = { ".........", "...###...", "o########", "..#####..", "...#.#..." };
+const char *const TALL_S[] = { "########", "#oo..oo#", "#.oooo.#", "#.oooo.#", "#oo..oo#", "########", "########", "#oo..oo#", "#.oooo.#", "#.oooo.#", "#.oooo.#", "#oo..oo#", "########" };
+const char *const BIRD_A[] = { "o.........o", "oo.......oo", ".ooo###ooo.", "oo.#o####..", "...#####...", "....#.#...." };
+const char *const BIRD_B[] = { "...........", "...#####...", "ooo#o####oo", ".ooo####oo.", "...#####...", "....#.#...." };
 
 struct Dim {
   const char *const *rows;
   int n, w;
   float bottom, hit_b, hit_t;  // sprite bottom above the ground, hit box bottom and top (cells above the ground)
+  float inset;                 // the hit box is this much narrower than the sprite on each side
 };
 const Dim DIMS[TYPES] = {
-  { PUDDLE_S, 2, 14, 0, 0, 1.2f },
-  { CRATE_S, 6, 8, 0, 0, 5.5f },
-  { TALL_S, 12, 8, 0, 0, 11.5f },
-  { BIRD_A, 5, 9, 1.5f, 2.0f, 6.0f },
+  { PUDDLE_S, 2, 14, 0, 0, 1.2f, 0.5f },
+  { CRATE_S, 6, 8, 0, 0, 5.5f, 0.5f },
+  { TALL_S, 13, 8, 0, 0, 12.5f, 0.5f },
+  { BIRD_A, 6, 11, 1.5f, 2.0f, 6.5f, 2.5f },
 };
 
 struct Ob {
@@ -79,7 +80,7 @@ bool new_hi = false;
 float ema_gap = 33, ema_draw = 10;
 uint32_t last_draw_ms = 0;
 
-int sc() { return theme::current() == theme::C64 ? 4 : 3; }
+int sc() { return theme::current() == theme::C64 ? 5 : 4; }
 float viewCells() { return (float)W / sc(); }
 
 void openPrefs()
@@ -162,7 +163,7 @@ bool hits()
   for (const Ob &o : obs) {
     if (!o.alive) continue;
     const Dim &d = DIMS[o.type];
-    float ox0 = o.x + 0.5f, ox1 = o.x + d.w - 0.5f;
+    float ox0 = o.x + d.inset, ox1 = o.x + d.w - d.inset;
     if (rx1 > ox0 && rx0 < ox1 && rb < d.hit_t && rt > d.hit_b) return true;
   }
   return false;
@@ -290,8 +291,8 @@ void drawBackground(float d, int s)
     case theme::ATARI: {  // flat sky bands and a striped ground, nothing finer than a 2600 could do
       clear(px::rgb(0, 0, 0));
       for (int k = 0; k < 6; k++) rect(0, 24 + k * 14, W, 5, k < 3 ? px::rgb(24, 26, 80) : px::rgb(80, 26, 24));
-      rect(470, 40, 54, 54, px::rgb(252, 188, 116));
-      for (int k = 0; k < 5; k++) rect(470, 52 + k * 10, 54, 3, px::rgb(0, 0, 0));
+      rect(300, 30, 54, 54, px::rgb(252, 188, 116));
+      for (int k = 0; k < 5; k++) rect(300, 42 + k * 10, 54, 3, px::rgb(0, 0, 0));
       for (int yy = GROUND_Y; yy < H; yy += 6) rect(0, yy, W, 6, ((yy - GROUND_Y) / 6) & 1 ? px::rgb(60, 130, 60) : px::rgb(92, 186, 92));
       for (int k = 0; k < 9; k++) {
         int x = ((k * 83 - cell) % 700 + 700) % 700 - 20;
@@ -390,6 +391,21 @@ void drawHud()
   }
 }
 
+// A dark box behind the messages, so they read over the copper sky and the clouds.
+void panel(int y0, int y1)
+{
+  uint16_t fill = BG, edge = DIM;
+  switch (theme::current()) {
+    case theme::C64: edge = HALO; break;
+    case theme::AMIGA: fill = px::rgb(0, 0, 34), edge = 0xFFFF; break;
+    case theme::ATARI: fill = 0, edge = px::rgb(160, 160, 200); break;
+    default: break;
+  }
+  rect(100, y0, 440, y1 - y0, fill);
+  frame(100, y0, 440, y1 - y0, edge);
+  frame(101, y0 + 1, 438, y1 - y0 - 2, edge);
+}
+
 void centered(const char *s, int p, int yy, const Ink &ink) { text(s, (W - textWidth(s, p)) / 2, yy, p, ink); }
 
 void runnerDraw(const DateTime &)
@@ -406,14 +422,16 @@ void runnerDraw(const DateTime &)
     lit = Ink{ 0xFFFF };
   }
   if (rs == Rs::Ready) {
-    centered(L("TAP TO RUN", "DOKUN: KOŞ"), 5, 58, lit);
+    panel(36, 126);
+    centered(L("TAP TO RUN", "DOKUN: KOŞ"), 5, 52, lit);
     centered(L("TAP: HOP   HOLD: HIGH JUMP", "DOKUN: ZIPLA  BASILI: YÜKSEK"), 2, 100, hot);
   } else if (rs == Rs::Dead) {
-    centered(L("GAME OVER", "OYUN BİTTİ"), 5, 40, hot);
+    panel(24, 136);
+    centered(L("GAME OVER", "OYUN BİTTİ"), 5, 36, hot);
     char b[32];
     snprintf(b, sizeof(b), "%s %lu", new_hi ? L("NEW BEST", "YENİ REKOR") : L("SCORE", "SKOR"), (unsigned long)score);
-    centered(b, 3, 84, lit);
-    if (millis() - dead_ms > 600) centered(L("TAP TO RETRY", "DOKUN: TEKRAR"), 2, 116, hot);
+    centered(b, 3, 82, lit);
+    if (millis() - dead_ms > 600) centered(L("TAP TO RETRY", "DOKUN: TEKRAR"), 2, 112, hot);
   }
   if (theme::current() == theme::C64) {
     const theme::Def &d = theme::def();
