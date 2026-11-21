@@ -41,7 +41,7 @@ void MachineDigits_Draw(const String &s, int x, int y, int cellWidth, int height
         int ww=(c+1)*cellWidth/nc-c*cellWidth/nc, hh=(r+1)*height/nr-r*height/nr;
         if (pass==0) rect(xx+4,yy+4,ww,hh,0);
         else if (pass==1) {
-          if (!atari) rect(xx-2,yy-2,ww+4,hh+4,hot && c64 ? rgb(104,55,43) : 0);
+          rect(xx-2,yy-2,ww+4,hh+4,hot && c64 ? rgb(104,55,43) : 0);  // also on the 2600: its light digits sit on snow skies
         } else if (c64 || atari) {
           uint16_t col=c64 ? (hot ? rgb(184,105,98) : wash[min(r/2,3)]) :
             hot ? (r<3 ? rgb(252,188,148) : rgb(208,128,92)) : rgb(236-r*24,236-r*16,236-r*9);

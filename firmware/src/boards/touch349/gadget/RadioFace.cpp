@@ -228,6 +228,8 @@ static Cells cells;
 static void drawCells()
 {
   int x0 = RADIO_SLOT_X, y0 = RADIO_SLOT_Y;
+  // The Workbench DIM is near-black text ink: waiting figures on the Amiga picture take a light grey instead.
+  const uint16_t waiting = theme::current() == theme::AMIGA ? px::rgb(153, 153, 170) : DIM;
   for (int j = 0; j < CH; j++)
     for (int i = 0; i < CW; i++)
       if (theme::current() == theme::VFD && !cells.v[j][i]) rect(x0 + i * PITCH, y0 + j * PITCH, 2, 2, FAINT);
@@ -239,7 +241,7 @@ static void drawCells()
   for (int j = 0; j < CH; j++)
     for (int i = 0; i < CW; i++) {
       uint8_t k = cells.v[j][i];
-      if (k) rect(x0 + i * PITCH, y0 + j * PITCH, 2, 2, k == 1 ? LIT : k == 2 ? DIM : HOT);
+      if (k) rect(x0 + i * PITCH, y0 + j * PITCH, 2, 2, k == 1 ? LIT : k == 2 ? waiting : HOT);
     }
 }
 

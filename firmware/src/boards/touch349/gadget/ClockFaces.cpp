@@ -342,7 +342,7 @@ void RadioFaces_Draw(const RadioFaceData &f)
   }
   clip(16, 4, right + 12, 130);
   label(f.channel, 16, 10, amiga ? ORANGE : dim, amiga);
-  label(f.genre, 96, 10, accent, amiga);
+  label(f.genre, max(96, 16 + textWidth(f.channel.c_str(), 2) + 14), 10, accent, amiga);  // 8 px fonts run longer
   label(MachineFit(f.station, slot ? 13 : 16), 16, 38, bright, amiga, 3);
   if (f.show_volume) {
     label(f.volume_label, 16, 78, bright, amiga);

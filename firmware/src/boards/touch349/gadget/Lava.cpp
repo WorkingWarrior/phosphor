@@ -210,7 +210,10 @@ static void machineLava(theme::Id id)
           else if (f < 1.3f) c = odd ? w[2] : w[1];
           else c = w[2];
         } else {
-          c = glow < 0.2f ? C64_LIQ[scheme][0] : glow < 0.65f ? (odd ? C64_LIQ[scheme][1] : C64_LIQ[scheme][0]) : C64_LIQ[scheme][1];
+          // a 2x2 ordered pattern gives five steps (0, 25, 50, 75, 100%) between the two colors instead of three hard bands
+          static const uint8_t B2[2][2] = { { 0, 2 }, { 3, 1 } };
+          float t = (glow - 0.1f) * (1.0f / 0.7f);
+          c = C64_LIQ[scheme][t * 4 > B2[cy & 1][cx & 1] + 0.5f];
         }
       } else {
         // flat: two wax colors, liquid steps by row only (like a background color register changed per scanline)

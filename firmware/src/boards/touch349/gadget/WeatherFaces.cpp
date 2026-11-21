@@ -143,10 +143,8 @@ void WeatherFaces_Draw(const WeatherFace &f)
   MachineDigits_Draw(temperature, 20, 22, 56, 92, 10);
   int degree = 20 + strlen(temperature) * 66 - 10 + 8;
   // A hollow ring remains legible on the light sky pictures.
-  if (!atari) {
-    rect(degree - 2, 18, 22, 22, 0);
-    rect(degree + 4, 24, 10, 10, 0);
-  }
+  rect(degree - 2, 18, 22, 22, 0);
+  rect(degree + 4, 24, 10, 10, 0);
   rect(degree, 20, 18, 4, WHITE);
   rect(degree, 34, 18, 4, WHITE);
   rect(degree, 20, 4, 18, WHITE);
@@ -160,11 +158,16 @@ void WeatherFaces_Draw(const WeatherFace &f)
   };
   uint16_t secondary = atari ? PEACH : BLUE;
   String hum = settings::tr() ? "%" + String(f.weather.humidity) : String(f.weather.humidity) + "%";
-  if (glyphCount(f.condition.c_str()) <= 6) {
+  String humLine = String(L("HUM ", "NEM ")) + hum, windLine = String(L("WIND ", "RÜZGAR ")) + String(f.weather.wind);
+  // The VFD split (big condition, two reading lines beside it) only where the theme font leaves room before the
+  // forecast at x 268; the 8 px machine fonts fall back to the two-line layout sooner.
+  int readX = max(140, 20 + textWidth(f.condition.c_str(), 3) + 12);
+  int readW = max(textWidth(humLine.c_str(), 2), textWidth(windLine.c_str(), 2));
+  if (readX + readW <= 262) {
     reading(f.condition, 20, 132, 3, WHITE);
     if (f.weather.valid) {
-      reading(String(L("HUM ", "NEM ")) + hum, 140, 126, 2, secondary);
-      reading(String(L("WIND ", "RÜZGAR ")) + String(f.weather.wind), 140, 150, 2, secondary);
+      reading(humLine, readX, 126, 2, secondary);
+      reading(windLine, readX, 150, 2, secondary);
     }
   } else {
     reading(f.condition, 20, 126, 2, WHITE);
@@ -177,7 +180,14 @@ void WeatherFaces_Draw(const WeatherFace &f)
     int x = 268 + i * 122;
     miniSky(d.sky, x, 149, amiga ? 2 : 4, WHITE, atari ? PEACH : GOLD);
     reading(f.days[i], x + 26, 148, 2, secondary);
-    reading(String(d.t_max) + "°", x + 72, 148, 2, WHITE);
+    // A small ring instead of the degree glyph keeps day, number and degree inside the 122 px column.
+    String t = String(d.t_max);
+    int tx = max(x + 72, x + 26 + textWidth(f.days[i].c_str(), 2) + 8);
+    reading(t, tx, 148, 2, WHITE);
+    int rx = tx + textWidth(t.c_str(), 2) + 2;
+    if (!atari) rect(rx - 2, 146, 10, 10, 0);
+    rect(rx, 148, 6, 2, WHITE); rect(rx, 152, 6, 2, WHITE);
+    rect(rx, 148, 2, 6, WHITE); rect(rx + 4, 148, 2, 6, WHITE);
   }
   setStyle(saved);
 }
