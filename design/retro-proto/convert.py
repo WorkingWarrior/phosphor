@@ -270,4 +270,5 @@ def main():
     print(name, machine, f'{w}x{h}', len(pal), 'colors', len(data), 'bytes')
 
 
-main()
+if __name__ == '__main__':
+    main()

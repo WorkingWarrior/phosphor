@@ -9,3 +9,5 @@ gen/*_c64.png
 gen/*_atari.png
 gen/*_lcd.png
 gen/*.out
+gen/dealer_*.png
+!gen/dealer_master.png

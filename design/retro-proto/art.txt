@@ -59,3 +59,4 @@ study_atari     atari_free   gen/study_atari.png          0.22:0.723
 ship_c64        sprite_c64   gen/shipsprite_c64.png       300
 ship_amiga      sprite_amiga gen/shipsprite_amiga.png     300
 ship_atari      sprite_atari gen/shipsprite_atari.png     300
+# The 21 dealer sprites (dealer_<pose>_<m>) are made by dealer.py, not by this table.
