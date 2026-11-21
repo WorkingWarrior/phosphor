@@ -969,7 +969,7 @@ void Gadget_Render(const DateTime &now)
     frame(140, 62, 360, 46, DIM);
     drawVolumeBar(158, 78);
   }
-  theme::decorate();
+  if (state.mode != Mode::Hourglass) theme::decorate();  // the hourglass stands alone on black, no machine border
   if (state.mode == Mode::Radio && radio_world) RadioFaces_Border();
 }
 
