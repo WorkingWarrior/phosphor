@@ -9,4 +9,3 @@ gen/*_c64.png
 gen/*_atari.png
 gen/*_lcd.png
 gen/*.out
-gen/*_fit.png

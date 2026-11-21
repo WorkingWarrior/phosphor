@@ -4,7 +4,7 @@ snow_c64       c64      gen/c64_raw.png               0.05:0.80
 snow_atari     atari    gen/atari_raw.png             0.06:0.92
 tank_amiga     amiga    gen/aquarium_amiga_raw.png    0.10:0.98
 tank_c64       c64      gen/aquarium_c64_raw.png      0.02:0.95
-tank_atari     atari    gen/aquarium_atari_raw.png    0.00:1.00
+tank_atari     atari_coarse gen/aquarium_atari_raw.png 0.00:1.00
 fire_amiga     amiga    gen/fireplace_amiga_raw.png   0.00:1.00
 fire_c64       c64      gen/fireplace_c64_raw.png     0.05:1.00
 fire_atari     atari    gen/fireplace_atari_raw.png   0.02:0.98
@@ -15,35 +15,44 @@ sea_atari      atari    gen/seaside_atari_raw.png     0.00:1.00
 world_amiga    amiga        gen/world_amiga.png    0.03:0.98
 world_c64      c64_free     gen/world_c64.png     0.00:1.00  0
 world_atari    atari_vivid  gen/world_atari.png    -
-# app backdrops: weather in 7 skies, radio, timer, hourglass (portrait, turned by convert.py); the two *_fit night
-# skies are re-cut by fit_band.py (commands in its header)
-wx_clear_c64    c64_free     gen/wx_clear_c64.png         - 20
-wx_night_c64    c64_free     gen/wx_night_c64_fit.png     - 20
-wx_part_c64     c64_free     gen/wx_part_c64.png          - 20
-wx_cloud_c64    c64_free     gen/wx_cloud_c64.png         - 20
-wx_rain_c64     c64_free     gen/wx_rain_c64.png          - 20
-wx_snow_c64     c64_free     gen/wx_snow_c64.png          - 0
-wx_storm_c64    c64_free     gen/wx_storm_c64.png         - 0
-radio_c64       c64_free     gen/radio_c64.png            - 20
-timer_c64       c64_free     gen/timer_c64.png            - 20
+# app backdrops: sky-only weather in 8 skies (also the wave's night sky), the timer launch field (rocket drawn by
+# code), radio (Amiga) and the study room
+sky_clear_c64   c64_free     gen/sky_clear_c64.png        - 20
+sky_night_c64   c64_free     gen/sky_night_c64.png        - 20
+sky_part_c64    c64_free     gen/sky_part_c64.png         - 20
+sky_partn_c64   c64_free     gen/sky_partn_c64.png        - 20
+# sky_cloud_c64 source: out/sky_rain_c64.png recolored (sky grey, clouds two steps lighter), saved as gen/sky_cloud_c64.png
+sky_cloud_c64   c64_cool     gen/sky_cloud_c64.png        - 0
+sky_rain_c64    c64_free     gen/sky_rain_c64.png         - 20
+sky_snow_c64    c64_cool     gen/sky_snow_c64.png         - 12
+sky_storm_c64   c64_free     gen/sky_storm_c64.png        - 20
+timer_c64       c64_free     gen/launch_c64.png           - 20
+study_c64       c64_free     gen/study_c64.png            0.22:0.723 20
 sand_c64        c64_free     gen/sand_c64.png             - 20
-wx_clear_amiga  amiga        gen/wx_clear_amiga.png       -
-wx_night_amiga  amiga        gen/wx_night_amiga.png       -
-wx_part_amiga   amiga        gen/wx_part_amiga.png        -
-wx_cloud_amiga  amiga        gen/wx_cloud_amiga.png       -
-wx_rain_amiga   amiga        gen/wx_rain_amiga.png        -
-wx_snow_amiga   amiga        gen/wx_snow_amiga.png        -
-wx_storm_amiga  amiga        gen/wx_storm_amiga.png       -
+sky_clear_amiga amiga        gen/sky_clear_amiga.png      -
+sky_night_amiga amiga        gen/sky_night_amiga.png      -
+sky_part_amiga  amiga        gen/sky_part_amiga.png       -
+sky_partn_amiga amiga        gen/sky_partn_amiga.png      -
+sky_cloud_amiga amiga        gen/sky_cloud_amiga.png      -
+sky_rain_amiga  amiga        gen/sky_rain_amiga.png       -
+sky_snow_amiga  amiga        gen/sky_snow_amiga.png       -
+sky_storm_amiga amiga        gen/sky_storm_amiga.png      -
 radio_amiga     amiga        gen/radio_amiga.png          -
-timer_amiga     amiga        gen/timer_amiga.png          -
+timer_amiga     amiga        gen/launch_amiga.png         -
+study_amiga     amiga        gen/study_amiga.png          0.25:0.753
 sand_amiga      amiga        gen/sand_amiga.png           -
-wx_clear_atari  atari_vivid  gen/wx_clear_atari.png       -
-wx_night_atari  atari_vivid  gen/wx_night_atari_fit.png   -
-wx_part_atari   atari_vivid  gen/wx_part_atari.png        -
-wx_cloud_atari  atari_vivid  gen/wx_cloud_atari.png       -
-wx_rain_atari   atari_vivid  gen/wx_rain_atari.png        -
-wx_snow_atari   atari_vivid  gen/wx_snow_atari.png        -
-wx_storm_atari  atari        gen/wx_storm_atari.png       -
-radio_atari     atari_vivid  gen/radio_atari.png          -
-timer_atari     atari_vivid  gen/timer_atari.png          -
+sky_clear_atari atari_vivid  gen/sky_clear_atari.png      -
+sky_night_atari atari_vivid  gen/sky_night_atari.png      -
+sky_part_atari  atari_vivid  gen/sky_part_atari.png       -
+sky_partn_atari atari_vivid  gen/sky_partn_atari.png      -
+sky_cloud_atari atari_vivid  gen/sky_cloud_atari.png      -
+sky_rain_atari  atari_vivid  gen/sky_rain_atari.png       -
+sky_snow_atari  atari_vivid  gen/sky_snow_atari.png       -
+sky_storm_atari atari_vivid  gen/sky_storm_atari.png      -
+timer_atari     atari_vivid  gen/launch_atari.png         -
+study_atari     atari_free   gen/study_atari.png          0.22:0.723
 sand_atari      atari_vivid  gen/sand_atari.png           -
+# sprites: one object on flat magenta, keyed out; the crop column is the width in screen px
+ship_c64        sprite_c64   gen/shipsprite_c64.png       300
+ship_amiga      sprite_amiga gen/shipsprite_amiga.png     300
+ship_atari      sprite_atari gen/shipsprite_atari.png     300

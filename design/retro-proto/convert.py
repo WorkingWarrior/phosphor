@@ -6,15 +6,22 @@
 #          shared background plus 3 colors, like multicolor character mode
 #   atari  160x86, 4x2 px, Atari 2600 NTSC colors, no dither, at most 4 colors on each line (COLUBK, COLUPF, COLUP0, COLUP1)
 #   c64_free     the same without the cell limit (sprite-and-raster busy art: small lit windows survive)
+#   c64_cool     c64_free with only the greys and blues (overcast and snow skies)
 #   atari_vivid  the same on the real NTSC table (Stella); for flat banded art
+#   atari_free   Stella colors without the line limit (a busy room keeps its shapes; still the 4x2 grid, no dither)
 #   lcd    320x86, 2x2 px, flat printed inks (12 colors), no dither
+#   atari_coarse / atari_vivid_coarse  80x43, 8x4 px: the cruder 2600 look (playfield-sized blocks)
+#
+# Sprites: machine sprite_amiga / sprite_c64 / sprite_atari takes a picture on flat magenta (#FF00FF), crops it to the
+# object, scales it to [width] screen px on the machine's grid and keys the magenta out: palette index 0 is transparent
+# (header flag 1). usage: python3 convert.py sprite_<m> <in.png> <name> <out_dir> <out.img> <width>
 #
 # A portrait source (taller than wide) is turned a quarter clockwise first: Px draws portrait scenes with their top at
 # the screen's right edge.
 #
 # usage: python3 convert.py <machine> <in.png> <name> <out_dir> <out.img> [crop|-] [c64 dither]
 #
-# .img (little endian): u16 w, u16 h, u8 sx, u8 sy, u8 colors, u8 0, u32 rle bytes, then colors x u16 RGB565 and the RLE
+# .img (little endian): u16 w, u16 h, u8 sx, u8 sy, u8 colors, u8 flags (1 = index 0 transparent), u32 rle bytes, then colors x u16 RGB565 and the RLE
 # as (count, color index) byte pairs, row by row. RetroScene.cpp reads it.
 import struct
 import sys
@@ -138,10 +145,11 @@ def convert(machine, path):
         b = bayer(4)
         img2 = img + b[np.arange(h)[:, None] % 4, np.arange(w)[None, :] % 4][:, :, None] * spread
         idx = nearest(img2, pal)
-    elif machine in ('c64', 'c64_free'):
+    elif machine in ('c64', 'c64_free', 'c64_cool'):
         w, h, sx, sy = 160, 86, 4, 2
         img = load(path, w, h)
-        pal = hexpal(C64)
+        # c64_cool: greys and blues only, so pale overcast tones cannot snap to light green or yellow
+        pal = hexpal([c for c in C64 if machine != 'c64_cool' or c in (0x000000, 0xFFFFFF, 0x70A4B2, 0x352879, 0x444444, 0x6C6C6C, 0x6C5EB5, 0x959595)])
         b = bayer(2)
         img2 = img + b[np.arange(h)[:, None] % 2, np.arange(w)[None, :] % 2][:, :, None] * C64_DITHER
         idx = nearest(img2, pal)
@@ -156,12 +164,13 @@ def convert(machine, path):
                 sub = pal[keep]
                 src = img2[cy:cy + 8, cx:cx + 4]
                 cell[:] = np.array(keep)[nearest(src, sub)]
-    elif machine in ('atari', 'atari_vivid'):
-        w, h, sx, sy = 160, 86, 4, 2
+    elif machine in ('atari', 'atari_vivid', 'atari_coarse', 'atari_vivid_coarse', 'atari_free'):
+        w, h, sx, sy = (80, 43, 8, 4) if machine.endswith('_coarse') else (160, 86, 4, 2)
+        machine = machine.replace('_coarse', '')
         img = load(path, w, h)
-        full = atari_palette(machine == 'atari_vivid')
+        full = atari_palette(machine != 'atari')
         idx = nearest(img, full)
-        for y in range(h):  # the 2600 draws a line at a time: background, playfield and a sprite or two
+        for y in range(h) if machine != 'atari_free' else ():  # the 2600 draws a line at a time: background, playfield and a sprite or two
             cnt = np.bincount(idx[y], minlength=len(full))
             keep = np.argsort(-cnt)[:4]  # background, playfield and the two player colors
             keep = keep[cnt[keep] > 0]
@@ -183,6 +192,40 @@ def convert(machine, path):
     return remap[idx].astype(np.uint8), pal[used].astype(np.uint8), w, h, sx, sy
 
 
+def sprite(machine, path, width):
+    a = np.asarray(Image.open(path).convert('RGB')).astype(np.float32)
+    key = (a[:, :, 0] > 170) & (a[:, :, 2] > 170) & (a[:, :, 1] < 110)  # the magenta and its soft fringe
+    ys, xs = np.where(~key)
+    a, key = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1], key[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    sx, sy = {'amiga': (2, 2), 'c64': (4, 2), 'atari': (4, 2)}[machine]
+    w = width // sx
+    h = max(1, round(w * sx * a.shape[0] / a.shape[1] / sy))
+    a[key] = 0  # edges bleed into black, which reads as the outline
+    img = np.asarray(Image.fromarray(a.astype(np.uint8)).resize((w, h), Image.BOX), dtype=np.float32)
+    solid = np.asarray(Image.fromarray(((~key) * 255).astype(np.uint8)).resize((w, h), Image.BOX)) > 127
+    if machine == 'amiga':
+        pal = np.unique(np.round(median_cut(img[solid].reshape(1, -1, 3), 31) / 17) * 17, axis=0)
+        idx = nearest(img, pal)
+    elif machine == 'c64':
+        pal = hexpal(C64)
+        idx = nearest(img, pal)
+    else:
+        full = atari_palette(True)
+        idx = nearest(img, full)
+        for y in range(h):  # four colors a line, counted on the ship only
+            cnt = np.bincount(idx[y][solid[y]], minlength=len(full))
+            keep = np.argsort(-cnt)[:4]
+            keep = keep[cnt[keep] > 0]
+            if len(keep):
+                idx[y] = keep[nearest(img[y:y + 1], full[keep])[0]]
+        pal = full
+    used = np.unique(idx[solid])
+    remap = np.zeros(len(pal), dtype=np.int64)
+    remap[used] = np.arange(1, len(used) + 1)
+    out = np.where(solid, remap[idx], 0).astype(np.uint8)
+    return out, np.vstack([[255, 0, 255], pal[used]]).astype(np.uint8), w, h, sx, sy
+
+
 def rle(data):
     out, i, n = bytearray(), 0, len(data)
     while i < n:
@@ -197,17 +240,22 @@ def rle(data):
 def main():
     global CROP
     machine, path, name, out_dir, blob = sys.argv[1:6]
-    CROP = sys.argv[6] if len(sys.argv) > 6 and sys.argv[6] != '-' else None
+    CROP = sys.argv[6] if len(sys.argv) > 6 and sys.argv[6] != '-' and not machine.startswith('sprite_') else None
     if len(sys.argv) > 7:
         global C64_DITHER
         C64_DITHER = float(sys.argv[7])
-    idx, pal, w, h, sx, sy = convert(machine, path)
+    flags = 0
+    if machine.startswith('sprite_'):
+        idx, pal, w, h, sx, sy = sprite(machine[7:], path, int(sys.argv[6]))
+        flags = 1  # palette index 0 is transparent
+    else:
+        idx, pal, w, h, sx, sy = convert(machine, path)
     rgb = pal[idx]
     Image.fromarray(rgb).resize((w * sx, h * sy), Image.NEAREST).save(f'{out_dir}/{name}.png')
     r565 = [((int(r) >> 3) << 11) | ((int(g) >> 2) << 5) | (int(b) >> 3) for r, g, b in pal]
     data = rle(idx.ravel().tolist())
     with open(blob, 'wb') as f:
-        f.write(struct.pack('<HHBBBBI', w, h, sx, sy, len(pal), 0, len(data)))
+        f.write(struct.pack('<HHBBBBI', w, h, sx, sy, len(pal), flags, len(data)))
         f.write(struct.pack(f'<{len(r565)}H', *r565))
         f.write(data)
     print(name, machine, f'{w}x{h}', len(pal), 'colors', len(data), 'bytes')
