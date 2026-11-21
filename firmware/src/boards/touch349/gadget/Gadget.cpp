@@ -1262,6 +1262,15 @@ static void tapTimer(int x, int y)
   }
 }
 
+bool Gadget_TouchDown(int x, int y)
+{
+  if (state.mode != Mode::App || ringing || phase == Phase::Done || (banner_prompt && bannerOn())) return false;
+  if (!Apps_TouchDown(x, y)) return false;
+  last_touch_ms = millis();
+  state.dirty = true;
+  return true;
+}
+
 void Gadget_Gesture(Gesture g, int x, int y)
 {
   last_touch_ms = millis();

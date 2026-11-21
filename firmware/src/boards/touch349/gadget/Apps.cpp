@@ -5,15 +5,18 @@
 #include "Radio.h"
 #include "Settings.h"
 #include "Theme.h"
+#include "GameFener.h"
 #include "ToolApps.h"
 #include "Vfd.h"
 
 using namespace vfd;
 
 static const App *const TOOLS[] = { &APP_LEVEL, &APP_COIN, &APP_BREATHE, &APP_SCORE, &APP_LAMP };
-static const App *const PLAY[] = { nullptr };  // no games yet; the Play page joins the ring when this lists one
+static const App *const PLAY[] = {
+  &APP_FENER,
+};
 static constexpr int TOOLS_COUNT = sizeof(TOOLS) / sizeof(TOOLS[0]);
-static constexpr int PLAY_COUNT = 0;
+static constexpr int PLAY_COUNT = sizeof(PLAY) / sizeof(PLAY[0]);
 static constexpr int MAX_TILES = 6;
 
 static const App *const *menuList(Mode m, int &n)
@@ -179,11 +182,14 @@ bool Apps_Gesture(Gesture g, int x, int y)
 {
   if (!cur) return false;
   if (g == Gesture::SwipeLeft || g == Gesture::SwipeRight) {
+    if (cur->swipes_locked && cur->swipes_locked()) return true;  // a game in play: a sideways slide is no exit
     Apps_Close();
     return true;
   }
   return cur->gesture && cur->gesture(g, x, y);
 }
+
+bool Apps_TouchDown(int x, int y) { return cur && cur->touch_down && cur->touch_down(x, y); }
 
 void Apps_Tick()
 {
