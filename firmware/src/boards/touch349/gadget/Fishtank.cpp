@@ -38,6 +38,20 @@ static const Kind KINDS[] = { { CLOWN, 6, 12, 3, 0.45f },  { TANG, 8, 14, 3, 0.5
                               { ANGEL, 13, 11, 3, 0.25f }, { GOLD, 7, 12, 4, 0.35f }, { GRAMMA, 5, 10, 2, 0.42f },
                               { BIG, 12, 24, 4, 0.18f } };
 
+// The 2600 tank is 8x4 blocks (RetroScene_Block() == 4 Px): a fish is a few flat blocks of one color, one block per
+// character, with its tail in the first column(s). w, n and tail are in Px, like KINDS, for the swimming.
+static const char *const A_CLOWN[] = { ".oo", "ooo" };
+static const char *const A_TANG[] = { "b.bb", "bbbb" };
+static const char *const A_TETRA[] = { "ccc" };
+static const char *const A_ANGEL[] = { ".s.", "sss", ".s." };
+static const char *const A_GOLD[] = { "aaa", ".aa" };
+static const char *const A_GRAMMA[] = { "ppp" };
+static const char *const A_BIG[] = { "..GG.", "GGGGG", "..GG." };
+static const Kind A_KINDS[] = { { A_CLOWN, 4, 12, 4, 0.45f },  { A_TANG, 4, 16, 4, 0.55f }, { A_TETRA, 2, 12, 4, 0.75f },
+                                { A_ANGEL, 6, 12, 4, 0.25f }, { A_GOLD, 4, 12, 4, 0.35f }, { A_GRAMMA, 2, 12, 4, 0.42f },
+                                { A_BIG, 6, 20, 8, 0.18f } };
+static int blk = 1;  // Px per machine pixel of the picture under the fish
+
 struct Fish {
   uint8_t kind;
   float x, y, ty;
@@ -45,6 +59,8 @@ struct Fish {
   uint16_t retarget;
   float home;  // x it likes to stay near (clownfish: the anemone), < 0 = anywhere
 };
+static const Kind &kindOf(const Fish &f) { return (blk >= 4 ? A_KINDS : KINDS)[f.kind]; }
+
 static Fish fish[] = {
   { K_CLOWN, 70, 52, 52, 1, 40, 82 },  { K_CLOWN, 96, 58, 58, -1, 90, 82 }, { K_TANG, 200, 30, 30, -1, 60, -1 },
   { K_ANGEL, 150, 24, 24, 1, 120, -1 }, { K_GOLD, 250, 44, 44, -1, 70, -1 }, { K_GRAMMA, 40, 36, 36, 1, 50, -1 },
@@ -118,7 +134,7 @@ static int nearestFood(const Fish &f)
 
 static void swim(Fish &f, int idx)
 {
-  const Kind &k = KINDS[f.kind];
+  const Kind &k = kindOf(f);
   float max_y = sandAt((int)f.x + k.w / 2) - k.n - 1;
   float min_y = min(max_y, surfaceAt(f.x + k.w / 2) + 2);
   bool panic = millis() < panic_until;
@@ -183,11 +199,23 @@ static void swim(Fish &f, int idx)
 // A fish with its tail beating (the tail columns move up and down).
 static void drawFish(const Fish &f, int idx)
 {
-  const Kind &k = KINDS[f.kind];
+  const Kind &k = kindOf(f);
   bool flip = f.dir < 0;
   bool panic = millis() < panic_until;
   float beat = sinf(frame_no * (panic ? 1.1f : 0.45f) + idx * 1.3f);
   int x0 = lroundf(f.x), y0 = lroundf(f.y);
+  if (blk >= 4) {  // blocks on the grid; the tail flicks a block up or down
+    int cols = k.w / 4, rows = k.n / 2, tail = k.tail / 4, bx0 = x0 & ~3, by0 = y0 & ~1;
+    int nk = strlen(FISH_KEY);
+    for (int j = 0; j < rows; j++)
+      for (int i = 0; i < cols; i++) {
+        const char *p = (const char *)memchr(FISH_KEY, k.rows[j][i], nk);
+        if (!p) continue;
+        int dy = i < tail && fabsf(beat) > 0.5f ? (beat > 0 ? 1 : -1) : 0;
+        set(bx0 + 4 * (flip ? cols - 1 - i : i), by0 + 2 * (j + dy), FISH_VALS[p - FISH_KEY]);
+      }
+    return;
+  }
   int nk = strlen(FISH_KEY);
   for (int j = 0; j < k.n; j++) {
     for (int i = 0; i < k.w; i++) {
@@ -329,6 +357,7 @@ void Fishtank_Draw(const char *corner_text)
 
   bool art = RetroScene_Begin(RetroArt::Aquarium);  // the theme's picture of the tank; fish and bubbles on top
   if (!art) drawTank(t);
+  blk = art ? RetroScene_Block() : 1;
   // bubbles from the rock, popping at the surface
   if (frame_no % 9 == 0) {
     for (auto &b : bubbles) {
@@ -348,7 +377,9 @@ void Fishtank_Draw(const char *corner_text)
       continue;
     }
     int x = lroundf(b.x), y = lroundf(b.y);
-    if (b.y < 40) {  // grown on the way up: a ring
+    if (blk >= 4) {  // one block
+      set(x & ~3, y & ~1, W5);
+    } else if (b.y < 40) {  // grown on the way up: a ring
       set(x, y - 1, W5);
       set(x - 1, y, W5);
       set(x + 1, y, W5);
@@ -362,7 +393,8 @@ void Fishtank_Draw(const char *corner_text)
     if (!p.life) continue;
     p.life--;
     if (p.y < sandAt(p.x) - 1) p.y += 0.22f;
-    set(lroundf(p.x), lroundf(p.y), F4);
+    int fx = lroundf(p.x), fy = lroundf(p.y);
+    set(blk >= 4 ? fx & ~3 : fx, blk >= 4 ? fy & ~1 : fy, F4);
   }
   for (int i = 0; i < FISH_COUNT; i++) swim(fish[i], i);
   for (int i = 0; i < FISH_COUNT; i++) drawFish(fish[i], i);

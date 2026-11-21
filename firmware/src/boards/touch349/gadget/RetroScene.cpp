@@ -13,6 +13,7 @@ struct Image {
   uint16_t w, h;   // in machine pixels
   uint8_t sx, sy;  // screen pixels per machine pixel
   uint8_t ncolors;
+  uint8_t flags;   // bit 0: palette index 0 is transparent (sprites)
   const uint16_t *pal;
   const uint8_t *rle;  // (count, color index) pairs, row by row
   uint32_t rle_len;
@@ -282,25 +283,35 @@ void tankUnder(const Entry &e)
 }
 
 
-// An .img blob: u16 w, u16 h, u8 sx, u8 sy, u8 colors, u8 0, u32 rle bytes, then the RGB565 palette and the RLE.
+// An .img blob: u16 w, u16 h, u8 sx, u8 sy, u8 colors, u8 flags, u32 rle bytes, then the RGB565 palette and the RLE.
+bool parse(const uint8_t *b, uint32_t size, art::Image &im)
+{
+  if (!b || size < 12) return false;
+  uint32_t rle_len;
+  memcpy(&im.w, b, 2);
+  memcpy(&im.h, b + 2, 2);
+  memcpy(&rle_len, b + 8, 4);
+  im.sx = b[4];
+  im.sy = b[5];
+  im.ncolors = b[6];
+  im.flags = b[7];
+  if (!im.w || !im.h || !im.sx || !im.sy || !im.ncolors || (rle_len & 1) || uint64_t(12) + im.ncolors * 2 + rle_len > size)
+    return false;
+  im.pal = (const uint16_t *)(b + 12);
+  im.rle = b + 12 + im.ncolors * 2;
+  im.rle_len = rle_len;
+  return true;
+}
+
 const art::Image *image(int i)
 {
   art::Image &im = images[i];
   if (im.w) return &im;
   uint32_t size = 0;
   const uint8_t *b = assets::find(ENTRIES[i].art, &size);
-  if (!b || size < 12) return nullptr;
-  uint32_t rle_len;
-  memcpy(&im.h, b + 2, 2);
-  memcpy(&rle_len, b + 8, 4);
-  im.sx = b[4];
-  im.sy = b[5];
-  im.ncolors = b[6];
-  if (12 + im.ncolors * 2 + rle_len > size || !im.sx || !im.sy) return nullptr;
-  im.pal = (const uint16_t *)(b + 12);
-  im.rle = b + 12 + im.ncolors * 2;
-  im.rle_len = rle_len;
-  memcpy(&im.w, b, 2);  // last: w != 0 marks it loaded
+  art::Image next = {};
+  if (!parse(b, size, next)) return nullptr;
+  im = next;
   return &im;
 }
 
@@ -318,6 +329,8 @@ const Entry *find(RetroArt scene, const art::Image **img)
 }
 
 }  // namespace
+
+int RetroScene_Block() { return cur ? max(1, imgOf(*cur)->sx / 2) : 1; }
 
 void RetroScene_Stir(float strength) { burst = max(burst, strength * 2.5f); }
 
@@ -351,7 +364,7 @@ void RetroScene_End(const char *corner_text)
 {
   if (!cur) return;
   const Entry &e = *cur;
-  if (actors) px::overlay(imgOf(e)->sx == 4);
+  if (actors) px::overlay(imgOf(e)->sx / 2, imgOf(e)->sy / 2);
   actors = false;
   switch (e.scene) {
     case RetroArt::Snow: snowPainted(e); break;
@@ -380,19 +393,12 @@ bool RetroPicture_Draw(const char *name)
   static char cached[24] = {};
   if (!name || !*name || strlen(name) >= sizeof(cached) || !assets::ok()) return false;
   if (strcmp(cached, name)) {
-    uint32_t size = 0, len = 0;
+    uint32_t size = 0;
     const uint8_t *b = assets::find(name, &size);
-    if (!b || size < 12) return false;
     art::Image next = {};
-    memcpy(&next.w, b, 2); memcpy(&next.h, b + 2, 2); memcpy(&len, b + 8, 4);
-    next.sx = b[4]; next.sy = b[5]; next.ncolors = b[6];
-    if (!next.w || !next.h || !next.sx || !next.sy || !next.ncolors ||
-        next.w * next.sx != vfd::W || next.h * next.sy != vfd::H ||
-        uint64_t(12) + next.ncolors * 2 + len > size || (len & 1)) return false;
-    next.pal = (const uint16_t *)(b + 12);
-    next.rle = b + 12 + next.ncolors * 2; next.rle_len = len;
+    if (!parse(b, size, next) || next.w * next.sx != vfd::W || next.h * next.sy != vfd::H) return false;
     uint32_t pixels = 0;
-    for (uint32_t i = 0; i < len; i += 2) {
+    for (uint32_t i = 0; i < next.rle_len; i += 2) {
       if (!next.rle[i] || next.rle[i + 1] >= next.ncolors) return false;
       pixels += next.rle[i];
     }
@@ -407,6 +413,44 @@ bool RetroPicture_Draw(const char *name)
   vfd::noClip();
   memcpy(vfd::canvas(), bg, vfd::W * vfd::H * sizeof(uint16_t));
   return true;
+}
+
+const RetroSprite *RetroSprite_Get(const char *name)
+{
+  struct Slot {
+    char name[24];
+    RetroSprite s;
+    uint8_t *buf;
+    uint32_t cap;
+  };
+  static Slot slots[3];
+  static int victim = 0;
+  if (!name || !*name || strlen(name) >= sizeof(slots[0].name) || !assets::ok()) return nullptr;
+  for (auto &sl : slots)
+    if (!strcmp(sl.name, name)) return &sl.s;
+
+  uint32_t size = 0;
+  art::Image im = {};
+  if (!parse(assets::find(name, &size), size, im)) return nullptr;
+  Slot &sl = slots[victim];
+  uint32_t n = uint32_t(im.w) * im.h;
+  sl.name[0] = 0;  // not valid until it is fully decoded
+  if (sl.cap < n) {
+    free(sl.buf);
+    sl.buf = (uint8_t *)heap_caps_malloc(n, MALLOC_CAP_SPIRAM);
+    sl.cap = sl.buf ? n : 0;
+  }
+  if (!sl.buf) return nullptr;
+  uint32_t p = 0;
+  for (uint32_t i = 0; i < im.rle_len && p < n; i += 2) {
+    if (im.rle[i + 1] >= im.ncolors) return nullptr;
+    for (int k = 0; k < im.rle[i] && p < n; k++) sl.buf[p++] = im.rle[i + 1];
+  }
+  if (p != n) return nullptr;
+  sl.s = { im.w, im.h, im.sx, im.sy, bool(im.flags & 1), im.pal, sl.buf };
+  strlcpy(sl.name, name, sizeof(sl.name));
+  victim = (victim + 1) % 3;
+  return &sl.s;
 }
 
 bool RetroWorld_Draw()
