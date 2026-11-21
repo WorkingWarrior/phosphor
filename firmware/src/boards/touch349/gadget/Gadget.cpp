@@ -1299,6 +1299,14 @@ String Gadget_Command(const String &name, const String &arg)
     }
     return "{\"hints_seen\":" + String(hints_seen) + "}";
   }
+  if (name == "touch") {  // "tap,x,y" or "hold,x,y" in screen pixels: a gesture without a finger (screenshots, tests)
+    int c1 = arg.indexOf(','), c2 = arg.indexOf(',', c1 + 1);
+    if (c1 < 0 || c2 < 0) return "{\"error\":\"tap|hold,x,y\"}";
+    String kind = arg.substring(0, c1);
+    Gesture g = kind == "hold" ? Gesture::LongPress : Gesture::Tap;
+    Gadget_Gesture(g, arg.substring(c1 + 1, c2).toInt(), arg.substring(c2 + 1).toInt());
+    return "{\"ok\":true}";
+  }
   if (name == "radiotest") {  // settings page: play a stream before adding it
     if (arg.startsWith("http")) Radio_PlayUrl(arg.c_str());
     else Radio_Stop();
