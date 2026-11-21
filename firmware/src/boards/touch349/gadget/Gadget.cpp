@@ -12,6 +12,7 @@
 #include "Px.h"
 #include "Snowglobe.h"
 #include "Radio.h"
+#include "RadioFace.h"
 #include "Settings.h"
 #include "SettingsUi.h"
 #include "Seaside.h"
@@ -65,8 +66,6 @@ static uint32_t egg_done_ms = 0, egg_beep_ms = 0;
 #define EGG_RING_MS 60000
 
 // Radio page spectrum (display side: smoothed, with falling peaks)
-static uint8_t spec_level[RADIO_BANDS], spec_peak[RADIO_BANDS];
-static uint8_t spec_hold[RADIO_BANDS];
 
 
 static void savePrefs()
@@ -340,8 +339,10 @@ static void drawRadio(const DateTime &now)
   text("STEREO", 440, 10, 2, rs == RadioState::Playing ? HOT_INK : GHOST_INK);
   text(hhmm(now).c_str(), 568, 10, 2, DIM_INK);
 
+  bool slot = RadioFace_Slot();  // the companion left of the equalizer takes the right end of the name and dial
+  int right = slot ? 336 : 400;
   char name[17];
-  snprintf(name, sizeof(name), "%-16s", s.name.c_str());
+  snprintf(name, sizeof(name), slot ? "%-13.13s" : "%-16s", s.name.c_str());
   text(name, 16, 36, 4, 3, { LIT, HALO, GHOST });
 
   // line under the name: volume while it changes, else what is playing
@@ -362,8 +363,8 @@ static void drawRadio(const DateTime &now)
         if (!line.length()) line = L("LIVE", "CANLI YAYIN");
         break;
     }
-    int w = textWidth(line.c_str(), 2), box = 412 - 16;
-    clip(16, 70, 412, 100);
+    int w = textWidth(line.c_str(), 2), box = right + 12 - 16;
+    clip(16, 70, right + 12, 100);
     if (w <= box) {
       text(line.c_str(), 16, 80, 2, ink);
     } else {
@@ -375,36 +376,16 @@ static void drawRadio(const DateTime &now)
   }
 
   // tuning dial with the needle on this station
-  for (int x = 16; x <= 400; x += 8) {
+  for (int x = 16; x <= right; x += 8) {
     bool major = (x - 16) % 64 == 0;
     rect(x, major ? 106 : 110, major ? 2 : 1, major ? 10 : 6, major ? DIM : GHOST);
   }
-  int nx = 16 + st * 384 / max(settings::stationCount() - 1, 1);
+  int nx = 16 + st * (right - 16) / max(settings::stationCount() - 1, 1);
   rect(nx - 3, 100, 6, 22, HOTH);
   rect(nx - 1, 102, 2, 18, HOT);
 
-  // spectrum analyzer
-  uint8_t lv[RADIO_BANDS];
-  Radio_Levels(lv);
-  for (int i = 0; i < RADIO_BANDS; i++) {
-    spec_level[i] = lv[i] >= spec_level[i] ? lv[i] : spec_level[i] - 1;
-    if (spec_level[i] >= spec_peak[i]) {
-      spec_peak[i] = spec_level[i];
-      spec_hold[i] = 12;
-    } else if (spec_hold[i]) {
-      spec_hold[i]--;
-    } else if (spec_peak[i]) {
-      spec_peak[i]--;
-      spec_hold[i] = 2;
-    }
-    int x = 426 + i * 14;
-    for (int r = 0; r < 10; r++) {
-      int y = 115 - r * 9;
-      bool on = r < spec_level[i], peak = spec_peak[i] && r == spec_peak[i] - 1 && !on, hot = r >= 8;
-      if (on || peak) rect(x - 1, y - 1, 13, 8, hot || peak ? HOTH : HALO);
-      rect(x, y, 11, 6, peak || (on && hot) ? HOT : on ? LIT : GHOST);
-    }
-  }
+  RadioFace_DrawSlot();
+  RadioFace_DrawEq();
 
   // genre presets
   for (int i = 0; i < settings::groupCount(); i++) {
@@ -1052,6 +1033,8 @@ void Gadget_Gesture(Gesture g, int x, int y)
         Hourglass_Reset();
       } else if (state.mode == Mode::Snow) {
         Snowglobe_Hold();
+      } else if (state.mode == Mode::Radio) {
+        RadioFace_Hold(x, y);
       }
       break;
     case Gesture::Tap:
@@ -1145,6 +1128,10 @@ String Gadget_Command(const String &name, const String &arg)
     else if (arg == "sleigh" || arg == "star") Snowglobe_Show(arg.c_str());
     else if (arg == "auto" || arg == "on" || arg == "off") SettingsUi_SetHolidays(arg == "auto" ? 0 : arg == "on" ? 1 : 2);
     state.mode = Mode::Snow;
+  } else if (name == "radioface") {
+    // radio page looks: "eq" | "comp" = next equalizer / companion, "eq<n>" | "comp<n>" = that one
+    RadioFace_Command(arg);
+    state.mode = Mode::Radio;
   } else if (name == "sky") {
     // preview: Sky index (1 clear .. 9 storm), "n" after it for night; empty or -1 = the real sky
     sky_force = arg.length() ? constrain(arg.toInt(), -1, 9) : -1;
@@ -1159,12 +1146,12 @@ String Gadget_Command(const String &name, const String &arg)
   title.replace("\"", "'");
   float ax, ay, az;
   Motion_Raw(ax, ay, az);
-  char json[560];
+  char json[720];
   snprintf(json, sizeof(json),
            "{\"theme\":\"%s\",\"natural_scenes\":%s,\"radio\":\"%s\",\"station\":%d,\"station_name\":\"%s\",\"title\":\"%s\",\"volume\":%d,"
-           "\"alarm\":\"%02d:%02d\",\"alarm_on\":%s,\"ringing\":%s,\"timer\":\"%s\",\"timer_state\":%d,\"accel\":[%.2f,%.2f,%.2f]}",
+           "\"alarm\":\"%02d:%02d\",\"alarm_on\":%s,\"ringing\":%s,\"timer\":\"%s\",\"timer_state\":%d,\"accel\":[%.2f,%.2f,%.2f],%s}",
            theme::def().key, theme::naturalScenes() ? "true" : "false", RS[(int)Radio_State()], Radio_Station(), settings::station(Radio_Station()).name.c_str(), title.c_str(), Radio_Volume(), alarm_h,
-           alarm_m, alarm_on ? "true" : "false", ringing ? "true" : "false", mss((eggLeftMs() + 999) / 1000).c_str(), (int)phase, ax, ay, az);
+           alarm_m, alarm_on ? "true" : "false", ringing ? "true" : "false", mss((eggLeftMs() + 999) / 1000).c_str(), (int)phase, ax, ay, az, RadioFace_Status().c_str());
   return json;
 }
 

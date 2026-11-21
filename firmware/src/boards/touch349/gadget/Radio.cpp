@@ -95,6 +95,123 @@ static volatile uint8_t levels[RADIO_BANDS];
 static int16_t decim_prev = 0;
 static bool decim_odd = false;
 
+// Beat tracking on the same blocks: spectral flux (rises in band energy, bass weighted) is the onset curve; its
+// autocorrelation over the last ~5.5 s gives the tempo; a phase counter steps once per beat and onsets pull it in.
+static constexpr float BLOCK_HZ = 24000.0f / 1024;  // ~23.4 blocks a second
+static constexpr int ENV_N = 128, LAG_MIN = 7, LAG_MAX = 26;  // 200 .. 54 BPM
+static float env[ENV_N];
+static int env_i = 0, env_count = 0;
+static float prev_db[RADIO_BANDS];
+static float flux_mean = 0, flux_var = 0, lag_f = 11;
+static float beat_conf = 0, beat_phase = 0;
+static volatile float beat_bpm = 0, beat_phase_out = 0, beat_strength = 0;
+static volatile uint32_t beat_count = 0, beat_block_ms = 0;
+static volatile bool beat_on = false;
+
+// Stereo loudness (VU) and a short trace of the wave (oscilloscope), both auto-gained like the bands.
+static float vu_sum[2];
+static volatile float vu_out[2];
+static int16_t trace_buf[RADIO_TRACE];
+static volatile int8_t trace_out[RADIO_TRACE];
+static int trace_n = 0;
+static float vu_ref = 2000, trace_ref = 2000;
+
+static void tempoUpdate()
+{
+  // mean-removed autocorrelation of the onset curve; a soft preference around 120 BPM keeps octave jumps away
+  float mean = 0;
+  for (int i = 0; i < ENV_N; i++) mean += env[i];
+  mean /= ENV_N;
+  float r0 = 0;
+  for (int i = 0; i < ENV_N; i++) r0 += (env[i] - mean) * (env[i] - mean);
+  if (r0 < 1e-3f) {
+    beat_conf *= 0.8f;
+    return;
+  }
+  int best = 0;
+  float best_v = 0, best_r = 0;
+  static float rs[LAG_MAX + 1], vs[LAG_MAX + 1];
+  for (int lag = LAG_MIN; lag <= LAG_MAX; lag++) {
+    float r = 0;
+    for (int i = 0; i + lag < ENV_N; i++) {
+      int a = (env_i + i) % ENV_N, b = (env_i + i + lag) % ENV_N;
+      r += (env[a] - mean) * (env[b] - mean);
+    }
+    r /= r0;
+    float oct = log2f((60 * BLOCK_HZ / lag) / 105.0f);
+    float v = r * expf(-oct * oct / (2 * 0.6f * 0.6f));
+    rs[lag] = r;
+    vs[lag] = v;
+    if (v > best_v) {
+      best_v = v;
+      best_r = r;
+      best = lag;
+    }
+  }
+  if (!best) {
+    beat_conf *= 0.8f;
+    return;
+  }
+  // a song does not change speed by an octave: stay on the current tempo while it still scores close to the best
+  int cur = constrain((int)lroundf(lag_f), LAG_MIN, LAG_MAX);
+  float ratio = (float)best / cur;
+  if (cur != best && (fabsf(ratio - 2) < 0.25f || fabsf(ratio - 0.5f) < 0.07f) && vs[cur] >= 0.7f * best_v) {
+    best = cur;
+    best_r = rs[cur];
+  }
+  // parabolic peak for a finer lag, then glide toward it (a jump of more than ~15% resets the glide)
+  float lag = best;
+  if (best > LAG_MIN && best < LAG_MAX) {
+    float rm = 0, rp = 0;
+    for (int i = 0; i + best + 1 < ENV_N; i++) {
+      int a = (env_i + i) % ENV_N;
+      rm += (env[a] - mean) * (env[(env_i + i + best - 1) % ENV_N] - mean);
+      rp += (env[a] - mean) * (env[(env_i + i + best + 1) % ENV_N] - mean);
+    }
+    float rc = best_r * r0, den = rm - 2 * rc + rp;
+    if (den < 0) lag += constrain(0.5f * (rm - rp) / den, -0.5f, 0.5f);
+  }
+  lag_f = fabsf(lag - lag_f) > lag_f * 0.15f ? lag : lag_f * 0.7f + lag * 0.3f;
+  beat_conf = beat_conf * 0.6f + constrain(best_r, 0.0f, 1.0f) * 0.4f;
+}
+
+static void beatBlock(const float *db, float top)
+{
+  float flux = 0;
+  for (int i = 0; i < RADIO_BANDS; i++) {
+    float d = db[i] - prev_db[i];
+    if (d > 0) flux += i < 5 ? 2 * d : d;
+    prev_db[i] = db[i];
+  }
+  env[env_i] = flux;
+  env_i = (env_i + 1) % ENV_N;
+  if (env_count < ENV_N) env_count++;
+  if (env_count == ENV_N && env_i % 12 == 0) tempoUpdate();  // twice a second
+
+  float dev = flux - flux_mean;
+  flux_mean += dev * 0.05f;
+  flux_var += (dev * dev - flux_var) * 0.05f;
+  bool onset = dev > 1.5f * sqrtf(flux_var) && flux > 2;
+
+  beat_phase += 1.0f / lag_f;
+  if (onset && beat_conf > 0.15f) {  // pull the phase toward the onset, harder when it lands near a beat
+    float err = beat_phase < 0.5f ? -beat_phase : 1 - beat_phase;
+    beat_phase += err * (fabsf(err) < 0.2f ? 0.35f : 0.1f);
+  }
+  if (beat_phase >= 1) {
+    beat_phase -= 1;
+    beat_count = beat_count + 1;
+  } else if (beat_phase < 0) {
+    beat_phase += 1;
+  }
+  bool loud = top > 25;
+  beat_on = loud && beat_conf > 0.12f && env_count == ENV_N;
+  beat_bpm = 60 * BLOCK_HZ / lag_f;
+  beat_strength = constrain(beat_conf * 2, 0.0f, 1.0f);
+  beat_phase_out = beat_phase;
+  beat_block_ms = millis();
+}
+
 static void spectrumInit()
 {
   const float fs = 24000, q = 1.8f;
@@ -109,12 +226,18 @@ static void spectrumFeed(const int16_t *stereo, int frames)
 {
   for (int n = 0; n < frames; n++) {
     int16_t mono = (stereo[2 * n] + stereo[2 * n + 1]) / 2;
+    vu_sum[0] += (float)stereo[2 * n] * stereo[2 * n];
+    vu_sum[1] += (float)stereo[2 * n + 1] * stereo[2 * n + 1];
     decim_odd = !decim_odd;
     if (decim_odd) {
       decim_prev = mono;
       continue;
     }
     float x = (mono + decim_prev) * 0.5f;
+    if (trace_n < RADIO_TRACE * 2) {  // every other decimated sample: ~10 ms of wave at the start of each block
+      if (!(trace_n & 1)) trace_buf[trace_n / 2] = (int16_t)x;
+      trace_n++;
+    }
     for (int i = 0; i < RADIO_BANDS; i++) {
       Biquad &b = bands[i];
       float y = b.b0 * x + b.z1;
@@ -133,6 +256,24 @@ static void spectrumFeed(const int16_t *stereo, int frames)
       for (int i = 0; i < RADIO_BANDS; i++) {
         levels[i] = (uint8_t)constrain((int)((db[i] - (ref_db - 30)) / 3.0f + 0.5f), 0, 10);
       }
+      beatBlock(db, top);
+
+      // VU: RMS per channel against a slowly falling reference, so the needles sit around 70% on a steady song
+      float rms[2], peak = 0;
+      for (int c = 0; c < 2; c++) {
+        rms[c] = sqrtf(vu_sum[c] / (energy_n * 2));
+        peak = max(peak, rms[c]);
+        vu_sum[c] = 0;
+      }
+      // the reference follows the louder blocks of the last few seconds; 0 dB on the meter sits a little above it
+      vu_ref = peak > vu_ref ? vu_ref * 0.9f + peak * 0.1f : max(vu_ref * 0.995f, 1.0f);
+      for (int c = 0; c < 2; c++) vu_out[c] = constrain(rms[c] / (vu_ref * 1.25f), 0.0f, 1.0f);
+
+      int16_t tmax = 1;
+      for (int i = 0; i < RADIO_TRACE; i++) tmax = max(tmax, (int16_t)abs(trace_buf[i]));
+      trace_ref = tmax > trace_ref ? trace_ref * 0.7f + tmax * 0.3f : max(trace_ref * 0.99f, 2.0f);
+      for (int i = 0; i < RADIO_TRACE; i++) trace_out[i] = (int8_t)constrain((int)(trace_buf[i] * 90 / trace_ref), -100, 100);
+      trace_n = 0;
       energy_n = 0;
     }
   }
@@ -420,6 +561,35 @@ void Radio_Levels(uint8_t out[RADIO_BANDS])
   for (int i = 0; i < RADIO_BANDS; i++) {
     out[i] = live ? levels[i] : 0;
   }
+}
+
+RadioBeat Radio_Beat()
+{
+  RadioBeat b{};
+  bool live = rstate == RadioState::Playing && millis() - beat_block_ms < 300;
+  b.on = live && beat_on;
+  b.bpm = beat_bpm;
+  b.strength = live ? beat_strength : 0;
+  b.count = beat_count;
+  // the tracker runs per block (~43 ms); carry the phase forward to now so the dancers move smoothly
+  float per_ms = beat_bpm / 60000.0f;
+  float ph = beat_phase_out + (millis() - beat_block_ms) * per_ms;
+  b.phase = ph - floorf(ph);
+  if (ph >= 1) b.count += (uint32_t)ph;
+  return b;
+}
+
+void Radio_Vu(float &left, float &right)
+{
+  bool live = rstate == RadioState::Playing;
+  left = live ? vu_out[0] : 0;
+  right = live ? vu_out[1] : 0;
+}
+
+void Radio_Trace(int8_t out[RADIO_TRACE])
+{
+  bool live = rstate == RadioState::Playing;
+  for (int i = 0; i < RADIO_TRACE; i++) out[i] = live ? trace_out[i] : 0;
 }
 
 #endif

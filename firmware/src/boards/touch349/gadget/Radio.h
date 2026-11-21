@@ -32,5 +32,21 @@ void Radio_RampVolume(uint32_t ms);
 static constexpr int RADIO_BANDS = 14;
 void Radio_Levels(uint8_t out[RADIO_BANDS]);
 
+// Beat of what plays, from the bass onsets: on = a steady beat is heard, bpm = its tempo, phase 0..1 within the
+// current beat (0 = on the beat), count = beats so far, strength 0..1 = how sure the tracker is.
+struct RadioBeat {
+  bool on;
+  float bpm;
+  float phase;
+  uint32_t count;
+  float strength;
+};
+RadioBeat Radio_Beat();
+
+// Loudness per channel 0..1 (VU needles) and ~10 ms of the wave, -100..100 (oscilloscope).
+static constexpr int RADIO_TRACE = 128;
+void Radio_Vu(float &left, float &right);
+void Radio_Trace(int8_t out[RADIO_TRACE]);
+
 // count beeps of hz for ms each, gap_ms apart; mixed into the radio, or played alone.
 void Radio_Beep(int hz, int ms, int count = 1, int gap_ms = 120);
