@@ -2,7 +2,10 @@
 
 #include <Arduino.h>
 
-#define FW_VERSION "0.10.0"
+// build.sh passes the release tag (or git describe) as -DFW_VERSION; "dev" is what a build outside it reports.
+#ifndef FW_VERSION
+#define FW_VERSION "dev"
+#endif
 
 enum class Mode { Clock, Info, Message, Image, Aquarium, AquariumNight, Radio, Weather, Timer, Snow, Fire, Sea, Study, Wave, Lava, Hourglass, Settings };
 

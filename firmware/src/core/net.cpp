@@ -26,6 +26,7 @@
 #include "net.h"
 #include "Board.h"
 #include "Audio.h"
+#include "Improv.h"
 #include "Watchdog.h"
 #include "state.h"
 #if __has_include("../../secrets.h")
@@ -439,8 +440,21 @@ void Net_Begin(bool force_portal)
   wm.setAPCallback([](WiFiManager *) {
     board().showSetup(apName().c_str());
   });
+  // The portal does not block: autoConnect returns as soon as it is up and the loop below serves it, so the web
+  // installer can still set the Wi-Fi over USB (Improv) while the portal is open.
+  wm.setConfigPortalBlocking(false);
 
   bool connected = wm.autoConnect(apName().c_str());
+  while (!connected && wm.getConfigPortalActive()) {  // ends on a save, a timeout, or when Improv got us online
+    wm.process();
+    Improv_Poll();
+    if (Net_Connected() && !Improv_Busy()) {
+      wm.stopConfigPortal();
+      break;
+    }
+    delay(5);
+  }
+  connected = Net_Connected();
 
   String name = sanitizeName(name_param.getValue());
   if (name != state.name) {
@@ -457,12 +471,13 @@ void Net_Begin(bool force_portal)
 
 void Net_Loop()
 {
+  Improv_Poll();
   if (WiFi.status() == WL_CONNECTED) {
     if (!services_started) {
       startServices();
     }
     syncTime();
-  } else if (millis() - last_retry_ms > WIFI_RETRY_MS) {
+  } else if (!Improv_Busy() && millis() - last_retry_ms > WIFI_RETRY_MS) {
     last_retry_ms = millis();
     WiFi.begin();  // retries the saved network
   }

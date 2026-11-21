@@ -5,6 +5,9 @@
 #   ./build.sh /dev/cu.usbmodemXXX upload over USB (serial port path)
 #   ./build.sh phosphor-1a2b.local upload over Wi-Fi (OTA); needs OTA_TOKEN in firmware/secrets.h
 #
+# The firmware reports the version in /status, the log and the installer: env PHOSPHOR_VERSION (CI sets the tag name),
+# else `git describe --tags --always` (v1.0.2, or v1.0.2-3-g1a2b3c4 between releases), else "dev".
+#
 # Needs arduino-cli with the esp32:esp32 core installed (arduino-cli core install esp32:esp32).
 # Libraries U8g2, WiFiManager and SensorLib are installed from the Library Manager; ESP32-audioI2S is vendored in libraries/.
 # Besides the app image, build/phosphor-full.bin is written: bootloader + partitions + boot_app0 + app merged into one
@@ -20,6 +23,8 @@ U8G2_VERSION="2.36.18"
 SENSORLIB_VERSION="0.3.1"
 WIFIMANAGER_VERSION="2.0.17"
 
+VERSION="${PHOSPHOR_VERSION:-$(git describe --tags --always 2>/dev/null || echo dev)}"
+
 command -v arduino-cli >/dev/null || { echo "arduino-cli not found: https://arduino.github.io/arduino-cli/"; exit 1; }
 
 arduino-cli lib install "U8g2@${U8G2_VERSION}" "WiFiManager@${WIFIMANAGER_VERSION}" "SensorLib@${SENSORLIB_VERSION}"
@@ -27,7 +32,7 @@ arduino-cli lib install "U8g2@${U8G2_VERSION}" "WiFiManager@${WIFIMANAGER_VERSIO
 arduino-cli compile --fqbn "$FQBN" \
   --libraries libraries \
   --build-property "compiler.c.extra_flags=-DBOARD_TOUCH349" \
-  --build-property "compiler.cpp.extra_flags=-DBOARD_TOUCH349" \
+  --build-property "compiler.cpp.extra_flags=-DBOARD_TOUCH349 -DFW_VERSION=\"${VERSION}\"" \
   --build-path "$BUILD" "$SKETCH"
 
 # The esp32 core already writes the merged image next to the app binary.
@@ -42,6 +47,7 @@ else
     0xe000 "$PLATFORM/tools/partitions/boot_app0.bin" \
     0x10000 "$BUILD/$SKETCH.ino.bin"
 fi
+echo "Version: $VERSION"
 echo "Built: $BUILD/$SKETCH.ino.bin (app), $BUILD/phosphor-full.bin (full flash image, write at 0x0)"
 
 [[ -z "$TARGET" ]] && exit 0
