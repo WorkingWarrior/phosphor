@@ -4,6 +4,7 @@
 #include "ThemeFonts.h"
 #include "Settings.h"
 #include "RetroScene.h"
+#include "MachineDigits.h"
 
 using namespace vfd;
 using px::rgb;
@@ -40,7 +41,7 @@ void miniSky(Sky sky, int x, int y, int grid, uint16_t ink, uint16_t accent)
 const char *pictureSky(Sky sky, bool day)
 {
   switch (sky) {
-    case Sky::PartCloud: return day ? "part" : "night";
+    case Sky::PartCloud: return day ? "part" : "partn";
     case Sky::Cloud: case Sky::Fog: return "cloud";
     case Sky::Drizzle: case Sky::Rain: case Sky::Shower: return "rain";
     case Sky::Snow: return "snow";
@@ -131,52 +132,52 @@ void WeatherFaces_Draw(const WeatherFace &f)
   bool atari = theme::current() == theme::ATARI;
   setStyle({ atari ? &VFD_FONT : amiga ? &AMIGA_FONT : &C64_FONT, false, false, false });
   char picture[32];
-  snprintf(picture, sizeof(picture), "wx_%s_%s", pictureSky(f.sky, f.day), amiga ? "amiga" : atari ? "atari" : "c64");
-  if (!RetroPicture_Draw(picture) && !RetroWorld_Draw()) clear();
+  snprintf(picture, sizeof(picture), "sky_%s_%s", pictureSky(f.sky, f.day), amiga ? "amiga" : atari ? "atari" : "c64");
+  if (!RetroPicture_Draw(picture)) clear();
   weatherLayer(f.sky, amiga);
-  if (!amiga && !atari) {
-    MachineWashText(f.weather.valid ? String(f.weather.temp) + "°" : String("--"), 28, 12);
-    MachineReading(f.condition, 28, 84, 584, WHITE, true, true);
-    if (f.weather.valid) MachineReading(f.humidity + "   " + f.wind, 28, 104, 584, rgb(184, 199, 111), true, true);
-    int border = theme::def().border_w;
-    rect(border, 140, W - 2 * border, 26, 0);
-    for (int i = 0; i < 3; i++) {
-      const WeatherDay &d = f.weather.next[i];
-      if (!f.weather.valid || d.weekday < 0) continue;
-      int x = 28 + i * 204;
-      MachineReading(f.days[i], x, 144, 48, WHITE, false);
-      miniSky(d.sky, x + 56, 146, 4, WHITE, rgb(184, 199, 111));
-      MachineReading(String(d.t_max) + "°", x + 88, 144, 100, rgb(184, 199, 111), false);
-    }
-    setStyle(saved);
-    return;
+  if (atari) rect(0, 120, W, 52, 0);
+
+  char temperature[8];
+  if (f.weather.valid) snprintf(temperature, sizeof(temperature), "%2d", f.weather.temp);
+  else strcpy(temperature, "--");
+  MachineDigits_Draw(temperature, 20, 22, 56, 92, 10);
+  int degree = 20 + strlen(temperature) * 66 - 10 + 8;
+  // A hollow ring remains legible on the light sky pictures.
+  if (!atari) {
+    rect(degree - 2, 18, 22, 22, 0);
+    rect(degree + 4, 24, 10, 10, 0);
   }
-  int tx = amiga ? 200 : atari ? 24 : 32;
-  MachineTemperature(f.weather.valid ? String(f.weather.temp) : String("--"), tx, amiga ? 14 : 16, amiga, atari);
-  if (amiga) {
-    MachineReading(f.condition, 200, 90, 426, WHITE, true, true);
+  rect(degree, 20, 18, 4, WHITE);
+  rect(degree, 34, 18, 4, WHITE);
+  rect(degree, 20, 4, 18, WHITE);
+  rect(degree + 14, 20, 4, 18, WHITE);
+
+  auto reading = [&](const String &s, int x, int y, int p, uint16_t color) {
+    if (!atari) for (int dy = -2; dy <= 2; dy += 2)
+      for (int dx = -2; dx <= 2; dx += 2)
+        if (dx || dy) text(s.c_str(), x + dx, y + dy, p, { 0 });
+    text(s.c_str(), x, y, p, { color });
+  };
+  uint16_t secondary = atari ? PEACH : BLUE;
+  String hum = settings::tr() ? "%" + String(f.weather.humidity) : String(f.weather.humidity) + "%";
+  if (glyphCount(f.condition.c_str()) <= 6) {
+    reading(f.condition, 20, 132, 3, WHITE);
     if (f.weather.valid) {
-      MachineReading(f.humidity, 200, 112, 152, BLUE, true, true);
-      MachineReading(f.wind, 360, 112, 266, BLUE, true, true);
+      reading(String(L("HUM ", "NEM ")) + hum, 140, 126, 2, secondary);
+      reading(String(L("WIND ", "RÜZGAR ")) + String(f.weather.wind), 140, 150, 2, secondary);
     }
-    MachinePanel(200, 132, 432, 34);
-  } else if (atari) {
-    MachineReading(f.condition, 24, 106, 360, WHITE, true, true);
-    if (f.weather.valid) {
-      MachineReading(f.humidity, 392, 30, 232, PEACH, true, true);
-      MachineReading(f.wind, 392, 60, 232, PEACH, true, true);
-    }
-    rect(0, 132, W, 40, 0);
+  } else {
+    reading(f.condition, 20, 126, 2, WHITE);
+    if (f.weather.valid) reading(hum + "  " + String(f.weather.wind) +
+      (settings::fahrenheit() ? " MPH" : L(" KM/H", " KM/SA")), 20, 150, 2, secondary);
   }
   for (int i = 0; i < 3; i++) {
     const WeatherDay &d = f.weather.next[i];
-    if (!f.weather.valid || d.weekday < 0) continue;
-    int x = amiga ? 208 + i * 142 : 24 + i * 204;
-    int y = amiga ? 142 : atari ? 144 : 144;
-    int grid = amiga ? 2 : 4;
-    miniSky(d.sky, x, y, grid, WHITE, amiga ? GOLD : atari ? PEACH : BLUE);
-    MachineReading(f.days[i], x + 28, y, 48, WHITE);
-    MachineReading(String(d.t_max) + "°", x + 80, y, amiga ? 58 : 100, amiga ? GOLD : atari ? PEACH : rgb(184, 199, 111));
+    if (d.weekday < 0) continue;
+    int x = 268 + i * 122;
+    miniSky(d.sky, x, 149, amiga ? 2 : 4, WHITE, atari ? PEACH : GOLD);
+    reading(f.days[i], x + 26, 148, 2, secondary);
+    reading(String(d.t_max) + "°", x + 72, 148, 2, WHITE);
   }
   setStyle(saved);
 }
