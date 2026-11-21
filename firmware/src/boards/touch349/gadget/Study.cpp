@@ -2,6 +2,9 @@
 
 #include "Study.h"
 #include "Px.h"
+#include "ClockFaces.h"
+#include "MachineDigits.h"
+#include "RetroScene.h"
 #include "Radio.h"
 #include "Vfd.h"
 #include "Weather.h"
@@ -323,10 +326,193 @@ static void person()
   set(hx - 1, DESK_Y - 5, N5), set(hx - 2, DESK_Y - 6, N5);  // pen
 }
 
+namespace {
+
+// Where the mug's rim is on each study picture (measured on design/retro-proto/out/study_*.png), and the machine's
+// pixel grid: the steam and every panel rect snap to it.
+struct MachineStudy {
+  const char *picture;
+  int mug_x, mug_y;
+  int cw, ch;
+};
+const MachineStudy MACHINE_STUDY[] = {
+  { "study_c64", 178, 126, 4, 2 },
+  { "study_amiga", 155, 124, 2, 2 },
+  { "study_atari", 212, 128, 8, 4 },
+};
+
+constexpr int MPX = 440;  // the machine panel starts here (the pictures end at ~435)
+
+uint16_t C(int r, int g, int b) { return px::rgb(r, g, b); }
+
+// Halves every channel: Amiga extra-half-brite, the picture dimmed inside the window.
+void halve(int x0, int y0, int x1, int y1)
+{
+  uint16_t *cv = vfd::canvas();
+  for (int y = y0; y < y1; y++)
+    for (int x = x0; x < x1; x++) {
+      uint16_t &p = cv[y * vfd::W + x];
+      p = (p >> 1) & 0x7BEF;
+    }
+}
+
+// Two or three puffs rising from the mug and thinning out, drawn as the machine's own pixels.
+void steam(const MachineStudy &m, theme::Id id)
+{
+  for (int i = 0; i < 3; i++) {
+    float p = ((frame_no + i * 16) % 48) / 48.0f;
+    if (p > 0.9f) continue;
+    int x = m.mug_x + (i - 1) * 5 + (int)(sinf(p * 6.28f + i * 2.0f) * 3);
+    int y = m.mug_y - 4 - (int)(p * 28);
+    x -= x % m.cw;
+    y -= y % m.ch;
+    uint16_t c;
+    int w = 2 * m.cw, h = 2 * m.ch;
+    if (id == theme::AMIGA) {  // three soft whites
+      c = p < 0.3f ? C(255, 255, 255) : p < 0.6f ? C(204, 204, 221) : C(136, 136, 170);
+      w = 3 * m.cw;
+    } else if (id == theme::C64) {
+      c = p < 0.55f ? C(255, 255, 255) : C(149, 149, 149);
+    } else {
+      c = C(236, 236, 236);  // one flat block
+      w = m.cw, h = m.ch;
+    }
+    vfd::rect(x, y, w, h, c);
+  }
+}
+
+// Shared panel numbers.
+void clockText(char *out, size_t n)
+{
+  uint32_t secs = (left_ms + 999) / 1000;
+  snprintf(out, n, "%02lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
+}
+uint32_t phaseTotal() { return on_break ? (done_count % 4 == 0 ? LONG_MS : BREAK_MS) : FOCUS_MS; }
+int progressFill(int width)
+{
+  uint32_t total = phaseTotal();
+  return (int)((uint64_t)(total - min(left_ms, total)) * width / total);
+}
+bool roundDone(int i) { return i < done_count % 4 || (done_count > 0 && done_count % 4 == 0 && on_break); }
+const char *phaseLabel() { return on_break ? (done_count % 4 == 0 ? L("LONG BREAK", "UZUN MOLA") : L("BREAK", "MOLA")) : L("FOCUS", "ODAK"); }
+
+void hints(int x)
+{
+  vfd::text(L("TAP: START / PAUSE", "DOKUN: BAŞLAT / DURAKLAT"), x, 148, 1, vfd::Ink{ vfd::DIM });
+  vfd::text(L("HOLD: RESET", "BASILI TUT: SIFIRLA"), x, 158, 1, vfd::Ink{ vfd::DIM });
+}
+
+void cornerText(const char *s, int right, int y, uint16_t color)
+{
+  if (s && *s) vfd::text(s, right - vfd::textWidth(s, 2), y, 2, vfd::Ink{ color });
+}
+
+// C64: black panel, wash-blocks digits, two greens and a grey.
+void panelC64(const char *corner)
+{
+  const uint16_t green = C(154, 210, 132), cyan = C(112, 164, 178), grey = C(68, 68, 68);
+  vfd::rect(MPX, 0, vfd::W - MPX, vfd::H, 0);
+  uint16_t pc = on_break ? cyan : green;
+  int lx = vfd::text(phaseLabel(), 448, 10, 2, vfd::Ink{ pc });
+  if (running) {
+    for (int k = 0; k < 7; k++) vfd::rect(lx + 10 + k, 10 + k, 1, 14 - 2 * k, C(255, 255, 255));
+  } else {
+    vfd::rect(lx + 10, 10, 4, 14, C(149, 149, 149)), vfd::rect(lx + 18, 10, 4, 14, C(149, 149, 149));
+  }
+  cornerText(corner, 630, 10, C(149, 149, 149));
+  char digits[8];
+  clockText(digits, sizeof(digits));
+  MachineDigits_Draw(digits, 448, 36, 34, 56, 3);
+  const int pw = 184, fill = progressFill(pw) / 4 * 4;
+  vfd::rect(448, 104, pw, 6, grey);
+  vfd::rect(448, 104, fill, 6, green);
+  int tx = vfd::text(L("ROUND", "TUR"), 448, 122, 2, vfd::Ink{ pc });
+  for (int i = 0; i < 4; i++) vfd::rect(tx + 12 + i * 24, 122, 16, 14, roundDone(i) ? green : grey);
+  hints(448);
+}
+
+// Amiga: a Workbench window over the (dimmed) picture, chrome digits, bevelled copper bar and buttons.
+void panelAmiga(const char *corner)
+{
+  const uint16_t light = C(238, 238, 255), white = C(255, 255, 255);
+  const int x0 = 438, y0 = 2, x1 = 634, y1 = 170;
+  halve(x0, y0, x1, y1);
+  vfd::rect(x0, y0, x1 - x0, 1, light), vfd::rect(x0, y0, 1, y1 - y0, light);
+  vfd::rect(x0, y1 - 1, x1 - x0, 1, 0), vfd::rect(x1 - 1, y0, 1, y1 - y0, 0);
+  // title strip: orange while focusing, cyan on a break, a light line under it
+  vfd::rect(x0 + 1, y0 + 1, x1 - x0 - 2, 22, on_break ? C(0, 119, 153) : C(204, 102, 0));
+  vfd::rect(x0 + 1, y0 + 23, x1 - x0 - 2, 1, light);
+  int lx = vfd::text(phaseLabel(), 446, 6, 2, vfd::Ink{ white });
+  if (running) {
+    for (int k = 0; k < 7; k++) vfd::rect(lx + 10 + k, 6 + k, 1, 14 - 2 * k, white);
+  } else {
+    vfd::rect(lx + 10, 6, 4, 14, white), vfd::rect(lx + 18, 6, 4, 14, white);
+  }
+  cornerText(corner, 626, 6, white);
+  char digits[8];
+  clockText(digits, sizeof(digits));
+  MachineDigits_Draw(digits, 450, 36, 32, 56, 4);
+  // progress: a sunken trough with a copper gradient (orange to yellow, 12-bit steps)
+  const int bx = 448, bw = 180, by = 100, bh = 12;
+  vfd::rect(bx, by, bw, bh, 0);
+  vfd::rect(bx, by, bw, 1, C(34, 34, 51)), vfd::rect(bx, by, 1, bh, C(34, 34, 51));
+  vfd::rect(bx, by + bh - 1, bw, 1, light), vfd::rect(bx + bw - 1, by, 1, bh, light);
+  const int in = bw - 4, fill = progressFill(in) & ~1;
+  for (int x = 0; x < fill; x += 2) {
+    int g = 136 + 85 * x / in;
+    vfd::rect(bx + 2 + x, by + 2, 2, bh - 4, C(255, (g & 0xF0) | (g >> 4), 0));
+  }
+  int tx = vfd::text(L("ROUND", "TUR"), 446, 122, 2, vfd::Ink{ light });
+  for (int i = 0; i < 4; i++) {
+    int x = tx + 12 + i * 24, y = 121;
+    bool on = roundDone(i);
+    vfd::rect(x, y, 18, 16, on ? C(255, 153, 0) : C(102, 102, 119));
+    vfd::rect(x, y, 18, 1, on ? C(255, 221, 136) : C(34, 34, 51)), vfd::rect(x, y, 1, 16, on ? C(255, 221, 136) : C(34, 34, 51));
+    vfd::rect(x, y + 15, 18, 1, on ? C(153, 68, 0) : C(170, 170, 187)), vfd::rect(x + 17, y, 1, 16, on ? C(153, 68, 0) : C(170, 170, 187));
+  }
+  hints(446);
+}
+
+// 2600: solid black, block digits, 8x4 blocks everywhere.
+void panelAtari(const char *corner)
+{
+  const uint16_t warm = C(252, 188, 148), mint = C(184, 252, 184), grey = C(68, 68, 68);
+  vfd::rect(MPX, 0, vfd::W - MPX, vfd::H, 0);
+  uint16_t pc = on_break ? mint : warm;
+  int lx = vfd::text(phaseLabel(), 448, 10, 2, vfd::Ink{ pc });
+  if (running) {  // stepped play triangle
+    static const int8_t TW[4] = { 8, 16, 16, 8 };
+    for (int j = 0; j < 4; j++) vfd::rect(lx + 8, 8 + j * 4, TW[j], 4, warm);
+  } else {
+    vfd::rect(lx + 8, 8, 8, 16, grey), vfd::rect(lx + 24, 8, 8, 16, grey);
+  }
+  cornerText(corner, 632, 10, warm);
+  char digits[8];
+  clockText(digits, sizeof(digits));
+  MachineDigits_Draw(digits, 456, 36, 24, 60, 8);
+  const int pw = 176, fill = progressFill(pw) / 8 * 8;
+  vfd::rect(448, 104, pw, 8, grey);
+  vfd::rect(448, 104, fill, 8, warm);
+  int tx = vfd::text(L("ROUND", "TUR"), 448, 122, 2, vfd::Ink{ pc });
+  for (int i = 0; i < 4; i++) vfd::rect(tx + 8 + i * 24, 122, 16, 12, roundDone(i) ? warm : grey);
+  hints(448);
+}
+
+}  // namespace
+
 void Study_Draw(const char *corner_text)
 {
   frame_no++;
   Study_Tick();
+  const theme::Id id = theme::current();
+  if (id != theme::VFD) {
+    const MachineStudy &m = MACHINE_STUDY[id - theme::C64];
+    if (RetroPicture_Draw(m.picture)) {
+      steam(m, id);
+      (id == theme::C64 ? panelC64 : id == theme::AMIGA ? panelAmiga : panelAtari)(corner_text);
+      return;
+    }
+  }
   WeatherNow w = Weather_Get();
   bool rain = w.valid && (w.sky == Sky::Rain || w.sky == Sky::Drizzle || w.sky == Sky::Shower || w.sky == Sky::Storm);
   // wall
@@ -347,35 +533,24 @@ void Study_Draw(const char *corner_text)
   const int px0 = PANEL_X * 2 + 14, pw = vfd::W - px0 - 12;
   uint16_t phase_c = on_break ? px::ink(C3) : HOT;
   uint16_t phase_h = on_break ? HALO : HOTH;
-  const bool machine = theme::current() != theme::VFD;
-  if (machine) phase_c = theme::current() == theme::C64 ? rgb(184, 199, 111) : rgb(236, 236, 236);
-  const char *label = on_break ? (done_count % 4 == 0 ? L("LONG BREAK", "UZUN MOLA") : L("BREAK", "MOLA")) : L("FOCUS", "ODAK");
-  int lx = text(label, px0, 10, 2, Ink{ phase_c, phase_h });
+  const bool machine = id != theme::VFD;
+  if (machine) phase_c = id == theme::C64 ? rgb(184, 199, 111) : rgb(236, 236, 236);
+  int lx = text(phaseLabel(), px0, 10, 2, Ink{ phase_c, phase_h });
   if (running) {  // play triangle
     for (int k = 0; k < 7; k++) rect(lx + 10 + k, 10 + k, 1, 14 - 2 * k, LIT);
   } else {  // pause bars
     rect(lx + 10, 10, 4, 14, DIM), rect(lx + 18, 10, 4, 14, DIM);
   }
-  if (corner_text && *corner_text) {
-    int tw = textWidth(corner_text, 2);
-    text(corner_text, vfd::W - 12 - tw, 10, 2, Ink{ DIM });
-  }
+  cornerText(corner_text, vfd::W - 12, 10, DIM);
   char digits[8];
-  uint32_t secs = (left_ms + 999) / 1000;
-  snprintf(digits, sizeof(digits), "%02lu:%02lu", (unsigned long)(secs / 60), (unsigned long)(secs % 60));
+  clockText(digits, sizeof(digits));
   Ink big = running ? Ink{ LIT, HALO, GHOST } : Ink{ LIT, NONE, GHOST };
   seg(digits, px0 + 2, 36, 32, 56, 7, 7, big);
-  uint32_t total = on_break ? (done_count % 4 == 0 ? LONG_MS : BREAK_MS) : FOCUS_MS;
-  int fill = (int)((uint64_t)(total - min(left_ms, total)) * pw / total);
   rect(px0, 104, pw, 6, GHOST);
-  rect(px0, 104, fill, 6, phase_c);
+  rect(px0, 104, progressFill(pw), 6, phase_c);
   int tx = text(L("ROUND", "TUR"), px0, 122, 2, Ink{ machine ? phase_c : DIM });
-  for (int i = 0; i < 4; i++) {  // focus blocks done in this round of four
-    bool filled = i < done_count % 4 || (done_count > 0 && done_count % 4 == 0 && on_break);
-    rect(tx + 10 + i * 22, 122, 16, 14, filled ? HOT : GHOST);
-  }
-  text(L("TAP: START / PAUSE", "DOKUN: BAŞLAT / DURAKLAT"), px0, 148, 1, Ink{ DIM });
-  text(L("HOLD: RESET", "BASILI TUT: SIFIRLA"), px0, 158, 1, Ink{ DIM });
+  for (int i = 0; i < 4; i++) rect(tx + 10 + i * 22, 122, 16, 14, roundDone(i) ? HOT : GHOST);
+  hints(px0);
 }
 
 #endif
