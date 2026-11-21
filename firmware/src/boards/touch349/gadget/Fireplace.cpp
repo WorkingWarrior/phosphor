@@ -1,6 +1,7 @@
 #ifdef BOARD_TOUCH349
 
 #include "Fireplace.h"
+#include "Motion.h"
 #include "Px.h"
 #include "RetroScene.h"
 #include "Vfd.h"
@@ -21,10 +22,156 @@ static uint32_t hash32(uint32_t v)
   return v ^ (v >> 16);
 }
 
-void Fireplace_Tap()
+// ---- sparks (tap on the fire), a log thrown on (hold), a yarn ball and a kitten (tilt) ------------------------------------
+
+struct Spark {
+  float x, y, vx, vy;
+  uint8_t life;  // frames left, 0 = unused
+};
+static Spark sparks[28];
+static int log_t = -1;     // frames since the log went on, -1 = none
+static float flare = 1.0f; // flame height factor, 1 = normal
+
+static void sparkBurst(int n, float cx, float cy)
 {
+  for (auto &s : sparks) {
+    if (n <= 0) break;
+    if (s.life) continue;
+    s = { cx + (frand() - 0.5f) * 10, cy, (frand() - 0.5f) * 2.4f, -(1.0f + frand() * 1.8f), (uint8_t)(18 + esp_random() % 22) };
+    n--;
+  }
+}
+
+static void sparksStep()
+{
+  for (auto &s : sparks) {
+    if (!s.life) continue;
+    s.x += s.vx;
+    s.y += s.vy;
+    s.vy += 0.07f;
+    s.vx *= 0.98f;
+    if (--s.life == 0 || s.x <= FX || s.x >= FX + FW - 1 || s.y <= FY || s.y >= FY + FH - 2) {
+      s.life = 0;
+      continue;
+    }
+    set((int)s.x, (int)s.y, s.life > 20 ? F5 : s.life > 10 ? F4 : F2);
+  }
+}
+
+void Fireplace_Tap(int sx, int sy)
+{
+  if (sx >= 2 * FX - 8 && sx <= 2 * (FX + FW) + 8 && sy >= 2 * FY - 8 && sy <= 2 * (FY + FH) + 12) {  // on the fire: sparks
+    sparkBurst(14, constrain(sx / 2, FX + 8, FX + FW - 8), FY + FH - 8);
+    RetroScene_Stir(0.9f);
+    return;
+  }
   awake_until = millis() + 4500;
   RetroScene_Stir(0.6f);  // with the theme's picture: the fire flares up
+}
+
+// Hold: a log goes on, the flames roar for a few seconds, the log burns down in about twelve.
+void Fireplace_Hold()
+{
+  log_t = 0;
+  RetroScene_Stir(1.5f);
+}
+
+static constexpr int LOG_FALL = 14, LOG_LIFE = 240;
+static void logStep()
+{
+  float target = 1.0f;
+  if (log_t >= 0) {
+    if (log_t == LOG_FALL) sparkBurst(12, FX + FW / 2, FY + FH - 14);
+    target = log_t < 90 ? 1.5f : 1.5f - 0.5f * (log_t - 90) / (LOG_LIFE - 90);
+    if (++log_t > LOG_LIFE) log_t = -1;
+  }
+  flare += (target - flare) * 0.15f;
+}
+
+static void logDraw()
+{
+  if (log_t < 0) return;
+  int rest = FY + FH - 12, ly = log_t < LOG_FALL ? rest - 20 + log_t * 20 / LOG_FALL : rest;
+  int lx = FX + 29;
+  rect(lx, ly, 34, 5, D2);
+  rect(lx, ly, 34, 1, D3);
+  rect(lx, ly + 4, 34, 1, D1);
+  if (log_t >= LOG_FALL)
+    for (int x = lx + 2; x < lx + 34; x += 5) set(x, ly + 2, (hash32(x + frame_no / 4) & 1) ? F4 : F3);  // catching fire
+}
+
+// The yarn ball rolls with the board's tilt; a kitten comes out to chase it, and leaves when the board is level again.
+static bool yarn_on = false, kit_on = false, kit_leaving = false;
+static float yarn_x = 250, yarn_v = 0, kit_x = -20;
+static int kit_dir = 1;
+static uint32_t yarn_until = 0;
+
+static void yarnStep()
+{
+  float gx = 0, gy = 1, gz = 0;
+  if (Motion_Ok()) Motion_Gravity(gx, gy, gz);
+  float tilt = fabsf(gx) > 0.18f ? gx : 0;
+  uint32_t now = millis();
+  if (tilt != 0) {
+    if (!yarn_on) {
+      yarn_on = true;
+      yarn_x = 250;
+      yarn_v = 0;
+    }
+    yarn_until = now + 20000;
+    if (!kit_on || kit_leaving) {
+      kit_on = true;
+      kit_leaving = false;
+      kit_x = tilt > 0 ? -12 : W + 4;  // comes in from the side the ball rolls away from
+    }
+  }
+  if (yarn_on) {
+    yarn_v = (yarn_v + tilt * 0.12f) * 0.965f;
+    yarn_x += yarn_v;
+    if (yarn_x < 5) yarn_x = 5, yarn_v = fabsf(yarn_v) * 0.5f;
+    if (yarn_x > W - 6) yarn_x = W - 6, yarn_v = -fabsf(yarn_v) * 0.5f;
+    if ((int32_t)(now - yarn_until) > 0 && fabsf(yarn_v) < 0.05f) {
+      yarn_on = false;
+      kit_leaving = true;
+    }
+  }
+  if (kit_on) {
+    float dx = kit_leaving ? (kit_x < W / 2 ? -100 : 100) : yarn_x - kit_x;
+    if (fabsf(dx) > (kit_leaving ? 0 : 9)) {
+      float sp = kit_leaving ? 1.1f : min(1.3f, 0.25f + fabsf(dx) * 0.04f);
+      kit_dir = dx > 0 ? 1 : -1;
+      kit_x += kit_dir * sp;
+    }
+    if (kit_x < -14 || kit_x > W + 6) kit_on = false;
+  }
+}
+
+static const char *const KITTEN[3][7] = {
+  { "......g.g..", "......ggggg", "g.gggggggeg", ".ggggggggww", ".gggggggg..", "..gg....gg.", ".g........g" },
+  { "......g.g..", "......ggggg", "g.gggggggeg", ".ggggggggww", ".gggggggg..", "...g..g.g..", "..g..g..g.." },
+  { "......g.g..", "......ggggg", "g.gggggggeg", ".ggggggggww", ".gggggggg..", "..g.....g..", "..g.....g.." },
+};
+static const uint8_t KITTEN_C[] = { N4, F5, N6 };
+
+static void yarnDraw()
+{
+  if (kit_on) {
+    bool moving = kit_leaving || fabsf(yarn_x - kit_x) > 9;
+    int f = moving ? (frame_no / 3) % 2 : 2;
+    sprite(KITTEN[f], 7, lroundf(kit_x) - 5, 79 + (moving && f ? -1 : 0), "gew", KITTEN_C, kit_dir < 0);
+  }
+  if (!yarn_on) return;
+  int cx = lroundf(yarn_x), cy = 81;
+  float a = yarn_x * 0.45f, ca = cosf(a), sa = sinf(a);
+  for (int y = -3; y <= 3; y++)
+    for (int x = -3; x <= 3; x++) {
+      if (x * x + y * y > 10) continue;
+      int band = (int)floorf((x * ca + y * sa + 8) * 0.8f) & 1;
+      set(cx + x, cy + y, band ? R3 : M1);
+    }
+  set(cx - 1, cy - 2, M2);
+  int dir = yarn_v > 0 ? -1 : 1;  // a loose end of thread trails behind
+  for (int k = 1; k <= 4; k++) set(cx + dir * (3 + k), cy + 3 - (k > 2 ? 1 : 0), R3);
 }
 
 // Flame tongues, thick at the base and thin at the tip, three layers (outer, body, hot core) that flicker and sway.
@@ -40,8 +187,8 @@ static void flames()
   for (int i = 0; i < TONGUES; i++) {
     float centre = 1.0f - fabsf(i - (TONGUES - 1) / 2.0f) / (TONGUES / 2.0f);  // 1 in the middle, 0 at the ends
     float n = sinf(t * 3.1f + i * 1.7f) * 0.5f + sinf(t * 5.3f + i * 0.9f) * 0.3f + sinf(t * 1.3f + i) * 0.2f;
-    tg[i] = { FX + 16 + i * (FW - 32) / (TONGUES - 1.0f) + sinf(t * 0.7f + i) * 1.5f, 6.5f + centre * 3.5f,
-              (12 + centre * 16) * (0.82f + 0.18f * n), i * 1.3f };
+    tg[i] = { FX + 16 + i * (FW - 32) / (TONGUES - 1.0f) + sinf(t * 0.7f + i) * 1.5f, (6.5f + centre * 3.5f) * (1 + (flare - 1) * 0.4f),
+              (12 + centre * 16) * (0.82f + 0.18f * n) * flare, i * 1.3f };
     total += tg[i].h;
   }
   static const uint8_t LAYER[3] = { F2, F3, F5 };
@@ -265,8 +412,13 @@ static void cat()
 
 void Fireplace_Draw(const char *corner_text)
 {
-  if (RetroScene_Draw(RetroArt::Fire, corner_text)) return;  // the theme's own picture of this scene
+  if (RetroScene_Draw(RetroArt::Fire, corner_text)) {  // the theme's own picture of this scene
+    log_t = -1;
+    return;
+  }
   frame_no++;
+  logStep();
+  yarnStep();
   room();
   lights();
   bigWindow();
@@ -289,6 +441,8 @@ void Fireplace_Draw(const char *corner_text)
     rect(lx, ly, 34, 1, D3);
     for (int x = lx + 3; x < lx + 34; x += 7) set(x, ly + 2, F3);  // embers
   }
+  logDraw();
+  sparksStep();
   // firelight on the floor and the hearth, breathing with the flames
   float g = constrain(glow, 0.2f, 1.2f);
   for (int y = 72; y < H; y++)
@@ -305,6 +459,7 @@ void Fireplace_Draw(const char *corner_text)
   rect(86, 8, 10, 6, G2);  // a small plant
   set(88, 6, G3), set(91, 5, G3), set(94, 6, G3);
   cat();
+  yarnDraw();
 
   present();
   if (corner_text && *corner_text) {
