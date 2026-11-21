@@ -521,6 +521,6 @@ void iconRunner(int x, int yy, uint16_t c)
 
 }  // namespace
 
-const App APP_RUNNER = { "runner", "RUNNER", "KOŞU", iconRunner, true, true, runnerEnter, nullptr, runnerDraw, runnerGesture, runnerTick, runnerFrameMs, runnerTouch };
+const App APP_RUNNER = { "runner", "RUNNER", "KOŞU", iconRunner, true, true, runnerEnter, nullptr, runnerDraw, runnerGesture, runnerTick, runnerFrameMs, nullptr, nullptr, runnerTouch };
 
 #endif

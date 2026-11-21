@@ -7,6 +7,7 @@
 #include "GameRunner.h"
 #include "Settings.h"
 #include "Theme.h"
+#include "GameFener.h"
 #include "ToolApps.h"
 #include "Vfd.h"
 
@@ -15,6 +16,7 @@ using namespace vfd;
 static const App *const TOOLS[] = { &APP_LEVEL, &APP_COIN, &APP_BREATHE, &APP_SCORE, &APP_LAMP };
 // The Play page joins the ring once this lists a game.
 static const App *const PLAY[] = {
+  &APP_FENER,
   &APP_POKER,
   &APP_RUNNER,
 };
@@ -185,11 +187,14 @@ bool Apps_Gesture(Gesture g, int x, int y)
 {
   if (!cur) return false;
   if (g == Gesture::SwipeLeft || g == Gesture::SwipeRight) {
+    if (cur->swipes_locked && cur->swipes_locked()) return true;  // a game in play: a sideways slide is no exit
     Apps_Close();
     return true;
   }
   return cur->gesture && cur->gesture(g, x, y);
 }
+
+bool Apps_TouchDown(int x, int y) { return cur && cur->touch_down && cur->touch_down(x, y); }
 
 void Apps_Tick()
 {

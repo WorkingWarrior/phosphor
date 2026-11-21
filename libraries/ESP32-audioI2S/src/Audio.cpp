@@ -7204,6 +7204,7 @@ uint64_t Audio::bswap64(uint64_t x) {
 
 void Audio::setAudioTaskCore(uint8_t coreID) { // Recommendation:If the ARDUINO RUNNING CORE is 1, the audio task should be core 0 or vice versa
     if (coreID > 1) return;
+    if (coreID == m_audioTaskCoreId && m_f_audioTaskIsRunning) return; // already there: stop+start would reuse the static TCB and stack of a task still being deleted
     stopAudioTask();
     xSemaphoreTake(mutex_audioTask, 0.3 * configTICK_RATE_HZ);
     m_audioTaskCoreId = coreID;

@@ -553,6 +553,6 @@ uint32_t pokerFrameMs()
 
 }  // namespace
 
-const App APP_POKER = { "poker", "POKER", "POKER", iconPoker, true, true, pokerEnter, pokerExit, pokerDraw, pokerGesture, pokerTick, pokerFrameMs, pokerTouch };
+const App APP_POKER = { "poker", "POKER", "POKER", iconPoker, true, true, pokerEnter, pokerExit, pokerDraw, pokerGesture, pokerTick, pokerFrameMs, nullptr, nullptr, pokerTouch };
 
 #endif

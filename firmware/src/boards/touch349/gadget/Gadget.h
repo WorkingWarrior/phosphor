@@ -19,6 +19,9 @@ void Gadget_Render(const DateTime &now);
 // Redraw period of the current page, 0 = only when something changes.
 uint32_t Gadget_FrameMs(Mode m);
 void Gadget_Gesture(Gesture g, int x, int y);
+// A finger just touched down (before any gesture is known). True = an open app (a game) acts on it right now: the board
+// then sends no tap, swipe or vertical swipe for this touch, only a LongPress if the finger stays.
+bool Gadget_TouchDown(int x, int y);
 // The pages of the swipe ring, for the settings: index 0..Gadget_PageCount()-1 in ring order (a page without content,
 // like Play before it has an app, is not listed). Clock and Settings can never be hidden.
 int Gadget_PageCount();

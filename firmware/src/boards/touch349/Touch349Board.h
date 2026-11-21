@@ -147,4 +147,5 @@ class Touch349Board : public Board {
   int touch_x0_ = 0, touch_y0_ = 0, touch_x_ = 0, touch_y_ = 0;
   uint32_t touch_down_ms_ = 0;
   bool long_sent_ = false;
+  bool down_used_ = false;  // an open app acted on this touch at touch-down (a game): the release is no gesture
 };
