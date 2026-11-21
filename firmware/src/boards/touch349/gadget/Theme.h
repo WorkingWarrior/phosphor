@@ -9,7 +9,7 @@
 
 namespace theme {
 
-enum Id : uint8_t { VFD, C64, AMIGA, ATARI, LCD, COUNT };  // saved by key, not by number
+enum Id : uint8_t { VFD, C64, AMIGA, ATARI, COUNT };  // saved by key, not by number
 
 struct Palette {
   uint16_t bg, ghost, faint, halo, lit, dim, hot, hoth, kelp;

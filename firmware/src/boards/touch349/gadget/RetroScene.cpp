@@ -36,7 +36,6 @@ struct Entry {
   RetroArt scene;
   theme::Id id;
   const art::Image *img;
-  bool lcd;
   int16_t p[12];
   uint16_t c[6];
 };
@@ -50,7 +49,6 @@ const art::Image *decoded = nullptr;
 const Entry *cur = nullptr;
 uint32_t frame_no = 0;
 float burst = 0;  // stir energy, decays
-float lcd_step = 0;
 bool actors = false;
 
 struct Flake {
@@ -125,42 +123,6 @@ void ripple(const art::Image *img, int y0, int y1, float amp, float speed)
   }
 }
 
-// ---- LCD handheld: black segments, either on or off, over a printed backdrop; the off ones show as ghosts ---------
-
-const uint16_t INK = rgb(34, 38, 36);
-
-void lcdDot(int X, int Y, bool on)
-{
-  if ((unsigned)X >= vfd::W || (unsigned)Y >= vfd::H) return;
-  cv()[Y * vfd::W + X] = on ? INK : mix(bg[Y * vfd::W + X], INK, 26);
-}
-
-// A segment from strings ('#' = one 2x2 machine pixel, or k x k of them); on = ink, off = ghost.
-void lcdSeg(const char *const *rows, int n, int x, int y, bool on, int k = 1)
-{
-  int s = 2 * k;
-  for (int r = 0; r < n; r++)
-    for (int c = 0; rows[r][c]; c++)
-      if (rows[r][c] == '#')
-        for (int d = 0; d < s * s; d++) lcdDot(x + c * s + d % s, y + r * s + d / s, on);
-}
-
-const char *const SEG_FLAKE[] = { ".#.", "###", ".#." };
-const char *const SEG_FLAME_HI[] = { "..#..", ".##..", ".###.", "#####", "#####", ".###." };
-const char *const SEG_FLAME_LO[] = { ".....", ".....", "..#..", ".###.", "#####", ".###." };
-const char *const SEG_RAY[] = { "########" };
-const char *const SEG_WAVE[] = { ".##...", "#..#.#", "....#." };
-
-void lcdPuff(int x, int y, int r, bool on)  // a ring of machine pixels
-{
-  for (int dy = -r; dy <= r; dy++)
-    for (int dx = -r; dx <= r; dx++) {
-      int d2 = dx * dx + dy * dy;
-      if (d2 > r * r || d2 < (r - 1) * (r - 1)) continue;
-      for (int k = 0; k < 4; k++) lcdDot(x + dx * 2 + (k & 1), y + dy * 2 + (k >> 1), on);
-    }
-}
-
 // ---- snow ---------------------------------------------------------------------------------------------------------
 
 void spawnFlake(Flake &f, const Entry &e, bool top)
@@ -217,21 +179,6 @@ void snowPainted(const Entry &e)
   }
 }
 
-void snowLcd(const Entry &e)
-{
-  int step = (int)lcd_step;
-  for (int c = 0; c < 27; c++) {  // columns of fixed flakes; the lit one moves a row down per tick
-    int x = 6 + c * 24 + (c & 1) * 6, off = hash32(c * 7 + 3) % 6;
-    for (int r = 0; r < 13; r++) {
-      int y = 4 + r * 12 + (c & 1) * 5;
-      if (y > vfd::H - 8) break;
-      lcdSeg(SEG_FLAKE, 3, x, y, ((r - step + off) % 6 + 6) % 6 == 0);
-    }
-  }
-  static const int8_t PUFF[3][3] = { { 0, 0, 2 }, { 7, -11, 3 }, { 17, -24, 4 } };
-  for (int i = 0; i < 3; i++) lcdPuff(e.p[6] + PUFF[i][0], e.p[7] + PUFF[i][1], PUFF[i][2], step % 4 == i);
-}
-
 // ---- fire ---------------------------------------------------------------------------------------------------------
 
 void firePainted(const Entry &e)
@@ -269,18 +216,6 @@ void firePainted(const Entry &e)
   if (p[4]) {
     mpx(img, p[4], p[5] - img->sy, 1, e.c[0]);
     if (hash32(frame_no / 2) % 3) mpx(img, p[4], p[5] - 2 * img->sy, 1, e.c[2]);
-  }
-}
-
-void fireLcd(const Entry &e)
-{
-  int step = (int)(lcd_step * 2);
-  int x0 = e.p[0], y1 = e.p[3], w = e.p[2] - e.p[0];
-  for (int k = 0; k < 3; k++) {  // three flames, each tall or low on its own beat
-    int x = x0 + w / 6 + k * w / 3 - 10, y = y1 - 24;
-    bool tall = hash32(step * 3 + k) & 1;
-    lcdSeg(SEG_FLAME_HI, 6, x, y, false, 2);
-    lcdSeg(tall ? SEG_FLAME_HI : SEG_FLAME_LO, 6, x, y, true, 2);
   }
 }
 
@@ -322,21 +257,10 @@ void seaPainted(const Entry &e)
   mpx(img, p[0], p[1], 1, e.c[0]);  // the lamp itself
 }
 
-void seaLcd(const Entry &e)
-{
-  int step = (int)(lcd_step * 1.5f);
-  for (int k = 0; k < 4; k++) lcdSeg(SEG_RAY, 1, e.p[0] + 10 + k * 36, e.p[1] - 2 + k * 2, step % 5 == k, 2);  // the beam
-  for (int k = 0; k < 9; k++) {  // waves rolling in
-    int x = 200 + (k % 3) * 140 + (k / 3) * 46, y = e.p[2] + (k / 3) * ((e.p[3] - e.p[2]) / 3);
-    lcdSeg(SEG_WAVE, 3, x, y, (step + k) % 3 == 0, 2);
-  }
-}
-
 // ---- aquarium, under the fish -------------------------------------------------------------------------------------
 
 void tankUnder(const Entry &e)
 {
-  if (e.lcd) return;
   const int16_t *p = e.p;
   ripple(e.img, p[0], p[1], 1, 1.4f);
   if (!e.c[0]) return;  // the picture has its own light shafts
@@ -356,7 +280,6 @@ void tankUnder(const Entry &e)
 
 const Entry *find(RetroArt scene)
 {
-  if (theme::naturalScenes()) return nullptr;
   for (auto &e : ENTRIES)
     if (e.scene == scene && e.id == theme::current()) return &e;
   return nullptr;
@@ -382,7 +305,6 @@ bool RetroScene_Begin(RetroArt scene)
     if (shake > 0.2f) RetroScene_Stir(shake);
   }
   burst *= 0.94f;
-  lcd_step += 0.05f / 0.38f * (1 + burst * 3);  // LCD figures move in ticks ~380 ms apart, faster when stirred
 
   vfd::noClip();
   memcpy(vfd::canvas(), bg, vfd::W * vfd::H * 2);
@@ -396,12 +318,12 @@ void RetroScene_End(const char *corner_text)
 {
   if (!cur) return;
   const Entry &e = *cur;
-  if (actors) px::overlay(e.img->sx == 4, e.lcd ? INK : 0);
+  if (actors) px::overlay(e.img->sx == 4);
   actors = false;
   switch (e.scene) {
-    case RetroArt::Snow: e.lcd ? snowLcd(e) : snowPainted(e); break;
-    case RetroArt::Fire: e.lcd ? fireLcd(e) : firePainted(e); break;
-    case RetroArt::Sea: e.lcd ? seaLcd(e) : seaPainted(e); break;
+    case RetroArt::Snow: snowPainted(e); break;
+    case RetroArt::Fire: firePainted(e); break;
+    case RetroArt::Sea: seaPainted(e); break;
     case RetroArt::Aquarium: break;
   }
   if (corner_text && *corner_text) {

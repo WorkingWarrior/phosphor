@@ -262,14 +262,17 @@ void Touch349Board::fadeBacklight(int from_pct, int to_pct, int ms)
   }
 }
 
-// Shows the level overlay at once, then the light glides to the new level. With the screen off it only stores it.
-void Touch349Board::setBrightness(int pct)
+// Shows the level overlay at once (unless the caller shows the level itself), then the light glides to the new level.
+// With the screen off it only stores it.
+void Touch349Board::setBrightness(int pct, bool show_level)
 {
   int from = brightness_pct_;
   brightness_pct_ = constrain(pct, BRIGHTNESS_MIN_PCT, 100);
   if (display_on_) {
-    level_until_ms_ = millis() + LEVEL_SHOW_MS;
-    render(now());
+    if (show_level) {
+      level_until_ms_ = millis() + LEVEL_SHOW_MS;
+      render(now());
+    }
     fadeBacklight(from, brightness_pct_, 90);
   }
   Preferences prefs;

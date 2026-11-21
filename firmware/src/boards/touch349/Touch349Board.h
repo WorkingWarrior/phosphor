@@ -61,7 +61,7 @@ class Touch349Board : public Board {
   void setTime(const DateTime &t) override;
   Sensors readSensors() override;
   bool keyDown() override;
-  void setBrightness(int pct) override;
+  void setBrightness(int pct, bool show_level = true) override;
   int brightness() const override { return brightness_pct_; }
   void setDisplayOn(bool on) override;
   int displayOn() const override { return display_on_ ? 1 : 0; }

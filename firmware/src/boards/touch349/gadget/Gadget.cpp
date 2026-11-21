@@ -285,11 +285,30 @@ static void drawSecondDot(int second)
   rect(x - 4, y - 4, 8, 8, HOT);
 }
 
+// C64-style: a rainbow sash across the top right corner, five stripes on the machine's wide pixels.
+static void drawRainbow()
+{
+  static const uint16_t BAND[] = { px::rgb(214, 72, 56), px::rgb(226, 140, 52), px::rgb(232, 212, 92),
+                                   px::rgb(104, 180, 80), px::rgb(96, 160, 230) };
+  const int right = W - theme::def().border_w, top = theme::def().border_w, first = 26, bw = 7;
+  for (int y = top; y < top + first + 5 * bw; y += 2) {
+    for (int k = 0; k < 5; k++) {
+      int lo = first + k * bw - (y - top), hi = lo + bw;  // distance in from the right edge on this row
+      lo = max(lo, 0);
+      if (hi <= 0) continue;
+      int x0 = (right - hi) & ~1, x1 = (right - lo) & ~1;
+      rect(x0, y, x1 - x0, 2, BAND[k]);
+    }
+  }
+}
+
 static void drawClock(const DateTime &now)
 {
   clear();
+  if (theme::current() == theme::C64) drawRainbow();
   String hm = hhmm(now);
-  seg(hm.c_str(), 20, 24, 78, 124, 12, 12, { LIT, HALO, GHOST });
+  // VFD draws ghost 8s, so the digits fill their cells; the machines show only the lit ones, which leaves a gap on the left
+  seg(hm.c_str(), theme::current() == theme::VFD ? 20 : 10, 24, 78, 124, 12, 12, { LIT, HALO, GHOST });
   drawSecondDot(now.second);
   bool alarm_lit = alarm_on && (!ringing || blinkOn(300));
   text("AL", 412, 26, 2, alarm_on ? HOT_INK : GHOST_INK);
@@ -1111,7 +1130,7 @@ String Gadget_Command(const String &name, const String &arg)
       eggSet(arg.toInt());  // seconds
     }
   } else if (name == "theme") {
-    // the whole look: vfd | c64 | amiga | atari | lcd (or 0..4), empty = next; "natural" / "themed" = scene colors
+    // the whole look: vfd | c64 | amiga | atari (or 0..3), empty = next; "natural" / "themed" = scene colors
     if (arg == "natural" || arg == "themed") {
       theme::setNaturalScenes(arg == "natural");
     } else {

@@ -16,7 +16,7 @@ using namespace vfd;
 // Items and texts
 // ---------------------------------------------------------------------------------------------------------------------
 
-enum Item : uint8_t { THEME, SCENES, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HOLIDAYS, HELP, WIFI, ABOUT, ITEM_COUNT };
+enum Item : uint8_t { THEME, CLOCK, UNITS, LANG, BRIGHT, CITY, CYCLE, HOLIDAYS, HELP, WIFI, ABOUT, ITEM_COUNT };
 
 struct ItemText {
   const char *en, *tr;            // in the list
@@ -25,7 +25,6 @@ struct ItemText {
 
 static const ItemText ITEMS[ITEM_COUNT] = {
   { "THEME", "TEMA", "LOOK OF EVERY PAGE", "TÜM SAYFALARIN GÖRÜNÜMÜ" },
-  { "SCENES", "SAHNELER", "SCENE COLORS", "SAHNE RENKLERİ" },
   { "CLOCK", "SAAT", "CLOCK STYLE", "SAAT BİÇİMİ" },
   { "UNITS", "BİRİM", "TEMPERATURE", "SICAKLIK" },
   { "LANGUAGE", "DİL", "TEXT ON SCREEN", "EKRANDAKİ YAZILAR" },
@@ -281,7 +280,6 @@ static void change(int dir)
 {
   switch (sel) {
     case THEME: theme::set((theme::Id)((theme::current() + dir + theme::COUNT) % theme::COUNT)); break;
-    case SCENES: theme::setNaturalScenes(!theme::naturalScenes()); break;
     case CLOCK: apply(settings::h24() ? "h24=0\n" : "h24=1\n"); break;
     case UNITS: apply(settings::fahrenheit() ? "unit=c\n" : "unit=f\n"); break;
     case LANG: apply(settings::tr() ? "lang=en\n" : "lang=tr\n"); break;
@@ -289,7 +287,7 @@ static void change(int dir)
       int b = board().brightness();
       if (b < 0) break;
       int to = dir > 0 ? (b / 10 + 1) * 10 : ((b + 9) / 10 - 1) * 10;
-      board().setBrightness(constrain(to, 5, 100));
+      board().setBrightness(constrain(to, 5, 100), false);  // the panel shows the level; no overlay
       break;
     }
     case CITY:
@@ -375,11 +373,6 @@ static void drawValue()
   String value, note;
   switch (sel) {
     case THEME: value = theme::def().name; break;
-    case SCENES:
-      value = theme::naturalScenes() ? L("NATURAL", "DOĞAL") : L("THEMED", "TEMAYA GÖRE");
-      note = theme::naturalScenes() ? L("SCENES KEEP THEIR OWN COLORS", "SAHNELER KENDİ RENGİNDE")
-                                    : L("SCENES IN THE THEME'S COLORS", "SAHNELER TEMANIN RENGİNDE");
-      break;
     case CLOCK: value = settings::h24() ? L("24 HOUR", "24 SAAT") : L("12 HOUR", "12 SAAT"); break;
     case UNITS:
       value = settings::fahrenheit() ? "°F" : "°C";

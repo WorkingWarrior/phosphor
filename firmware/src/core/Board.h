@@ -52,7 +52,7 @@ class Board {
   virtual void setVolume(int pct) {}
 
   // Backlight, optional (backlit panels only). brightness() is -1 without a control.
-  virtual void setBrightness(int pct) {}
+  virtual void setBrightness(int pct, bool show_level = true) {}  // show_level: the level overlay
   virtual int brightness() const { return -1; }
   // Screen off/on without cutting power (backlight dark, nothing drawn). displayOn() is -1 without a control.
   virtual void setDisplayOn(bool on) {}
