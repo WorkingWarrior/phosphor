@@ -1121,6 +1121,8 @@ void Gadget_Gesture(Gesture g, int x, int y)
         Fireplace_Hold();
       } else if (state.mode == Mode::Sea) {
         Seaside_Hold();
+      } else if (state.mode == Mode::Wave) {
+        Wave_Hold();
       } else if (state.mode == Mode::Radio) {
         RadioFace_Hold(x, y);
       }
