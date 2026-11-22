@@ -1,5 +1,9 @@
 # Phosphor
 
+[![Build](https://github.com/melihkoray/phosphor/actions/workflows/build.yml/badge.svg)](https://github.com/melihkoray/phosphor/actions/workflows/build.yml)
+[![Built and signed by GitHub Actions](https://img.shields.io/badge/built%20%26%20signed-GitHub%20Actions-2ea44f?logo=githubactions&logoColor=white)](https://github.com/melihkoray/phosphor/attestations)
+[![VirusTotal: 0 of 61 engines](https://img.shields.io/badge/VirusTotal-0%2F61%20(v1.0.2)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/76c78b370eb964d81868a291831b9b6ec8567f1719e10fcf8d736a7a624806da)
+
 A retro VFD-style desk gadget for the **Waveshare ESP32-S3-Touch-LCD-3.49** (640×172 bar display). Clock, weather,
 internet radio, focus timer and a set of slow pixel scenes, all drawn to look like an old vacuum-fluorescent display.
 
@@ -113,6 +117,11 @@ The main endpoints, plain HTTP on your local network (`GET /status` also tells y
   those are off.
 - There is no microphone code and no cloud account. The board talks to Open-Meteo (weather), NTP servers (time) and the
   radio streams you choose (weather is fetched over plain HTTP); the settings page in your phone's browser also talks to Open-Meteo geocoding and Radio Browser.
+- The installer and the release files are built by GitHub Actions on GitHub's servers from this repository
+  ([workflow](.github/workflows/build.yml)), not on anyone's computer. Since 22 Nov 2026 every build also gets a
+  `SHA256SUMS.txt` and a signed [build provenance attestation](https://github.com/melihkoray/phosphor/attestations): to
+  check that a `.bin` came from here, run `gh attestation verify phosphor.bin -R melihkoray/phosphor` (GitHub CLI).
+  The v1.0.2 release `phosphor.bin` scans clean on [VirusTotal](https://www.virustotal.com/gui/file/76c78b370eb964d81868a291831b9b6ec8567f1719e10fcf8d736a7a624806da) (0 of 61 engines).
 
 ## Credits and license
 
