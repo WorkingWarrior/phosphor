@@ -4,11 +4,16 @@
 [![Built and signed by GitHub Actions](https://img.shields.io/badge/built%20%26%20signed-GitHub%20Actions-2ea44f?logo=githubactions&logoColor=white)](https://github.com/melihkoray/phosphor/attestations)
 [![VirusTotal: 0 of 61 engines](https://img.shields.io/badge/VirusTotal-0%2F61%20(v2.0.0)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/d247cd729a6fe92ad5cbd1ab439eb3e935a6f67bbce1772ae09508605da895f5)
 
-![Phosphor on the Waveshare 3.49" bar: the same clock and scenes in the VFD, C64, Amiga and 2600 looks](media/readme/hero.gif)
+[![Phosphor on the Waveshare 3.49" bar: the snowy cabin, the fireplace, the ocean liner, the radio, 21, a storm and the fish tank](media/readme/board-3d.webp)](https://melihkoray.github.io/phosphor/#film)
+
+▶ **[Watch the 42-second film with sound](https://melihkoray.github.io/phosphor/#film)**: the clock, Lighthouse Keeper with
+its beeps, then the scenes on a chiptune. Everything on the screen was recorded from the board; the board is a 3D model.
 
 Phosphor turns the **Waveshare ESP32-S3-Touch-LCD-3.49**, a 640×172 bar display, into a retro desk gadget: a clock,
 weather, internet radio, timers, pixel scenes to leave running, three games and a few small tools. Every page is drawn
 four times, as an old vacuum-fluorescent display (VFD), C64-style, Amiga-style and 2600-style.
+
+![The same clock and scenes in the VFD, C64, Amiga and 2600 looks](media/readme/hero.gif)
 
 **[Install from the browser →](https://melihkoray.github.io/phosphor/)** (Chrome or Edge, USB cable, no tools needed)
 

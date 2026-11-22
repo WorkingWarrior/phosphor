@@ -98,6 +98,19 @@ h1 { font-size: clamp(56px, 9vw, 120px); line-height: .9; margin: 34px 0 16px; }
 .count { font: 600 14px "IBM Plex Mono", monospace; padding-left: 10px; border-left: 1px solid currentColor; }
 .fine { color: var(--dim); font-size: 15px; margin: 18px 0 0; }
 
+/* film: the board in 3D, rendered on the page colour so it has no edge */
+.film { max-width: 1400px; margin: -24px auto 0; padding-bottom: 72px; }
+.film video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: var(--bg); }
+.film-bar { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px 18px; padding: 0 20px; margin-top: 4px; }
+.film-bar p { color: var(--dim); font-size: 14px; margin: 0; max-width: 62ch; }
+.sound { display: inline-flex; align-items: center; gap: 8px; font: 600 13px/1 "IBM Plex Mono", monospace; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text); background: none; border: 1px solid var(--line); border-radius: 999px;
+  padding: 11px 16px; cursor: pointer; }
+.sound:hover { border-color: var(--dim); }
+.sound[aria-pressed=true] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.sound:focus-visible { outline: 2px solid var(--lit); outline-offset: 2px; }
+.sound svg { width: 16px; height: 16px; fill: currentColor; }
+
 /* feature rows */
 .feat { display: grid; grid-template-columns: 5fr 7fr; gap: 56px; align-items: center; padding-block: 88px; border-top: 1px solid var(--line); }
 .feat.flip { grid-template-columns: 7fr 5fr; }
@@ -164,6 +177,8 @@ footer p { margin: 0; }
   .looks button { padding: 10px 12px; }
   .device { transform: rotateX(9deg) rotateY(16deg) rotateZ(-1deg); }
   .nw { white-space: normal; } .br { display: none; }
+  .film { margin-top: -36px; padding-bottom: 56px; }
+  .film video { aspect-ratio: 3 / 2; }
 }
 </style>
 </head>
@@ -203,6 +218,17 @@ footer p { margin: 0; }
       <p class="fine">Free and open source. You need a USB-C cable and Chrome or Edge, nothing else.</p>
     </div>
   </header>
+
+  <section class="film" id="film" aria-label="Phosphor on the board, 42 seconds">
+    <video poster="img/board-3d.jpg" width="1920" height="1080" muted loop playsinline preload="none">
+      <source src="img/board-3d-540.mp4" type="video/mp4" media="(max-width: 700px)">
+      <source src="img/board-3d-1080.mp4" type="video/mp4">
+    </video>
+    <div class="film-bar">
+      <button class="sound" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4zM16 8.5a5 5 0 0 1 0 7l-1.2-1.2a3.3 3.3 0 0 0 0-4.6zM18.6 6a8.6 8.6 0 0 1 0 12l-1.2-1.2a6.9 6.9 0 0 0 0-9.6z"/></svg><span>Sound on</span></button>
+      <p>Everything on the screen was recorded from the board, frame by frame, beeps and all. The board around it is a 3D model, and the music is made in code.</p>
+    </div>
+  </section>
 
   <section class="wrap feat" aria-labelledby="h-21">
     <div class="copy">
@@ -385,7 +411,29 @@ function show(i) {
 btns.forEach((b, i) => b.addEventListener('click', () => { clearInterval(timer); show(i); }));
 if (!matchMedia('(prefers-reduced-motion: reduce)').matches) timer = setInterval(() => show((cur + 1) % imgs.length), 2600);
 
+// The 3D film plays muted while it is on screen; the button turns the sound on (and starts it if it was not playing).
+// The label follows what the video is really doing, so a refused play() never leaves it saying "Sound off".
+const film = document.querySelector('.film video'), snd = document.querySelector('.film .sound');
+const sndLabel = snd.querySelector('span');
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let wanted = !calm;
+const syncSound = () => {
+  const loud = !film.muted && !film.paused;
+  snd.setAttribute('aria-pressed', loud);
+  sndLabel.textContent = loud ? 'Sound off' : calm && film.paused ? 'Play with sound' : 'Sound on';
+};
+['play', 'pause', 'volumechange'].forEach(t => film.addEventListener(t, syncSound));
+syncSound();
+new IntersectionObserver(([e]) => {
+  if (e.isIntersecting && wanted) film.play().catch(() => {});
+  else if (!e.isIntersecting) film.pause();
+}, { threshold: .35 }).observe(film);
+snd.addEventListener('click', () => {
+  if (!film.muted && !film.paused) { film.muted = true; return; }
+  wanted = true;
+  film.muted = false;
+  film.play().catch(() => { film.muted = true; film.play().catch(() => {}); });
+});
 
 // The short loops recorded from the board play only while they are on screen (and not at all with reduced motion:
 // the poster is their first frame).
