@@ -225,4 +225,4 @@ resolution, palette and color limits by [`convert.py`](design/retro-proto/conver
 this project; no ROM fonts are copied. Commodore 64, Amiga and Atari 2600 are trademarks of their owners; the looks
 are only in their style. Not affiliated with Waveshare.
 
-Made by [Melih Koray](https://melihkoray.com).
+Made by [Melih Koray](https://melihkoray.com) · [Project page](https://melihkoray.com/projects/phosphor)
