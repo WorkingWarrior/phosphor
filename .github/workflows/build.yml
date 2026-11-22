@@ -5,6 +5,8 @@ name: Build
 # The version string is the tag name on a tag build, else `git describe`. It goes into the firmware (-DFW_VERSION, which the
 # device reports over Improv Serial) and into the installer manifest, and the two must match for the installer to tell
 # "same version" from "update".
+# The binaries get a SHA256SUMS.txt and a signed build provenance attestation (Sigstore, stored by GitHub): anyone can
+# check that a .bin was built here from this repository with `gh attestation verify phosphor.bin -R melihkoray/phosphor`.
 on:
   push:
     branches: [main]
@@ -24,6 +26,11 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.version.outputs.version }}
+    permissions:
+      contents: read
+      id-token: write           # the attestation's signing certificate
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -61,6 +68,15 @@ jobs:
           cp build/firmware.ino.bin out/phosphor.bin
           cp build/assets.bin out/assets.bin
           ls -l out
+
+      - name: Checksums
+        run: cd out && sha256sum *.bin | tee SHA256SUMS.txt
+
+      - name: Attest that the binaries were built here
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@v4
+        with:
+          subject-path: out/*.bin
 
       - uses: actions/upload-artifact@v4
         with:
@@ -108,4 +124,4 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" out/*.bin --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" out/*.bin out/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
