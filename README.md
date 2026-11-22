@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/melihkoray/phosphor/actions/workflows/build.yml/badge.svg)](https://github.com/melihkoray/phosphor/actions/workflows/build.yml)
 [![Built and signed by GitHub Actions](https://img.shields.io/badge/built%20%26%20signed-GitHub%20Actions-2ea44f?logo=githubactions&logoColor=white)](https://github.com/melihkoray/phosphor/attestations)
-[![VirusTotal: 0 of 61 engines](https://img.shields.io/badge/VirusTotal-0%2F61%20(v1.0.2)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/76c78b370eb964d81868a291831b9b6ec8567f1719e10fcf8d736a7a624806da)
+[![VirusTotal: 0 of 61 engines](https://img.shields.io/badge/VirusTotal-0%2F61%20(v2.0.0)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/d247cd729a6fe92ad5cbd1ab439eb3e935a6f67bbce1772ae09508605da895f5)
 
 A retro desk gadget for the **Waveshare ESP32-S3-Touch-LCD-3.49** (640×172 bar display). Clock, weather, internet
 radio, timers, pixel scenes, three games and a few small tools, in four looks: an old vacuum-fluorescent display (VFD),
@@ -192,7 +192,7 @@ The main endpoints, plain HTTP on your local network (`GET /status` also tells y
   ([workflow](.github/workflows/build.yml)), not on anyone's computer. Since 22 Nov 2026 every build also gets a
   `SHA256SUMS.txt` and a signed [build provenance attestation](https://github.com/melihkoray/phosphor/attestations): to
   check that a `.bin` came from here, run `gh attestation verify phosphor.bin -R melihkoray/phosphor` (GitHub CLI).
-  The v1.0.2 release `phosphor.bin` scans clean on [VirusTotal](https://www.virustotal.com/gui/file/76c78b370eb964d81868a291831b9b6ec8567f1719e10fcf8d736a7a624806da) (0 of 61 engines).
+  The v2.0.0 release `phosphor.bin` scans clean on [VirusTotal](https://www.virustotal.com/gui/file/d247cd729a6fe92ad5cbd1ab439eb3e935a6f67bbce1772ae09508605da895f5) (0 of 61 engines).
 
 ## Credits and license
 
