@@ -34,7 +34,7 @@ over.
 ## Internet radio
 
 ![The radio page in the VFD look](media/readme/radio-vfd.gif)
-![The radio page, C64-style](media/readme/radio-c64.gif)
+![The radio page, Amiga-style, with a tracker pattern that runs with the music](media/readme/radio-amiga.gif)
 
 Up to seven genre buttons; tap one again for the next station. The dancers and the equalizer move with the music.
 Find stations on the settings page through [Radio Browser](https://www.radio-browser.info) or paste your own stream
@@ -57,18 +57,9 @@ And the real board on my desk (tilting it tilts the sea under the liner):
 
 ## New in v2.0.0
 
-- **Four looks.** VFD, C64-style, Amiga-style and 2600-style, each with its own palette, 8×8 font and page layouts.
-  The pixel scenes are redrawn in each machine's resolution and colors.
-- **Play menu:** Lighthouse Keeper, 21 against a cartoon dealer (knock on the table to play) and an endless runner.
-- **Tools menu:** spirit level, coin flip, box breathing, scoreboard and a screen lamp.
-- **Settings on the board itself:** look, clock style, °C or °F, language, brightness, city, auto page turn, holiday
-  lights, night dimming, which pages show, help for every gesture, Wi-Fi and About.
-- **Scenes you can touch:** feed the fish, wake the cat, call up a storm at the lighthouse, sound the ship's fog horn,
-  hold the snowy cabin for a snow globe.
-- **Update notice.** Once a day the board looks at the installer page for a newer version and says so in
-  Settings > About. It never updates itself.
-- Battery percentage from a Li-ion curve, a short hint the first time you open each page, and a fix for a rare boot
-  loop at start-up (also in v1.0.x).
+Four looks, a Play menu with three games, a Tools menu, settings on the board itself, scenes you can touch and a daily
+update notice. The full list, with the fixes, is in the
+[v2.0.0 release notes](https://github.com/melihkoray/phosphor/releases/tag/v2.0.0).
 
 **Coming from v1.0.x:** install once more from the [installer page](https://melihkoray.github.io/phosphor/) over USB and
 leave **Erase device** unticked. The flash layout changed, so this one step cannot happen over Wi-Fi. Your Wi-Fi,
@@ -95,9 +86,9 @@ Pixel scenes, to leave running:
 - **Ship:** an ocean liner that tilts with the board. Hold for the fog horn; now and then a whale.
 - **Lava lamp** (tap for new colors) and an **hourglass** you turn over by tilting the board.
 
-| ![Snow](media/snow.gif) | ![Fireplace](media/fire.gif) |
+| ![The snowy cabin, Amiga-style](media/readme/snow-amiga.gif) | ![The fireplace with the sleeping cat, Amiga-style](media/readme/fire.gif) |
 |---|---|
-| ![Seaside](media/sea.gif) | ![Aquarium](media/aquarium.gif) |
+| ![The lighthouse at night, Amiga-style](media/readme/sea.gif) | ![The fish tank, Amiga-style](media/readme/fish.gif) |
 
 ### Play
 
@@ -152,6 +143,8 @@ Settings are stored on the board and survive restarts and updates (a reinstall w
 own buttons. Hold on the clock to switch the alarm on or off, hold on a timer to reset it. **Settings > Help** on the
 board lists every gesture. Back buttons: PWR turns the screen off and on (hold 3 s on battery to power off), BOOT
 changes brightness (hold 5 s to forget Wi-Fi and open the setup again), RESET restarts.
+
+<img src="docs/img/buttons.jpg" width="600" alt="The back edge of the board: the BOOT, PWR and RESET buttons on the left, the speaker in the middle">
 
 ## Troubleshooting
 

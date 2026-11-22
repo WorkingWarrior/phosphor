@@ -7,7 +7,11 @@
 <meta name="description" content="Phosphor 2.0 for the Waveshare ESP32-S3-Touch-LCD-3.49: every page as VFD, C64, Amiga 500 and Atari 2600, a game of 21 you play by knocking on the table, internet radio. Install it from the browser.">
 <meta property="og:title" content="Phosphor 2.0">
 <meta property="og:description" content="Retro firmware for the Waveshare ESP32-S3-Touch-LCD-3.49. Install it from the browser.">
-<meta property="og:image" content="https://melihkoray.github.io/phosphor/img/hero-amiga.png">
+<meta property="og:image" content="https://melihkoray.github.io/phosphor/img/og-board.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="The Waveshare 3.49-inch bar running Phosphor: a snowy cabin in the Amiga-style look">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500;62..125,600;62..125,800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
@@ -101,7 +105,8 @@ h1 { font-size: clamp(56px, 9vw, 120px); line-height: .9; margin: 34px 0 16px; }
 .feat .copy p + p { margin-top: 14px; }
 .shots { display: grid; gap: 14px; }
 .bezel { display: block; background: oklch(0.11 0.006 250); border-radius: 14px; padding: 10px 12px; }
-.bezel img { display: block; width: 100%; height: auto; }
+.bezel img, .bezel video { display: block; width: 100%; height: auto; }
+.bezel video, .tiles video { aspect-ratio: 640 / 172; }
 .cap { color: var(--dim); font-size: 14px; margin: 8px 0 0 4px; }
 
 /* four machines */
@@ -116,7 +121,7 @@ h1 { font-size: clamp(56px, 9vw, 120px); line-height: .9; margin: 34px 0 16px; }
 .more { padding-block: 88px 96px; border-top: 1px solid var(--line); }
 .more h2 { font-size: clamp(44px, 8vw, 104px); }
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px 18px; margin: 40px 0 0; padding: 0; list-style: none; }
-.tiles img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.tiles img, .tiles video { display: block; width: 100%; height: auto; border-radius: 6px; }
 .tiles b { display: block; font-weight: 800; font-stretch: 85%; font-size: 19px; margin-top: 12px; }
 .tiles span { color: var(--dim); font-size: 15px; line-height: 1.45; }
 
@@ -138,6 +143,9 @@ esp-web-install-button button[slot=activate]:hover { background: oklch(0.92 0.11
 .doc ol { padding-left: 22px; margin: 0; } .doc li { margin: 10px 0; } .doc ol ol { margin-top: 6px; }
 .doc dt { font-weight: 600; margin: 22px 0 4px; } .doc dd { margin: 0; color: var(--dim); }
 .doc dd b { color: var(--text); }
+.buttons { margin: 0 0 6px; max-width: 560px; }
+.buttons img { display: block; width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line); }
+.buttons figcaption { color: var(--dim); font-size: 14px; margin-top: 8px; }
 
 footer { border-top: 1px solid var(--line); margin-top: 72px; padding-block: 44px 64px; }
 footer .row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
@@ -203,7 +211,7 @@ footer p { margin: 0; }
       <p class="lede">Ten hands a match. Tapping HIT and STAND works too.</p>
     </div>
     <div class="shots">
-      <span class="bezel"><img class="px" src="img/21-amiga.png" width="640" height="172" alt="21 in the Amiga-style look: the dealer says one more for the house"></span>
+      <span class="bezel"><video class="px loop" src="img/loop-21.mp4" poster="img/loop-21.png" width="640" height="172" muted loop playsinline preload="none" aria-label="A hand of 21 in the Amiga-style look, recorded from the board: the dealer shuffles, deals and wins"></video></span>
       <span class="bezel"><img class="px" src="img/21-c64.png" width="640" height="172" alt="21 in the C64-style look, with the HIT and STAND buttons"></span>
     </div>
   </section>
@@ -214,7 +222,7 @@ footer p { margin: 0; }
       <p class="lede">My own <b>Game &amp; Watch-style</b> game. Ships head for the rocks on three lanes; tap a lane to swing the lamp over and turn the ship away.</p>
       <p class="lede">Fixed LCD segments with their faint ghosts, Game A and Game B, a beep for every save. Three wrecks and the night is over.</p>
     </div>
-    <span class="bezel"><img class="px" src="img/keeper.gif" width="640" height="172" alt="Lighthouse Keeper being played: ships move in on three lanes"></span>
+    <span class="bezel"><video class="px loop" src="img/loop-keeper.mp4" poster="img/loop-keeper.png" width="640" height="172" muted loop playsinline preload="none" aria-label="Lighthouse Keeper being played, recorded from the board: the lamp turns four ships away"></video></span>
   </section>
 
   <section class="wrap feat" aria-labelledby="h-radio">
@@ -224,8 +232,8 @@ footer p { margin: 0; }
       <p class="lede">Add stations from your phone: search thousands of them or paste a stream link (MP3 and AAC work). The alarm wakes you with it.</p>
     </div>
     <div class="shots">
-      <span class="bezel"><img class="px" src="img/radio-vfd.gif" width="640" height="172" alt="The radio page in the VFD look, with dancers and an equalizer"></span>
-      <span class="bezel"><img class="px" src="img/radio-c64.gif" width="640" height="172" alt="The radio page in the C64-style look"></span>
+      <span class="bezel"><video class="px loop" src="img/loop-radio-vfd.mp4" poster="img/loop-radio-vfd.png" width="640" height="172" muted loop playsinline preload="none" aria-label="The radio page in the VFD look: the dancers and the equalizer move with the music"></video></span>
+      <span class="bezel"><video class="px loop" src="img/loop-radio-amiga.mp4" poster="img/loop-radio-amiga.png" width="640" height="172" muted loop playsinline preload="none" aria-label="The radio page in the Amiga-style look, with a tracker pattern that runs with the music"></video></span>
     </div>
   </section>
 
@@ -245,13 +253,13 @@ footer p { margin: 0; }
     <h2 id="h-more">And many more</h2>
     <p class="lede">Scenes to leave running on your desk, a lava lamp, a few tools, and settings right on the board.</p>
     <ul class="tiles">
-      <li><img class="px" src="img/more-aquarium-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Fish tank</b><span>Tap to feed them, hold for night. Once a day a rare visitor.</span></li>
-      <li><img class="px" src="img/more-sea-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Lighthouse</b><span>Follows the time of day. Hold for a storm.</span></li>
-      <li><img class="px" src="img/more-wave-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Ocean liner</b><span>Tilt the board and the sea tilts with it. Hold for the fog horn.</span></li>
+      <li><video class="px loop" src="img/loop-fish.mp4" poster="img/loop-fish.png" width="640" height="172" muted loop playsinline preload="none" aria-hidden="true"></video><b>Fish tank</b><span>Tap to feed them, hold for night. Once a day a rare visitor.</span></li>
+      <li><video class="px loop" src="img/loop-sea.mp4" poster="img/loop-sea.png" width="640" height="172" muted loop playsinline preload="none" aria-hidden="true"></video><b>Lighthouse</b><span>Follows the time of day. Hold for a storm.</span></li>
+      <li><video class="px loop" src="img/loop-liner.mp4" poster="img/loop-liner.png" width="640" height="172" muted loop playsinline preload="none" aria-hidden="true"></video><b>Ocean liner</b><span>Tilt the board and the sea tilts with it. Hold for the fog horn.</span></li>
       <li><img class="px" src="img/more-study-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Focus timer</b><span>Pomodoro rounds in a little study room.</span></li>
       <li><img class="px" src="img/more-clock-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Clock and alarm</b><span>Big digits, date and battery. The alarm wakes you with the radio.</span></li>
       <li><img class="px" src="img/more-play-c64.png" width="640" height="172" alt="" loading="lazy"><b>Play menu</b><span>Lighthouse Keeper, 21 and the runner. High scores stay on the board.</span></li>
-      <li><img class="px" src="img/more-snow-c64.png" width="640" height="172" alt="" loading="lazy"><b>Snowy cabin</b><span>Shake it to stir the snow, hold it for a snow globe.</span></li>
+      <li><video class="px loop" src="img/loop-snow-c64.mp4" poster="img/loop-snow-c64.png" width="640" height="172" muted loop playsinline preload="none" aria-hidden="true"></video><b>Snowy cabin</b><span>Shake it to stir the snow, hold it for a snow globe.</span></li>
       <li><img class="px" src="img/more-hourglass-c64.png" width="640" height="172" alt="" loading="lazy"><b>Hourglass</b><span>Tip the board over to turn it.</span></li>
       <li><img class="px" src="img/more-runner-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Runner</b><span>Tap the top to jump, the bottom to duck. The scenery changes every 400 m.</span></li>
       <li><img class="px" src="img/more-tools-vfd.png" width="640" height="172" alt="" loading="lazy"><b>Tools</b><span>Spirit level, coin flip, box breathing, scoreboard and a screen lamp.</span></li>
@@ -311,6 +319,10 @@ footer p { margin: 0; }
       </ol>
 
       <h3>Troubleshooting</h3>
+      <figure class="buttons">
+        <img src="img/buttons.jpg" width="1000" height="481" alt="The back edge of the board: the BOOT, PWR and RESET buttons on the left, the speaker in the middle" loading="lazy">
+        <figcaption>The buttons are on the back edge. Most fixes below start with <b>BOOT</b>.</figcaption>
+      </figure>
       <dl>
         <dt>No "USB JTAG/serial debug unit" in the port list</dt>
         <dd>Try another cable (many only charge) or another USB port. Still nothing: hold <b>BOOT</b> on the back while you
@@ -372,6 +384,17 @@ function show(i) {
 }
 btns.forEach((b, i) => b.addEventListener('click', () => { clearInterval(timer); show(i); }));
 if (!matchMedia('(prefers-reduced-motion: reduce)').matches) timer = setInterval(() => show((cur + 1) % imgs.length), 2600);
+
+const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// The short loops recorded from the board play only while they are on screen (and not at all with reduced motion:
+// the poster is their first frame).
+if (!calm) {
+  const seen = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) e.target.play().catch(() => {}); else e.target.pause();
+  }), { threshold: .25 });
+  document.querySelectorAll('video.loop').forEach(v => seen.observe(v));
+}
 
 // Live star count from the GitHub API; the buttons work without it.
 fetch('https://api.github.com/repos/melihkoray/phosphor')
