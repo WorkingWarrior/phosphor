@@ -4,8 +4,9 @@
 [![Built and signed by GitHub Actions](https://img.shields.io/badge/built%20%26%20signed-GitHub%20Actions-2ea44f?logo=githubactions&logoColor=white)](https://github.com/melihkoray/phosphor/attestations)
 [![VirusTotal: 0 of 61 engines](https://img.shields.io/badge/VirusTotal-0%2F61%20(v1.0.2)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/76c78b370eb964d81868a291831b9b6ec8567f1719e10fcf8d736a7a624806da)
 
-A retro VFD-style desk gadget for the **Waveshare ESP32-S3-Touch-LCD-3.49** (640×172 bar display). Clock, weather,
-internet radio, focus timer and a set of slow pixel scenes, all drawn to look like an old vacuum-fluorescent display.
+A retro desk gadget for the **Waveshare ESP32-S3-Touch-LCD-3.49** (640×172 bar display). Clock, weather, internet
+radio, timers, pixel scenes, three games and a few small tools, in four looks: an old vacuum-fluorescent display (VFD),
+C64-style, Amiga-style and 2600-style. Every page is drawn again for each look.
 
 ![Phosphor in the hand: tilting the board tilts the sea under the liner](media/hero.gif)
 
@@ -15,22 +16,88 @@ internet radio, focus timer and a set of slow pixel scenes, all drawn to look li
 > Installing replaces whatever runs on the board now, the Waveshare factory demo included. It is not backed up and
 > Phosphor cannot restore it. On a first install, tick **Erase device** in the installer for a clean start.
 
+## New in v2.0.0
+
+- **Four looks.** VFD, C64-style, Amiga-style and 2600-style, each with its own palette, 8×8 font and page layouts.
+  The pixel scenes are redrawn in each machine's resolution and colors.
+- **Play menu:** Lighthouse Keeper (an original game in the style of 1980s handheld LCD games), 21 against a cartoon
+  dealer (you can knock on the table to play) and an endless runner.
+- **Tools menu:** spirit level, coin flip, box breathing, scoreboard and a screen lamp.
+- **Settings on the board itself:** look, clock style, °C or °F, language, brightness, city, auto page turn, holiday
+  lights, night dimming, which pages show, help for every gesture, Wi-Fi and About.
+- **Scenes you can touch:** feed the fish, wake the cat, call up a storm at the lighthouse, sound the ship's fog horn,
+  hold the snowy cabin for a snow globe.
+- **Update notice.** Once a day the board looks at the installer page for a newer version and says so in
+  Settings > About. It never updates itself.
+- Battery percentage from a Li-ion curve, a short hint the first time you open each page, and a fix for a rare boot
+  loop at start-up (also in v1.0.x).
+
+**Coming from v1.0.x:** install once more from the [installer page](https://melihkoray.github.io/phosphor/) over USB and
+leave **Erase device** unticked. The flash layout changed, so this one step cannot happen over Wi-Fi. Your Wi-Fi,
+city, stations and other settings are kept.
+
+## Four looks
+
+| ![Clock in the VFD look](media/screens/clock-vfd.png) | ![Clock in the C64-style look](media/screens/clock-c64.png) |
+|---|---|
+| VFD | C64-style |
+| ![Clock in the Amiga-style look](media/screens/clock-amiga.png) | ![Clock in the 2600-style look](media/screens/clock-2600.png) |
+| Amiga-style | 2600-style |
+| ![Snowy cabin, Amiga-style](media/screens/snow-amiga.png) | ![Fireplace with the cat, C64-style](media/screens/fire-c64.png) |
+| ![Lighthouse, 2600-style](media/screens/sea-2600.png) | ![Weather, C64-style](media/screens/weather-c64.png) |
+
+Change the look in **Settings > Theme** on the board.
+
 ## What it does
+
+The pages, shown here in the VFD look:
 
 | | |
 |---|---|
-| ![Clock](media/clock.gif) | **Clock.** Big segment digits, date, battery, 12 or 24 hour. Alarm: tap the right column to switch it on and set the time; it wakes you with the radio. |
-| ![Weather](media/weather.gif) | **Weather.** Now and the next three days for your city ([Open-Meteo](https://open-meteo.com), no key). |
-| ![Radio](media/radio.gif) | **Internet radio.** Up to 7 genre buttons; tap again for the next station. Tested with MP3 and AAC streams. |
+| ![Clock](media/clock.gif) | **Clock.** Big segment digits, date, battery, 12 or 24 hour. Alarm: tap the bell to switch it on or off, tap the alarm hours (+1) or minutes (+5) to set it; it wakes you with the radio. |
+| ![Weather](media/weather.gif) | **Weather.** Now and the next three days for your city ([Open-Meteo](https://open-meteo.com), no key). Tap for the days after. |
+| ![Radio](media/radio.gif) | **Internet radio.** Up to 7 genre buttons; tap again for the next station. Dancers and an equalizer move with the music (hold them for another look). Tested with MP3 and AAC streams. |
 | ![Timer](media/timer.gif) | **Timer.** Add or remove 1, 5 or 10 minutes by touch, up to 99; it rings at the end. |
 | ![Study](media/study.gif) | **Focus timer.** Pomodoro rounds in a little study room. |
 
-Pixel scenes, to leave running: aquarium, snowy cabin, fireplace with a sleeping cat, seaside that follows the time of day, an ocean liner
-that tilts with the board, a lava lamp and an hourglass you turn over.
+Pixel scenes, to leave running:
+
+- **Fish tank:** tap to feed, hold for night. Once a day a rare visitor.
+- **Snowy cabin:** tap or shake to stir the snow, hold for a snow globe; holiday lights in winter.
+- **Fireplace:** a cat sleeps by the fire. Tap to wake it, tilt the board for a ball of yarn, hold to add a log.
+- **Lighthouse:** follows the time of day. Tap for a big wave, hold for a storm.
+- **Ship:** an ocean liner that tilts with the board. Hold for the fog horn; now and then a whale.
+- **Lava lamp** (tap for new colors) and an **hourglass** you turn over by tilting the board.
 
 | ![Snow](media/snow.gif) | ![Fireplace](media/fire.gif) |
 |---|---|
 | ![Seaside](media/sea.gif) | ![Aquarium](media/aquarium.gif) |
+
+### Play
+
+| | |
+|---|---|
+| ![Lighthouse Keeper](media/screens/keeper.png) | **Lighthouse Keeper.** Ships head for the rocks in three lanes; tap a lane to light it and turn the ship away. Fixed LCD segments with their faint ghosts, Game A and Game B, three misses and it is over. |
+| ![21](media/screens/21-c64.png) | **21.** Blackjack against a cartoon dealer, ten hands a match. Tap HIT or STAND, or knock on the table: once to stand, twice to hit. |
+| ![Runner](media/screens/runner-amiga.png) | **Runner.** Tap the top of the screen to jump, the bottom to duck. Archers, bugs, pits and ledges; the scenery changes every 400 m. |
+
+High scores are kept on the board.
+
+### Tools
+
+![The Tools menu, 2600-style](media/screens/tools-2600.png)
+
+Spirit level (tap sets zero), coin flip (tap or shake), box breathing (4-4-4-4), scoreboard (tap +1, hold −1) and a
+screen lamp (tap for a color, swipe up or down for brightness). In any app or game, swipe sideways to go back to its
+menu (in a game, from the pause or title screen).
+
+### Settings on the board
+
+![The Settings page, Amiga-style](media/screens/settings-amiga.png)
+
+The last page. Look, clock style, temperature unit, language (English or Turkish), brightness, city, auto page turn,
+holiday lights, night dimming, which pages show, help pages for every gesture, Wi-Fi (with a QR code that opens the
+settings page on your phone) and About (version, and a note when a newer one is out).
 
 ## Setup
 
@@ -41,11 +108,11 @@ that tilts with the board, a lava lamp and an hourglass you turn over.
    password); a setup page opens. If it does not, or the browser shows normal websites, turn off mobile data and type
    `http://192.168.4.1` in the browser (if you see a menu, tap **Configure WiFi**). Tap your
    home Wi-Fi (2.4 GHz), type its password, scroll down to **Device name** (prefilled as `phosphor-1a2b`, change it to
-   something short like **`desk`**: this is the name you type in the next step) and tap **Save**. **Write the name down: you need it in the next step and
-   the board does not show it anywhere.**
+   something short like **`desk`**: this is the name you type in the next step) and tap **Save**. Write the name down.
+   (Lost it? **Settings > Wi-Fi** on the board shows its IP address and a QR code for the settings page.)
 3. With the phone back on your home Wi-Fi (mobile data on again), open `http://<device name>.local/settings` with the
    name from step 2, for example `http://desk.local/settings`. If the phone cannot open `.local` addresses
-   (some Android phones), use the board's IP address from your router's device list. There you set:
+   (some Android phones), use the board's IP address from **Settings > Wi-Fi**. There you set:
    - **City:** search by name; weather and the time zone follow it.
    - **Language:** English or Turkish screen texts.
    - **Clock:** 12 or 24 hour.
@@ -56,9 +123,9 @@ that tilts with the board, a lava lamp and an hourglass you turn over.
 Settings are stored on the board and survive restarts and updates (a reinstall with **Erase device** clears them).
 
 **Touch:** swipe left for the next page, right for the previous one, up or down for the volume; taps work the page's
-own buttons. Hold on the clock to switch the alarm on or off, hold on a timer to reset it. Back buttons: PWR turns the
-screen off and on (hold 3 s on battery to power off), BOOT changes brightness (hold 5 s to forget Wi-Fi and open the
-setup again), RESET restarts.
+own buttons. Hold on the clock to switch the alarm on or off, hold on a timer to reset it. **Settings > Help** on the
+board lists every gesture. Back buttons: PWR turns the screen off and on (hold 3 s on battery to power off), BOOT
+changes brightness (hold 5 s to forget Wi-Fi and open the setup again), RESET restarts.
 
 ## Troubleshooting
 
@@ -70,10 +137,10 @@ setup again), RESET restarts.
   again until you finish it. (After a restart with a failing saved Wi-Fi it opens by itself, but only for 3 minutes.)
 - **The setup page does not open, or the browser shows normal websites:** the phone is on mobile data. Turn it off,
   stay joined to `Phosphor-Setup-…` ("no internet" is normal) and type `http://192.168.4.1` in the browser.
-- **Forgot the device name:** look in your router's list of connected devices, or hold BOOT for 5 seconds and set up
-  the Wi-Fi again.
+- **Forgot the device name:** **Settings > Wi-Fi** on the board shows the IP address and a QR code for the settings
+  page. Your router's list of connected devices has it too.
 - **`desk.local` does not open:** be on the same Wi-Fi as the board. Some Android phones cannot open `.local`: use a
-  computer, or the board's IP from your router's device list (`GET /status` also shows it).
+  computer, or the board's IP address.
 - **A station does not play:** use Test on the settings page. MP3 and AAC streams are tested.
 
 ## Building it yourself
@@ -92,7 +159,7 @@ arduino-cli core install esp32:esp32@3.3.12 --additional-urls https://espressif.
 To update over Wi-Fi, copy `firmware/secrets.h.example` to `firmware/secrets.h`, set a long random `OTA_TOKEN`, flash
 once over USB, then `./build.sh desk.local`. Without a token, Wi-Fi updates are switched off.
 
-Every push to `main` is built by GitHub Actions and published to the installer page; tags (`v1.0.0`) become releases.
+Every push to `main` is built by GitHub Actions and published to the installer page; tags (`v2.0.0`) become releases.
 
 ## HTTP API
 
@@ -102,8 +169,10 @@ The main endpoints, plain HTTP on your local network (`GET /status` also tells y
 |---|---|
 | `GET /status` | JSON status (IP, page, battery, ...) |
 | `GET /screen` | the current screen, raw RGB565 640×172 |
-| `POST /page` `name=clock\|radio\|weather\|timer\|aquarium\|snow\|fire\|sea\|study\|wave\|lava\|hourglass` | show a page |
-| `POST /cmd` `name=radio arg=next\|stop\|<index>` | radio control (also `vol`, `alarm`, `timer`, `theme arg=vfd\|ega\|natural`) |
+| `POST /page` `name=clock\|radio\|weather\|timer\|study\|hourglass\|aquarium\|snow\|fire\|sea\|wave\|lava\|tools\|play\|settings` | show a page |
+| `POST /cmd` `name=radio arg=next\|stop\|toggle\|<index>` | radio control (also `vol`, `alarm`, `timer`) |
+| `POST /cmd` `name=theme arg=vfd\|c64\|amiga\|atari` | change the look |
+| `POST /cmd` `name=app arg=fener\|blackjack\|runner\|level\|coin\|breathe\|score\|lamp\|close` | open an app or game, or close it |
 | `POST /text` `text=... title=... ttl=60` | show a message |
 | `GET/POST /api/settings` | the settings as `key=value` lines (POST needs the header `X-Phosphor: 1`) |
 | `POST /update` | firmware update, needs the `X-Token` header (see above) |
@@ -115,8 +184,10 @@ The main endpoints, plain HTTP on your local network (`GET /status` also tells y
   browser cannot change them. Do not expose the device to the internet.
 - Firmware updates, renaming and Wi-Fi reset over the network need `OTA_TOKEN`; the published builds have none, so
   those are off.
-- There is no microphone code and no cloud account. The board talks to Open-Meteo (weather), NTP servers (time) and the
-  radio streams you choose (weather is fetched over plain HTTP); the settings page in your phone's browser also talks to Open-Meteo geocoding and Radio Browser.
+- There is no microphone code and no cloud account. The board talks to Open-Meteo (weather), NTP servers (time), the
+  radio streams you choose (weather is fetched over plain HTTP) and, once a day, the installer page
+  (`melihkoray.github.io`, HTTPS) to read the latest version number. The settings page in your phone's browser also
+  talks to Open-Meteo geocoding and Radio Browser.
 - The installer and the release files are built by GitHub Actions on GitHub's servers from this repository
   ([workflow](.github/workflows/build.yml)), not on anyone's computer. Since 22 Nov 2026 every build also gets a
   `SHA256SUMS.txt` and a signed [build provenance attestation](https://github.com/melihkoray/phosphor/attestations): to
@@ -126,9 +197,15 @@ The main endpoints, plain HTTP on your local network (`GET /status` also tells y
 ## Credits and license
 
 GPL-3.0, see [LICENSE](LICENSE). Uses [ESP32-audioI2S](https://github.com/schreibfaul1/ESP32-audioI2S) (GPL-3.0,
-vendored in `libraries/`), [U8g2](https://github.com/olikraus/u8g2) (BSD-2-Clause),
-[WiFiManager](https://github.com/tzapu/WiFiManager) (MIT), [SensorLib](https://github.com/lewisxhe/SensorLib) (MIT),
-the Espressif AXS15231B display and touch drivers (Apache-2.0) and
-[ESP Web Tools](https://esphome.github.io/esp-web-tools/) for the installer. Not affiliated with Waveshare.
+vendored in `libraries/`), [QRCode](https://github.com/ricmoo/qrcode) (MIT, vendored in `libraries/`),
+[U8g2](https://github.com/olikraus/u8g2) (BSD-2-Clause), [WiFiManager](https://github.com/tzapu/WiFiManager) (MIT),
+[SensorLib](https://github.com/lewisxhe/SensorLib) (MIT), the Espressif AXS15231B display and touch drivers
+(Apache-2.0) and [ESP Web Tools](https://esphome.github.io/esp-web-tools/) for the installer.
+
+The pictures behind the scenes in the C64-style, Amiga-style and 2600-style looks were generated with an AI image
+model (the prompts are in [`design/retro-proto/gen/`](design/retro-proto/gen)), then cut down to each machine's
+resolution, palette and color limits by [`convert.py`](design/retro-proto/convert.py). The 8×8 fonts are drawn for
+this project; no ROM fonts are copied. Commodore 64, Amiga and Atari 2600 are trademarks of their owners; the looks
+are only in their style. Not affiliated with Waveshare.
 
 Made by [Melih Koray](https://melihkoray.com).

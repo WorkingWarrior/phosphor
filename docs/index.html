@@ -37,12 +37,23 @@ esp-web-install-button button[slot=activate] {
 .star-count { font: 600 16px ui-monospace, Menlo, monospace; border-left: 1px solid currentColor; padding-left: 12px; }
 .star-note { flex: 1 1 200px; margin: 0; color: var(--dim); font-size: 14px; }
 .star.end { margin: 44px 0 0; padding-top: 28px; border-top: 1px solid var(--line); }
+.looks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 28px; }
+.looks figure { margin: 0; } .looks img { display: block; width: 100%; height: auto; border-radius: 6px; image-rendering: pixelated; }
+.looks figcaption { color: var(--dim); font: 12px ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
+@media (max-width: 480px) { .looks { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <main>
   <h1>Phosphor</h1>
-  <p class="lead">A retro VFD-style desk gadget for the Waveshare ESP32-S3-Touch-LCD-3.49: clock, weather, internet radio, focus timer and pixel scenes.</p>
+  <p class="lead">A retro desk gadget for the Waveshare ESP32-S3-Touch-LCD-3.49: clock, weather, internet radio, timers, pixel scenes, three games and small tools, in four looks.</p>
+
+  <div class="looks">
+    <figure><img src="img/clock-vfd.png" width="640" height="172" alt="Clock in the VFD look"><figcaption>VFD</figcaption></figure>
+    <figure><img src="img/clock-c64.png" width="640" height="172" alt="Clock in the C64-style look"><figcaption>C64-style</figcaption></figure>
+    <figure><img src="img/clock-amiga.png" width="640" height="172" alt="Clock in the Amiga-style look"><figcaption>Amiga-style</figcaption></figure>
+    <figure><img src="img/clock-2600.png" width="640" height="172" alt="Clock in the 2600-style look"><figcaption>2600-style</figcaption></figure>
+  </div>
 
   <div class="star">
     <a class="star-btn" href="https://github.com/melihkoray/phosphor">
@@ -62,7 +73,7 @@ esp-web-install-button button[slot=activate] {
     <span slot="unsupported">This browser cannot talk to USB devices. Use Chrome or Edge on a computer.</span>
     <span slot="not-allowed">The installer needs a secure page (https).</span>
   </esp-web-install-button>
-  <p class="small">Already running Phosphor 1.0.x? Leave <b>Erase device</b> unticked this once and your Wi-Fi and settings stay. From 1.1 on, the installer recognises the board and offers <b>Update</b> by itself.</p>
+  <p class="small">Already running Phosphor 1.0.x? Install once from here and leave <b>Erase device</b> unticked: your Wi-Fi and settings stay. From then on the installer recognises the board and offers <b>Update</b> by itself, and the board tells you in <b>Settings &gt; About</b> when a newer version is out.</p>
 
   <h2>Steps</h2>
   <ol>
@@ -83,7 +94,7 @@ esp-web-install-button button[slot=activate] {
           Keep it or change it to something short like <b><code>desk</code></b>: this is the name you type in the next
           step.
           <div class="warn" style="margin:10px 0"><b>Write this name down.</b> You need it in the next step to reach
-          the settings, and the board does not show it anywhere else.</div></li>
+          the settings. (Lost it later? <b>Settings &gt; Wi-Fi</b> on the board shows its IP address and a QR code.)</div></li>
         <li>tap <b>Save</b>. The board joins your Wi-Fi and shows the clock. Turn mobile data back on.</li>
       </ol></li>
     <li>With the phone back on your home Wi-Fi, open <code>http://&lt;your device name&gt;.local/settings</code> with the
@@ -120,7 +131,7 @@ esp-web-install-button button[slot=activate] {
 
     <dt><code>desk.local</code> does not open</dt>
     <dd>The phone must be on the same Wi-Fi as the board. Some Android phones cannot open <code>.local</code> addresses:
-      use a computer, or the board's IP address from your router's list of connected devices
+      use a computer, or the board's IP address from <b>Settings &gt; Wi-Fi</b> on the board
       (<code>http://192.168.x.x/settings</code>).</dd>
 
     <dt>A radio station does not play</dt>
