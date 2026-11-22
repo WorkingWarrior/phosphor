@@ -6,9 +6,10 @@
 
 ![Phosphor on the Waveshare 3.49" bar: the snowy cabin, the fireplace, the ocean liner, the radio, 21, a storm and the fish tank](media/readme/board-3d.webp)
 
-Phosphor turns the **Waveshare ESP32-S3-Touch-LCD-3.49**, a 640×172 bar display, into a retro desk gadget: a clock,
-weather, internet radio, timers, pixel scenes to leave running, three games and a few small tools. Every page is drawn
-four times, as an old vacuum-fluorescent display (VFD), C64-style, Amiga-style and 2600-style.
+Phosphor turns the **[Waveshare ESP32-S3-Touch-LCD-3.49](https://www.waveshare.com/esp32-s3-touch-lcd-3.49.htm)**,
+a 640×172 bar display, into a retro desk gadget: a clock, weather, internet radio, timers, pixel scenes to leave
+running, three games and a few small tools. Every page is drawn four times, as an old vacuum-fluorescent display
+(VFD), C64-style, Amiga-style and 2600-style.
 
 ![The same clock and scenes in the VFD, C64, Amiga and 2600 looks](media/readme/hero.gif)
 
@@ -112,6 +113,8 @@ holiday lights, night dimming, which pages show, help pages for every gesture, W
 settings page on your phone) and About (version, and a note when a newer one is out).
 
 ## Setup
+
+You need the [Waveshare ESP32-S3-Touch-LCD-3.49](https://www.waveshare.com/esp32-s3-touch-lcd-3.49.htm) and a USB-C data cable.
 
 1. Open the [installer page](https://melihkoray.github.io/phosphor/), connect the board with a USB-C data cable, press
    **Install Phosphor** and pick **USB JTAG/serial debug unit** from the port list (`cu.usbmodem…` on a Mac, `COMx` on
