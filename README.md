@@ -4,11 +4,11 @@
 [![Built and signed by GitHub Actions](https://img.shields.io/badge/built%20%26%20signed-GitHub%20Actions-2ea44f?logo=githubactions&logoColor=white)](https://github.com/melihkoray/phosphor/attestations)
 [![VirusTotal: 0 of 61 engines](https://img.shields.io/badge/VirusTotal-0%2F61%20(v2.0.0)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/d247cd729a6fe92ad5cbd1ab439eb3e935a6f67bbce1772ae09508605da895f5)
 
-A retro desk gadget for the **Waveshare ESP32-S3-Touch-LCD-3.49** (640×172 bar display). Clock, weather, internet
-radio, timers, pixel scenes, three games and a few small tools, in four looks: an old vacuum-fluorescent display (VFD),
-C64-style, Amiga-style and 2600-style. Every page is drawn again for each look.
+![Phosphor on the Waveshare 3.49" bar: the same clock and scenes in the VFD, C64, Amiga and 2600 looks](media/readme/hero.gif)
 
-![Phosphor in the hand: tilting the board tilts the sea under the liner](media/hero.gif)
+Phosphor turns the **Waveshare ESP32-S3-Touch-LCD-3.49**, a 640×172 bar display, into a retro desk gadget: a clock,
+weather, internet radio, timers, pixel scenes to leave running, three games and a few small tools. Every page is drawn
+four times, as an old vacuum-fluorescent display (VFD), C64-style, Amiga-style and 2600-style.
 
 **[Install from the browser →](https://melihkoray.github.io/phosphor/)** (Chrome or Edge, USB cable, no tools needed)
 
@@ -16,12 +16,50 @@ C64-style, Amiga-style and 2600-style. Every page is drawn again for each look.
 > Installing replaces whatever runs on the board now, the Waveshare factory demo included. It is not backed up and
 > Phosphor cannot restore it. On a first install, tick **Erase device** in the installer for a clean start.
 
+## Knock on the table to play 21
+
+![21 against a cartoon dealer, Amiga-style](media/readme/21.gif)
+
+Blackjack against a cartoon dealer, ten hands a match. You don't have to touch the screen: the board's motion sensor
+feels your knuckles on the table. Knock once to stand, twice to hit.
+
+## Lighthouse Keeper
+
+![Lighthouse Keeper](media/readme/keeper.gif)
+
+My own game in the style of the 1980s handheld LCD games. Ships head for the rocks in three lanes; tap a lane to light
+it and turn the ship away. Fixed segments with their faint ghosts, Game A and Game B, three misses and the night is
+over.
+
+## Internet radio
+
+![The radio page in the VFD look](media/readme/radio-vfd.gif)
+![The radio page, C64-style](media/readme/radio-c64.gif)
+
+Up to seven genre buttons; tap one again for the next station. The dancers and the equalizer move with the music.
+Find stations on the settings page through [Radio Browser](https://www.radio-browser.info) or paste your own stream
+(MP3 and AAC). The alarm wakes you with it.
+
+## One page, four machines
+
+![The snowy cabin, the fireplace and the weather in the VFD, C64-style, Amiga-style and 2600-style looks](media/readme/machines.png)
+
+The scenes are redrawn in each machine's resolution and colors, not just recolored: 16 colors on the C64, 32 out of
+4096 on the Amiga, 4 per line on the 2600. Change the look in **Settings > Theme** on the board.
+
+## And many more
+
+![Fish tank, lighthouse, ocean liner, focus timer, clock and alarm, play menu, snowy cabin, hourglass, runner, tools, coin flip and settings](media/readme/more.png)
+
+And the real board on my desk (tilting it tilts the sea under the liner):
+
+![Phosphor in the hand: tilting the board tilts the sea under the liner](media/hero.gif)
+
 ## New in v2.0.0
 
 - **Four looks.** VFD, C64-style, Amiga-style and 2600-style, each with its own palette, 8×8 font and page layouts.
   The pixel scenes are redrawn in each machine's resolution and colors.
-- **Play menu:** Lighthouse Keeper (an original game in the style of 1980s handheld LCD games), 21 against a cartoon
-  dealer (you can knock on the table to play) and an endless runner.
+- **Play menu:** Lighthouse Keeper, 21 against a cartoon dealer (knock on the table to play) and an endless runner.
 - **Tools menu:** spirit level, coin flip, box breathing, scoreboard and a screen lamp.
 - **Settings on the board itself:** look, clock style, °C or °F, language, brightness, city, auto page turn, holiday
   lights, night dimming, which pages show, help for every gesture, Wi-Fi and About.
@@ -35,18 +73,6 @@ C64-style, Amiga-style and 2600-style. Every page is drawn again for each look.
 **Coming from v1.0.x:** install once more from the [installer page](https://melihkoray.github.io/phosphor/) over USB and
 leave **Erase device** unticked. The flash layout changed, so this one step cannot happen over Wi-Fi. Your Wi-Fi,
 city, stations and other settings are kept.
-
-## Four looks
-
-| ![Clock in the VFD look](media/screens/clock-vfd.png) | ![Clock in the C64-style look](media/screens/clock-c64.png) |
-|---|---|
-| VFD | C64-style |
-| ![Clock in the Amiga-style look](media/screens/clock-amiga.png) | ![Clock in the 2600-style look](media/screens/clock-2600.png) |
-| Amiga-style | 2600-style |
-| ![Snowy cabin, Amiga-style](media/screens/snow-amiga.png) | ![Fireplace with the cat, C64-style](media/screens/fire-c64.png) |
-| ![Lighthouse, 2600-style](media/screens/sea-2600.png) | ![Weather, C64-style](media/screens/weather-c64.png) |
-
-Change the look in **Settings > Theme** on the board.
 
 ## What it does
 
@@ -77,7 +103,7 @@ Pixel scenes, to leave running:
 
 | | |
 |---|---|
-| ![Lighthouse Keeper](media/screens/keeper.png) | **Lighthouse Keeper.** Ships head for the rocks in three lanes; tap a lane to light it and turn the ship away. Fixed LCD segments with their faint ghosts, Game A and Game B, three misses and it is over. |
+| ![Lighthouse Keeper](media/screens/keeper.png) | **Lighthouse Keeper.** Ships head for the rocks in three lanes; tap a lane to light it and turn the ship away. Game A is slower, Game B faster with more ships. Three misses and it is over. |
 | ![21](media/screens/21-c64.png) | **21.** Blackjack against a cartoon dealer, ten hands a match. Tap HIT or STAND, or knock on the table: once to stand, twice to hit. |
 | ![Runner](media/screens/runner-amiga.png) | **Runner.** Tap the top of the screen to jump, the bottom to duck. Archers, bugs, pits and ledges; the scenery changes every 400 m. |
 

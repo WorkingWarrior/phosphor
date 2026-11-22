@@ -3,152 +3,376 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Phosphor installer</title>
-<meta name="description" content="Install Phosphor on a Waveshare ESP32-S3-Touch-LCD-3.49 from the browser.">
+<title>Phosphor: retro firmware for the ESP32-S3 bar screen</title>
+<meta name="description" content="Phosphor 2.0 for the Waveshare ESP32-S3-Touch-LCD-3.49: every page as VFD, C64, Amiga 500 and Atari 2600, a game of 21 you play by knocking on the table, internet radio. Install it from the browser.">
+<meta property="og:title" content="Phosphor 2.0">
+<meta property="og:description" content="Retro firmware for the Waveshare ESP32-S3-Touch-LCD-3.49. Install it from the browser.">
+<meta property="og:image" content="https://melihkoray.github.io/phosphor/img/hero-amiga.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500;62..125,600;62..125,800&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script type="module" src="https://unpkg.com/esp-web-tools@10.1.0/dist/web/install-button.js?module"></script>
 <style>
 :root {
-  --bg: #07100f; --panel: #0d1a19; --line: #1c302e; --text: #cfe9e5; --dim: #7fa29d; --lit: #6ff3e0; --hot: #ff3ea5;
+  --bg: oklch(0.15 0.012 205); --bg2: oklch(0.185 0.014 205); --line: oklch(0.29 0.02 205);
+  --text: oklch(0.94 0.012 195); --dim: oklch(0.72 0.02 200); --lit: oklch(0.87 0.13 178); --hot: oklch(0.68 0.24 0);
+  --ink: oklch(0.2 0.04 180);
+  --case: oklch(0.63 0.15 252); --case-hi: oklch(0.72 0.13 248); --case-lo: oklch(0.47 0.14 258); --case-deep: oklch(0.36 0.11 262);
+  --glow: oklch(0.6 0.2 285 / .6);
+  --ease: cubic-bezier(.22, 1, .36, 1);
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
-main { max-width: 640px; margin: 0 auto; padding: 48px 16px 80px; }
-h1 { font: 600 14px/1 ui-monospace, Menlo, monospace; letter-spacing: .2em; color: var(--lit); text-transform: uppercase; margin: 0 0 18px; }
-.lead { font-size: 22px; line-height: 1.35; margin: 0 0 28px; }
-h2 { font: 600 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); margin: 36px 0 12px; }
-ol { padding-left: 20px; margin: 0; } li { margin: 6px 0; } ol ol { margin-top: 4px; }
-dt { font-weight: 600; margin: 18px 0 4px; } dd { margin: 0; color: var(--text); }
-.warn { border: 1px solid var(--hot); border-radius: 10px; padding: 14px 16px; margin: 0 0 24px; }
-.warn b { color: var(--hot); }
-code { font: 14px ui-monospace, Menlo, monospace; color: var(--lit); }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--text); font: 500 17px/1.6 "Archivo", system-ui, sans-serif; font-stretch: 100%; }
 a { color: var(--lit); }
+code { font: 500 .88em "IBM Plex Mono", ui-monospace, monospace; color: var(--lit); }
+img { max-width: 100%; }
+.px { image-rendering: pixelated; }
+.nw { white-space: nowrap; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 20px; }
+h1, h2 { font-weight: 800; font-stretch: 74%; text-transform: uppercase; letter-spacing: -.005em; margin: 0; }
+h2 { font-size: clamp(34px, 5vw, 62px); line-height: .95; margin-bottom: 18px; }
+.lede { color: var(--dim); max-width: 44ch; margin: 0; }
+.lede b { color: var(--text); font-weight: 600; }
+
+/* hero: the board on a dark stage */
+.hero { position: relative; padding: 34px 0 72px; text-align: center; overflow: hidden; }
+.hero::before { content: ""; position: absolute; left: 50%; top: -30%; width: 140%; height: 90%; transform: translateX(-50%);
+  background: radial-gradient(closest-side, oklch(0.3 0.03 220 / .55), transparent); pointer-events: none; }
+.stage { position: relative; margin: 34px auto 0; width: min(88vw, 900px); perspective: 2200px; }
+.stage::after { content: ""; position: absolute; left: 6%; right: 6%; top: 74%; height: 46%; background: var(--glow);
+  filter: blur(70px); z-index: -1; transition: background .8s var(--ease); }
+.device { --w: min(88vw, 900px); --u: calc(var(--w) / 98.5); position: relative; width: var(--w); height: calc(var(--u) * 34.8);
+  transform-style: preserve-3d; transform: rotateX(11deg) rotateY(19deg) rotateZ(-1.5deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .device { animation: drift 9s var(--ease) infinite alternate; }
+  @keyframes drift { to { transform: rotateX(8deg) rotateY(13deg) rotateZ(-1deg); } }
+}
+.face { position: absolute; }
+.front { inset: 0; border-radius: calc(var(--u) * 3); transform: translateZ(0);
+  background: linear-gradient(160deg, var(--case-hi), var(--case) 38%, var(--case-lo));
+  box-shadow: inset 0 calc(var(--u) * .35) 0 oklch(0.8 0.1 245 / .7), inset 0 calc(var(--u) * -.4) 0 oklch(0.4 0.12 260 / .6); }
+.bottom { left: calc(var(--u) * 1.2); width: calc(var(--u) * 96.1); height: calc(var(--u) * 17.3); top: 100%;
+  transform-origin: top; transform: rotateX(-90deg); background: linear-gradient(oklch(0.32 0.1 260), oklch(0.2 0.06 262)); }
+.endcap { left: 0; top: calc(var(--u) * 1.2); width: calc(var(--u) * 17.3); height: calc(var(--u) * 32.4);
+  transform-origin: left; transform: rotateY(90deg); background: linear-gradient(90deg, oklch(0.5 0.14 256), oklch(0.36 0.11 260)); border-radius: calc(var(--u) * 1.5); }
+.usb { position: absolute; left: calc(var(--u) * 4); top: 50%; width: calc(var(--u) * 3.3); height: calc(var(--u) * 9);
+  transform: translateY(-50%); border-radius: 99px; background: oklch(0.22 0.01 250); box-shadow: inset 0 0 0 calc(var(--u) * .5) oklch(0.6 0.01 250); }
+.btn-tab { position: absolute; top: calc(var(--u) * 8.4); width: calc(var(--u) * 7.3); height: calc(var(--u) * 7.6);
+  border: calc(var(--u) * .35) solid oklch(0.16 0.05 262); border-radius: calc(var(--u) * 2.4) calc(var(--u) * 2.4) calc(var(--u) * .8) calc(var(--u) * .8); }
+.grille { position: absolute; top: calc(var(--u) * 11.5); height: calc(var(--u) * 5); width: calc(var(--u) * 10.8);
+  background: repeating-linear-gradient(90deg, oklch(0.1 0.02 262) 0 calc(var(--u) * 1.2), transparent 0 calc(var(--u) * 2)); }
+.glass { position: absolute; left: calc(var(--u) * 2.9); top: calc(var(--u) * 2.9); width: calc(var(--u) * 92.69); height: calc(var(--u) * 28.99);
+  border-radius: calc(var(--u) * .9); background: oklch(0.12 0.005 250); overflow: hidden; transform: translateZ(1px);
+  box-shadow: 0 0 0 calc(var(--u) * .25) oklch(0.36 0.1 258); }
+.screen { position: absolute; left: calc(var(--u) * 5.66); top: calc(var(--u) * 3.3); width: calc(var(--u) * 84); height: calc(var(--u) * 22.58); }
+.screen img { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .5s var(--ease); }
+.screen img.on { opacity: 1; }
+.glass::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(115deg, oklch(1 0 0 / .13) 0 18%, transparent 18.2% 62%, oklch(1 0 0 / .05) 62.2% 70%, transparent 70.2%); }
+.shadow { position: absolute; left: 4%; right: 4%; bottom: -16%; height: 16%; background: oklch(0.05 0.01 250 / .7);
+  filter: blur(18px); border-radius: 50%; transform: translateZ(-40px); }
+
+.looks { display: inline-flex; gap: 4px; margin-top: 46px; padding: 4px; border: 1px solid var(--line); border-radius: 999px; }
+.looks button { font: 600 13px/1 "IBM Plex Mono", monospace; letter-spacing: .06em; color: var(--dim); background: none;
+  border: 0; border-radius: 999px; padding: 11px 16px; cursor: pointer; transition: color .2s var(--ease), background .2s var(--ease); }
+.looks button:hover { color: var(--text); }
+.looks button[aria-pressed=true] { background: var(--text); color: var(--bg); }
+.looks button:focus-visible { outline: 2px solid var(--lit); outline-offset: 2px; }
+h1 { font-size: clamp(56px, 9vw, 120px); line-height: .9; margin: 34px 0 16px; }
+.hero .lede { margin: 0 auto 30px; max-width: 48ch; font-size: clamp(18px, 2.1vw, 22px); }
+.cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: 10px; font: 800 17px/1 "Archivo", sans-serif; font-stretch: 105%;
+  text-decoration: none; padding: 18px 26px; border-radius: 12px; transition: transform .2s var(--ease), background .2s var(--ease), color .2s var(--ease); }
+.btn:active { transform: translateY(1px); }
+.btn.primary { background: var(--lit); color: var(--ink); }
+.btn.primary:hover { background: oklch(0.92 0.11 178); }
+.btn.ghost { color: var(--text); border: 1px solid var(--line); }
+.btn.ghost:hover { border-color: var(--dim); }
+.btn svg { width: 20px; height: 20px; fill: currentColor; }
+.count { font: 600 14px "IBM Plex Mono", monospace; padding-left: 10px; border-left: 1px solid currentColor; }
+.fine { color: var(--dim); font-size: 15px; margin: 18px 0 0; }
+
+/* feature rows */
+.feat { display: grid; grid-template-columns: 5fr 7fr; gap: 56px; align-items: center; padding-block: 88px; border-top: 1px solid var(--line); }
+.feat.flip { grid-template-columns: 7fr 5fr; }
+.feat.flip .copy { order: 2; }
+.feat .copy p + p { margin-top: 14px; }
+.shots { display: grid; gap: 14px; }
+.bezel { display: block; background: oklch(0.11 0.006 250); border-radius: 14px; padding: 10px 12px; }
+.bezel img { display: block; width: 100%; height: auto; }
+.cap { color: var(--dim); font-size: 14px; margin: 8px 0 0 4px; }
+
+/* four machines */
+.machines { padding-block: 88px; border-top: 1px solid var(--line); }
+.machines .lede { margin-bottom: 34px; }
+.grid3 { display: grid; grid-template-columns: 7.2em repeat(3, 1fr); gap: 12px 14px; align-items: center; }
+.grid3 .head, .grid3 .row { color: var(--dim); font-size: 14px; }
+.grid3 .row { font: 600 12px/1.3 "IBM Plex Mono", monospace; letter-spacing: .08em; text-transform: uppercase; }
+.grid3 img { display: block; width: 100%; height: auto; border-radius: 6px; }
+
+/* and many more */
+.more { padding-block: 88px 96px; border-top: 1px solid var(--line); }
+.more h2 { font-size: clamp(44px, 8vw, 104px); }
+.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px 18px; margin: 40px 0 0; padding: 0; list-style: none; }
+.tiles img { display: block; width: 100%; height: auto; border-radius: 6px; }
+.tiles b { display: block; font-weight: 800; font-stretch: 85%; font-size: 19px; margin-top: 12px; }
+.tiles span { color: var(--dim); font-size: 15px; line-height: 1.45; }
+
+/* install */
+.install { padding-block: 88px 40px; border-top: 1px solid var(--line); }
+.install-top { display: grid; grid-template-columns: 5fr 6fr; gap: 48px; align-items: start; }
+.desk video { display: block; width: 100%; height: auto; border-radius: 14px; background: var(--bg2); }
+.desk figcaption { color: var(--dim); font-size: 14px; margin-top: 8px; }
+.warn { border: 1px solid var(--hot); border-radius: 12px; padding: 16px 18px; margin: 0 0 24px; }
+.warn b { color: var(--hot); }
 esp-web-install-button button[slot=activate] {
-  font: 600 16px system-ui, sans-serif; background: var(--lit); color: #04201c; border: 0; border-radius: 10px; padding: 14px 22px; cursor: pointer;
+  font: 800 19px/1 "Archivo", sans-serif; font-stretch: 105%; background: var(--lit); color: var(--ink); border: 0; border-radius: 12px;
+  padding: 20px 30px; cursor: pointer; transition: background .2s var(--ease); }
+esp-web-install-button button[slot=activate]:hover { background: oklch(0.92 0.11 178); }
+.small { color: var(--dim); font-size: 15px; }
+.small b { color: var(--text); }
+.doc { max-width: 720px; }
+.doc h3 { font: 800 30px/1 "Archivo", sans-serif; font-stretch: 74%; text-transform: uppercase; margin: 64px 0 18px; }
+.doc ol { padding-left: 22px; margin: 0; } .doc li { margin: 10px 0; } .doc ol ol { margin-top: 6px; }
+.doc dt { font-weight: 600; margin: 22px 0 4px; } .doc dd { margin: 0; color: var(--dim); }
+.doc dd b { color: var(--text); }
+
+footer { border-top: 1px solid var(--line); margin-top: 72px; padding-block: 44px 64px; }
+footer .row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 22px; }
+footer p { margin: 0; }
+
+@media (max-width: 860px) {
+  .feat, .feat.flip, .install-top { grid-template-columns: 1fr; gap: 30px; }
+  .feat { padding-block: 64px; }
+  .feat.flip .copy { order: 0; }
+  .tiles { grid-template-columns: 1fr 1fr; }
+  .machines, .more, .install { padding-block: 64px; }
 }
-.small { color: var(--dim); font-size: 14px; }
-.star { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin: 0 0 28px; }
-.star-btn {
-  display: inline-flex; align-items: center; gap: 12px; font: 600 19px system-ui, sans-serif; color: var(--lit);
-  text-decoration: none; background: var(--panel); border: 2px solid var(--lit); border-radius: 12px; padding: 15px 24px;
-  transition: background .15s ease-out, color .15s ease-out;
+@media (max-width: 560px) {
+  .grid3 { grid-template-columns: 1fr; } .grid3 .head, .grid3 .corner { display: none; } .grid3 .row { margin-top: 14px; }
+  .tiles { grid-template-columns: 1fr; }
+  .looks button { padding: 10px 12px; }
+  .device { transform: rotateX(9deg) rotateY(16deg) rotateZ(-1deg); }
+  .nw { white-space: normal; } .br { display: none; }
 }
-.star-btn:hover, .star-btn:focus-visible { background: var(--lit); color: #04201c; }
-.star-btn svg { width: 24px; height: 24px; fill: currentColor; flex: none; }
-.star-count { font: 600 16px ui-monospace, Menlo, monospace; border-left: 1px solid currentColor; padding-left: 12px; }
-.star-note { flex: 1 1 200px; margin: 0; color: var(--dim); font-size: 14px; }
-.star.end { margin: 44px 0 0; padding-top: 28px; border-top: 1px solid var(--line); }
-.looks { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 28px; }
-.looks figure { margin: 0; } .looks img { display: block; width: 100%; height: auto; border-radius: 6px; image-rendering: pixelated; }
-.looks figcaption { color: var(--dim); font: 12px ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
-@media (max-width: 480px) { .looks { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <main>
-  <h1>Phosphor</h1>
-  <p class="lead">A retro desk gadget for the Waveshare ESP32-S3-Touch-LCD-3.49: clock, weather, internet radio, timers, pixel scenes, three games and small tools, in four looks.</p>
+  <header class="hero">
+    <div class="wrap">
+      <div class="stage" id="stage">
+        <div class="device" aria-hidden="true">
+          <div class="face bottom">
+            <i class="btn-tab" style="left:calc(var(--u)*8.3)"></i><i class="btn-tab" style="left:calc(var(--u)*18.4)"></i><i class="btn-tab" style="left:calc(var(--u)*28.7)"></i>
+            <i class="grille" style="left:calc(var(--u)*40.6)"></i>
+          </div>
+          <div class="face endcap"><i class="usb"></i></div>
+          <div class="face front">
+            <div class="glass">
+              <div class="screen">
+                <img class="px" src="img/hero-vfd.png" width="640" height="172" alt="">
+                <img class="px" src="img/hero-c64.png" width="640" height="172" alt="">
+                <img class="px on" src="img/hero-amiga.png" width="640" height="172" alt="">
+                <img class="px" src="img/hero-2600.png" width="640" height="172" alt="">
+              </div>
+            </div>
+          </div>
+          <div class="shadow"></div>
+        </div>
+      </div>
+      <div class="looks" role="group" aria-label="Look">
+        <button aria-pressed="false">VFD</button><button aria-pressed="false">C64</button><button aria-pressed="true">AMIGA</button><button aria-pressed="false">2600</button>
+      </div>
+      <h1>Phosphor 2.0</h1>
+      <p class="lede">Retro firmware for the <span class="nw">Waveshare ESP32-S3-Touch-LCD-3.49</span>.<br class="br"> Every page now comes as <b>VFD</b>, <b>C64</b>, <b>Amiga 500</b> and <b>Atari 2600</b>.</p>
+      <div class="cta">
+        <a class="btn primary" href="#install">Install from the browser</a>
+        <a class="btn ghost" href="https://github.com/melihkoray/phosphor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>Star on GitHub<span class="count" data-stars hidden></span></a>
+      </div>
+      <p class="fine">Free and open source. You need a USB-C cable and Chrome or Edge, nothing else.</p>
+    </div>
+  </header>
 
-  <div class="looks">
-    <figure><img src="img/clock-vfd.png" width="640" height="172" alt="Clock in the VFD look"><figcaption>VFD</figcaption></figure>
-    <figure><img src="img/clock-c64.png" width="640" height="172" alt="Clock in the C64-style look"><figcaption>C64-style</figcaption></figure>
-    <figure><img src="img/clock-amiga.png" width="640" height="172" alt="Clock in the Amiga-style look"><figcaption>Amiga-style</figcaption></figure>
-    <figure><img src="img/clock-2600.png" width="640" height="172" alt="Clock in the 2600-style look"><figcaption>2600-style</figcaption></figure>
-  </div>
+  <section class="wrap feat" aria-labelledby="h-21">
+    <div class="copy">
+      <h2 id="h-21">Knock on the table to play 21</h2>
+      <p class="lede">You play against a cartoon dealer and you never touch the screen. <b>Knock once on the table to stand, twice to take another card.</b> The board's motion sensor feels it through the desk.</p>
+      <p class="lede">Ten hands a match. Tapping HIT and STAND works too.</p>
+    </div>
+    <div class="shots">
+      <span class="bezel"><img class="px" src="img/21-amiga.png" width="640" height="172" alt="21 in the Amiga-style look: the dealer says one more for the house"></span>
+      <span class="bezel"><img class="px" src="img/21-c64.png" width="640" height="172" alt="21 in the C64-style look, with the HIT and STAND buttons"></span>
+    </div>
+  </section>
 
-  <div class="star">
-    <a class="star-btn" href="https://github.com/melihkoray/phosphor">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>
-      Star on GitHub<span class="star-count" data-stars hidden></span>
-    </a>
-    <p class="star-note">Phosphor is free and open source. A star helps other people find it.</p>
-  </div>
+  <section class="wrap feat flip" aria-labelledby="h-keeper">
+    <div class="copy">
+      <h2 id="h-keeper">Lighthouse Keeper</h2>
+      <p class="lede">My own <b>Game &amp; Watch-style</b> game. Ships head for the rocks on three lanes; tap a lane to swing the lamp over and turn the ship away.</p>
+      <p class="lede">Fixed LCD segments with their faint ghosts, Game A and Game B, a beep for every save. Three wrecks and the night is over.</p>
+    </div>
+    <span class="bezel"><img class="px" src="img/keeper.gif" width="640" height="172" alt="Lighthouse Keeper being played: ships move in on three lanes"></span>
+  </section>
 
-  <div class="warn">
-    <b>This replaces what the board runs now.</b> Whatever is on it, including the Waveshare factory demo, is not kept.
-    Phosphor does not back it up and cannot restore it.
-  </div>
+  <section class="wrap feat" aria-labelledby="h-radio">
+    <div class="copy">
+      <h2 id="h-radio">Internet radio</h2>
+      <p class="lede">Up to seven genre buttons; tap one again for the next station. <b>Two little dancers and an equalizer move with the music.</b></p>
+      <p class="lede">Add stations from your phone: search thousands of them or paste a stream link (MP3 and AAC work). The alarm wakes you with it.</p>
+    </div>
+    <div class="shots">
+      <span class="bezel"><img class="px" src="img/radio-vfd.gif" width="640" height="172" alt="The radio page in the VFD look, with dancers and an equalizer"></span>
+      <span class="bezel"><img class="px" src="img/radio-c64.gif" width="640" height="172" alt="The radio page in the C64-style look"></span>
+    </div>
+  </section>
 
-  <esp-web-install-button manifest="manifest.json">
-    <button slot="activate">Install Phosphor</button>
-    <span slot="unsupported">This browser cannot talk to USB devices. Use Chrome or Edge on a computer.</span>
-    <span slot="not-allowed">The installer needs a secure page (https).</span>
-  </esp-web-install-button>
-  <p class="small">Already running Phosphor 1.0.x? Install once from here and leave <b>Erase device</b> unticked: your Wi-Fi and settings stay. From then on the installer recognises the board and offers <b>Update</b> by itself, and the board tells you in <b>Settings &gt; About</b> when a newer version is out.</p>
+  <section class="wrap machines" aria-labelledby="h-machines">
+    <h2 id="h-machines">One page, four machines</h2>
+    <p class="lede">Each look keeps the old machine's limits, not only its colors: <b>16 colors</b> on the C64, <b>32 out of 4096</b> on the Amiga, <b>4 per line</b> on the 2600. Switch it any time in Settings on the board.</p>
+    <div class="grid3">
+      <div class="corner"></div><div class="head">Snowy cabin</div><div class="head">Fireplace</div><div class="head">Weather</div>
+      <div class="row">VFD</div><img class="px" src="img/snow-vfd.png" width="640" height="172" alt="Snowy cabin, VFD" loading="lazy"><img class="px" src="img/fire-vfd.png" width="640" height="172" alt="Fireplace with the cat, VFD" loading="lazy"><img class="px" src="img/weather-vfd.png" width="640" height="172" alt="Weather, VFD" loading="lazy">
+      <div class="row">C64-style</div><img class="px" src="img/snow-c64.png" width="640" height="172" alt="Snowy cabin, C64-style" loading="lazy"><img class="px" src="img/fire-c64.png" width="640" height="172" alt="Fireplace with the cat, C64-style" loading="lazy"><img class="px" src="img/weather-c64.png" width="640" height="172" alt="Weather, C64-style" loading="lazy">
+      <div class="row">Amiga-style</div><img class="px" src="img/snow-amiga.png" width="640" height="172" alt="Snowy cabin, Amiga-style" loading="lazy"><img class="px" src="img/fire-amiga.png" width="640" height="172" alt="Fireplace with the cat, Amiga-style" loading="lazy"><img class="px" src="img/weather-amiga.png" width="640" height="172" alt="Weather, Amiga-style" loading="lazy">
+      <div class="row">2600-style</div><img class="px" src="img/snow-2600.png" width="640" height="172" alt="Snowy cabin, 2600-style" loading="lazy"><img class="px" src="img/fire-2600.png" width="640" height="172" alt="Fireplace with the cat, 2600-style" loading="lazy"><img class="px" src="img/weather-2600.png" width="640" height="172" alt="Weather, 2600-style" loading="lazy">
+    </div>
+  </section>
 
-  <h2>Steps</h2>
-  <ol>
-    <li>Connect the board to the computer with a USB-C data cable.</li>
-    <li>Press <b>Install Phosphor</b>. Chrome lists serial ports: pick <b>USB JTAG/serial debug unit</b>
-      (<code>cu.usbmodem…</code> on a Mac, <code>COM3</code> or similar on Windows, <code>ttyACM0</code> on Linux).
-      On a first install tick <b>Erase device</b>, confirm, and wait for <b>Installation complete</b> (about a minute).
-      Close the installer window with <b>Next</b> or the &times;.</li>
-    <li>The board restarts and shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code> and a QR code. On your phone,
-      join that Wi-Fi (no password). A setup page opens by itself. If it does not, or your browser shows normal websites,
-      the phone is still using mobile data: <b>turn off mobile data</b>, open Safari (or any browser) and type
-      <code>http://192.168.4.1</code> in the address bar.</li>
-    <li>On the setup page (if you see a menu first, tap <b>Configure WiFi</b>):
-      <ol type="a">
-        <li>tap your home Wi-Fi in the list (2.4 GHz, see below),</li>
-        <li>type its password,</li>
-        <li>scroll down: under the password there is <b>Device name</b>, already filled in as <code>phosphor-1a2b</code>.
-          Keep it or change it to something short like <b><code>desk</code></b>: this is the name you type in the next
-          step.
-          <div class="warn" style="margin:10px 0"><b>Write this name down.</b> You need it in the next step to reach
-          the settings. (Lost it later? <b>Settings &gt; Wi-Fi</b> on the board shows its IP address and a QR code.)</div></li>
-        <li>tap <b>Save</b>. The board joins your Wi-Fi and shows the clock. Turn mobile data back on.</li>
-      </ol></li>
-    <li>With the phone back on your home Wi-Fi, open <code>http://&lt;your device name&gt;.local/settings</code> with the
-      name from step 4. Named it <code>desk</code>? Then it is <code>http://desk.local/settings</code>; kept the default?
-      Something like <code>http://phosphor-1a2b.local/settings</code>. There you set your city, language and radio
-      stations.</li>
-  </ol>
+  <section class="wrap more" aria-labelledby="h-more">
+    <h2 id="h-more">And many more</h2>
+    <p class="lede">Scenes to leave running on your desk, a lava lamp, a few tools, and settings right on the board.</p>
+    <ul class="tiles">
+      <li><img class="px" src="img/more-aquarium-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Fish tank</b><span>Tap to feed them, hold for night. Once a day a rare visitor.</span></li>
+      <li><img class="px" src="img/more-sea-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Lighthouse</b><span>Follows the time of day. Hold for a storm.</span></li>
+      <li><img class="px" src="img/more-wave-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Ocean liner</b><span>Tilt the board and the sea tilts with it. Hold for the fog horn.</span></li>
+      <li><img class="px" src="img/more-study-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Focus timer</b><span>Pomodoro rounds in a little study room.</span></li>
+      <li><img class="px" src="img/more-clock-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Clock and alarm</b><span>Big digits, date and battery. The alarm wakes you with the radio.</span></li>
+      <li><img class="px" src="img/more-play-c64.png" width="640" height="172" alt="" loading="lazy"><b>Play menu</b><span>Lighthouse Keeper, 21 and the runner. High scores stay on the board.</span></li>
+      <li><img class="px" src="img/more-snow-c64.png" width="640" height="172" alt="" loading="lazy"><b>Snowy cabin</b><span>Shake it to stir the snow, hold it for a snow globe.</span></li>
+      <li><img class="px" src="img/more-hourglass-c64.png" width="640" height="172" alt="" loading="lazy"><b>Hourglass</b><span>Tip the board over to turn it.</span></li>
+      <li><img class="px" src="img/more-runner-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Runner</b><span>Tap the top to jump, the bottom to duck. The scenery changes every 400 m.</span></li>
+      <li><img class="px" src="img/more-tools-vfd.png" width="640" height="172" alt="" loading="lazy"><b>Tools</b><span>Spirit level, coin flip, box breathing, scoreboard and a screen lamp.</span></li>
+      <li><img class="px" src="img/more-coin-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Coin flip</b><span>Tap it or shake the board. It keeps count.</span></li>
+      <li><img class="px" src="img/more-settings-amiga.png" width="640" height="172" alt="" loading="lazy"><b>Settings on the board</b><span>Look, clock style, language, brightness, city, and a QR code that opens the rest on your phone.</span></li>
+    </ul>
+  </section>
 
-  <h2>Troubleshooting</h2>
-  <dl>
-    <dt>No "USB JTAG/serial debug unit" in the port list</dt>
-    <dd>Try another cable (many only charge) or another USB port. Still nothing: hold <b>BOOT</b> on the back while you
-      plug the cable in, then try again. Not sure which entry is the board? Unplug it, look at the list, plug it back in:
-      the new entry is the board.</dd>
+  <section class="wrap install" id="install" aria-labelledby="h-install">
+    <h2 id="h-install">Install it</h2>
+    <div class="install-top">
+      <figure class="desk" style="margin:0">
+        <video src="img/desk.mp4" poster="img/desk.jpg" width="480" height="334" autoplay muted loop playsinline></video>
+        <figcaption>The real board on my desk. Tilting it tilts the sea under the liner.</figcaption>
+      </figure>
+      <div>
+        <div class="warn">
+          <b>This replaces what the board runs now.</b> Whatever is on it, including the Waveshare factory demo, is not kept.
+          Phosphor does not back it up and cannot restore it.
+        </div>
+        <esp-web-install-button manifest="manifest.json">
+          <button slot="activate">Install Phosphor</button>
+          <span slot="unsupported">This browser cannot talk to USB devices. Use Chrome or Edge on a computer.</span>
+          <span slot="not-allowed">The installer needs a secure page (https).</span>
+        </esp-web-install-button>
+        <p class="small">Already running Phosphor 1.0.x? Install once from here and leave <b>Erase device</b> unticked: your Wi-Fi and settings stay. From then on the installer recognises the board and offers <b>Update</b> by itself, and the board tells you in <b>Settings &gt; About</b> when a newer version is out.</p>
+      </div>
+    </div>
 
-    <dt>The board does not join my Wi-Fi</dt>
-    <dd>Most often a mistyped password: phones capitalise the first letter. Hold <b>BOOT</b> for 5 seconds and try again.
-      The ESP32 also only works with <b>2.4 GHz</b> Wi-Fi: if your router has a separate 5 GHz network (often named
-      "…-5G"), pick the other one.</dd>
+    <div class="doc">
+      <h3>Steps</h3>
+      <ol>
+        <li>Connect the board to the computer with a USB-C data cable.</li>
+        <li>Press <b>Install Phosphor</b>. Chrome lists serial ports: pick <b>USB JTAG/serial debug unit</b>
+          (<code>cu.usbmodem…</code> on a Mac, <code>COM3</code> or similar on Windows, <code>ttyACM0</code> on Linux).
+          On a first install tick <b>Erase device</b>, confirm, and wait for <b>Installation complete</b> (about a minute).
+          Close the installer window with <b>Next</b> or the &times;.</li>
+        <li>The board restarts and shows a Wi-Fi name like <code>Phosphor-Setup-1A2B</code> and a QR code. On your phone,
+          join that Wi-Fi (no password). A setup page opens by itself. If it does not, or your browser shows normal websites,
+          the phone is still using mobile data: <b>turn off mobile data</b>, open Safari (or any browser) and type
+          <code>http://192.168.4.1</code> in the address bar.</li>
+        <li>On the setup page (if you see a menu first, tap <b>Configure WiFi</b>):
+          <ol type="a">
+            <li>tap your home Wi-Fi in the list (2.4 GHz, see below),</li>
+            <li>type its password,</li>
+            <li>scroll down: under the password there is <b>Device name</b>, already filled in as <code>phosphor-1a2b</code>.
+              Keep it or change it to something short like <b><code>desk</code></b>: this is the name you type in the next
+              step.
+              <div class="warn" style="margin:10px 0"><b>Write this name down.</b> You need it in the next step to reach
+              the settings. (Lost it later? <b>Settings &gt; Wi-Fi</b> on the board shows its IP address and a QR code.)</div></li>
+            <li>tap <b>Save</b>. The board joins your Wi-Fi and shows the clock. Turn mobile data back on.</li>
+          </ol></li>
+        <li>With the phone back on your home Wi-Fi, open <code>http://&lt;your device name&gt;.local/settings</code> with the
+          name from step 4. Named it <code>desk</code>? Then it is <code>http://desk.local/settings</code>; kept the default?
+          Something like <code>http://phosphor-1a2b.local/settings</code>. There you set your city, language and radio
+          stations.</li>
+      </ol>
 
-    <dt>The setup Wi-Fi or setup page is gone</dt>
-    <dd>Hold <b>BOOT</b> on the back for 5 seconds. The board forgets the saved Wi-Fi and shows
-      <code>Phosphor-Setup-…</code> again, until you finish the setup. (When a saved Wi-Fi fails, the board also opens the
-      setup by itself after a restart, but only for 3 minutes.)</dd>
+      <h3>Troubleshooting</h3>
+      <dl>
+        <dt>No "USB JTAG/serial debug unit" in the port list</dt>
+        <dd>Try another cable (many only charge) or another USB port. Still nothing: hold <b>BOOT</b> on the back while you
+          plug the cable in, then try again. Not sure which entry is the board? Unplug it, look at the list, plug it back in:
+          the new entry is the board.</dd>
 
-    <dt>The setup page does not open, or the browser shows normal websites</dt>
-    <dd>The phone is using mobile data instead of the board's Wi-Fi. Turn off mobile data, check you are joined to
-      <code>Phosphor-Setup-…</code> ("no internet" there is normal), then type <code>http://192.168.4.1</code> in the
-      browser's address bar (with <code>http://</code>, or the browser searches for it).</dd>
+        <dt>The board does not join my Wi-Fi</dt>
+        <dd>Most often a mistyped password: phones capitalise the first letter. Hold <b>BOOT</b> for 5 seconds and try again.
+          The ESP32 also only works with <b>2.4 GHz</b> Wi-Fi: if your router has a separate 5 GHz network (often named
+          "…-5G"), pick the other one.</dd>
 
-    <dt>I forgot the device name</dt>
-    <dd>Open your router's list of connected devices: the board shows up under its name (and its IP address works too:
-      <code>http://192.168.x.x/settings</code>). Or hold <b>BOOT</b> for 5 seconds and set up the Wi-Fi again.</dd>
+        <dt>The setup Wi-Fi or setup page is gone</dt>
+        <dd>Hold <b>BOOT</b> on the back for 5 seconds. The board forgets the saved Wi-Fi and shows
+          <code>Phosphor-Setup-…</code> again, until you finish the setup. (When a saved Wi-Fi fails, the board also opens the
+          setup by itself after a restart, but only for 3 minutes.)</dd>
 
-    <dt><code>desk.local</code> does not open</dt>
-    <dd>The phone must be on the same Wi-Fi as the board. Some Android phones cannot open <code>.local</code> addresses:
-      use a computer, or the board's IP address from <b>Settings &gt; Wi-Fi</b> on the board
-      (<code>http://192.168.x.x/settings</code>).</dd>
+        <dt>The setup page does not open, or the browser shows normal websites</dt>
+        <dd>The phone is using mobile data instead of the board's Wi-Fi. Turn off mobile data, check you are joined to
+          <code>Phosphor-Setup-…</code> ("no internet" there is normal), then type <code>http://192.168.4.1</code> in the
+          browser's address bar (with <code>http://</code>, or the browser searches for it).</dd>
 
-    <dt>A radio station does not play</dt>
-    <dd>Use <b>Test</b> on the settings page first. MP3 and AAC streams are tested; some others may not play.</dd>
-  </dl>
+        <dt>I forgot the device name</dt>
+        <dd>Open your router's list of connected devices: the board shows up under its name (and its IP address works too:
+          <code>http://192.168.x.x/settings</code>). Or hold <b>BOOT</b> for 5 seconds and set up the Wi-Fi again.</dd>
 
-  <div class="star end">
-    <a class="star-btn" href="https://github.com/melihkoray/phosphor">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>
-      Star on GitHub<span class="star-count" data-stars hidden></span>
-    </a>
-    <p class="star-note">Enjoying it on your desk? A star on GitHub is the easiest way to say thanks.</p>
-  </div>
+        <dt><code>desk.local</code> does not open</dt>
+        <dd>The phone must be on the same Wi-Fi as the board. Some Android phones cannot open <code>.local</code> addresses:
+          use a computer, or the board's IP address from <b>Settings &gt; Wi-Fi</b> on the board
+          (<code>http://192.168.x.x/settings</code>).</dd>
 
-  <p class="small" style="margin-top:24px">Source, issues and license (GPL-3.0): <a href="https://github.com/melihkoray/phosphor">github.com/melihkoray/phosphor</a>. Made by <a href="https://melihkoray.com">Melih Koray</a>.</p>
+        <dt>A radio station does not play</dt>
+        <dd>Use <b>Test</b> on the settings page first. MP3 and AAC streams are tested; some others may not play.</dd>
+      </dl>
+    </div>
+  </section>
 </main>
+
+<footer>
+  <div class="wrap">
+    <div class="row">
+      <a class="btn ghost" href="https://github.com/melihkoray/phosphor"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.6 1.1 6.5L12 17.5l-5.8 3.05 1.1-6.5-4.7-4.6 6.5-.95z"/></svg>Star on GitHub<span class="count" data-stars hidden></span></a>
+      <p class="small">Enjoying it on your desk? A star on GitHub is the easiest way to say thanks.</p>
+    </div>
+    <p class="small" style="margin-top:28px">Source, issues and license (GPL-3.0): <a href="https://github.com/melihkoray/phosphor">github.com/melihkoray/phosphor</a>. Made by <a href="https://melihkoray.com">Melih Koray</a>. Not affiliated with Waveshare. Commodore 64, Amiga and Atari 2600 are trademarks of their owners; the looks are only in their style.</p>
+  </div>
+</footer>
+
 <script>
+// The board's screen cycles through one page in each look; the buttons pick one and stop the cycle.
+const imgs = [...document.querySelectorAll('.screen img')];
+const btns = [...document.querySelectorAll('.looks button')];
+const glow = ['oklch(0.8 0.14 178 / .5)', 'oklch(0.66 0.17 50 / .5)', 'oklch(0.6 0.2 285 / .6)', 'oklch(0.66 0.13 230 / .5)'];
+let cur = 2, timer;
+function show(i) {
+  imgs[cur].classList.remove('on'); imgs[i].classList.add('on');
+  btns.forEach((b, k) => b.setAttribute('aria-pressed', k === i));
+  document.documentElement.style.setProperty('--glow', glow[i]);
+  cur = i;
+}
+btns.forEach((b, i) => b.addEventListener('click', () => { clearInterval(timer); show(i); }));
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) timer = setInterval(() => show((cur + 1) % imgs.length), 2600);
+
 // Live star count from the GitHub API; the buttons work without it.
 fetch('https://api.github.com/repos/melihkoray/phosphor')
   .then(r => r.ok ? r.json() : null)

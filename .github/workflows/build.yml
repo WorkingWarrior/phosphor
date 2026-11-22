@@ -39,8 +39,13 @@ jobs:
       - name: Version
         id: version
         run: |
+          last="$(git describe --tags --abbrev=0 2>/dev/null || true)"
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             version="$GITHUB_REF_NAME"
+          elif [[ -n "$last" ]] && git diff --quiet "$last" HEAD -- firmware libraries assets tools/pack_assets.py build.sh; then
+            # Only the docs, README or media changed since the last release: the firmware is the same, so keep that
+            # release's version. A "v2.0.0-3-g1a2b3c4" build would never see update notices (they need x.y.z).
+            version="$last"
           else
             version="$(git describe --tags --always)"
           fi
