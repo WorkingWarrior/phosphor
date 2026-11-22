@@ -4,10 +4,7 @@
 [![Built and signed by GitHub Actions](https://img.shields.io/badge/built%20%26%20signed-GitHub%20Actions-2ea44f?logo=githubactions&logoColor=white)](https://github.com/melihkoray/phosphor/attestations)
 [![VirusTotal: 0 of 61 engines](https://img.shields.io/badge/VirusTotal-0%2F61%20(v2.0.0)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/d247cd729a6fe92ad5cbd1ab439eb3e935a6f67bbce1772ae09508605da895f5)
 
-[![Phosphor on the Waveshare 3.49" bar: the snowy cabin, the fireplace, the ocean liner, the radio, 21, a storm and the fish tank](media/readme/board-3d.webp)](https://melihkoray.github.io/phosphor/#film)
-
-▶ **[Watch the 42-second film with sound](https://melihkoray.github.io/phosphor/#film)**: the clock, Lighthouse Keeper with
-its beeps, then the scenes on a chiptune. Everything on the screen was recorded from the board; the board is a 3D model.
+![Phosphor on the Waveshare 3.49" bar: the snowy cabin, the fireplace, the ocean liner, the radio, 21, a storm and the fish tank](media/readme/board-3d.webp)
 
 Phosphor turns the **Waveshare ESP32-S3-Touch-LCD-3.49**, a 640×172 bar display, into a retro desk gadget: a clock,
 weather, internet radio, timers, pixel scenes to leave running, three games and a few small tools. Every page is drawn
@@ -26,22 +23,23 @@ four times, as an old vacuum-fluorescent display (VFD), C64-style, Amiga-style a
 ![21 against a cartoon dealer, Amiga-style](media/readme/21.gif)
 
 Blackjack against a cartoon dealer, ten hands a match. You don't have to touch the screen: the board's motion sensor
-feels your knuckles on the table. Knock once to stand, twice to hit.
+feels your knuckles on the table. Knock once to stand, twice to hit (or tap HIT and STAND).
 
 ## Lighthouse Keeper
 
 ![Lighthouse Keeper](media/readme/keeper.gif)
 
 My own game in the style of the 1980s handheld LCD games. Ships head for the rocks in three lanes; tap a lane to light
-it and turn the ship away. Fixed segments with their faint ghosts, Game A and Game B, three misses and the night is
-over.
+it and turn the ship away. Fixed segments with their faint ghosts, Game A and a faster Game B with more ships, three
+misses and the night is over.
 
 ## Internet radio
 
 ![The radio page in the VFD look](media/readme/radio-vfd.gif)
 ![The radio page, Amiga-style, with a tracker pattern that runs with the music](media/readme/radio-amiga.gif)
 
-Up to seven genre buttons; tap one again for the next station. The dancers and the equalizer move with the music.
+Up to seven genre buttons; tap one again for the next station. The dancers and the equalizer move with the music
+(hold them for another look).
 Find stations on the settings page through [Radio Browser](https://www.radio-browser.info) or paste your own stream
 (MP3 and AAC). The alarm wakes you with it.
 
@@ -72,13 +70,12 @@ city, stations and other settings are kept.
 
 ## What it does
 
-The pages, shown here in the VFD look:
+The other pages, shown here in the VFD look:
 
 | | |
 |---|---|
 | ![Clock](media/clock.gif) | **Clock.** Big segment digits, date, battery, 12 or 24 hour. Alarm: tap the bell to switch it on or off, tap the alarm hours (+1) or minutes (+5) to set it; it wakes you with the radio. |
 | ![Weather](media/weather.gif) | **Weather.** Now and the next three days for your city ([Open-Meteo](https://open-meteo.com), no key). Tap for the days after. |
-| ![Radio](media/radio.gif) | **Internet radio.** Up to 7 genre buttons; tap again for the next station. Dancers and an equalizer move with the music (hold them for another look). Tested with MP3 and AAC streams. |
 | ![Timer](media/timer.gif) | **Timer.** Add or remove 1, 5 or 10 minutes by touch, up to 99; it rings at the end. |
 | ![Study](media/study.gif) | **Focus timer.** Pomodoro rounds in a little study room. |
 
@@ -91,19 +88,12 @@ Pixel scenes, to leave running:
 - **Ship:** an ocean liner that tilts with the board. Hold for the fog horn; now and then a whale.
 - **Lava lamp** (tap for new colors) and an **hourglass** you turn over by tilting the board.
 
-| ![The snowy cabin, Amiga-style](media/readme/snow-amiga.gif) | ![The fireplace with the sleeping cat, Amiga-style](media/readme/fire.gif) |
-|---|---|
-| ![The lighthouse at night, Amiga-style](media/readme/sea.gif) | ![The fish tank, Amiga-style](media/readme/fish.gif) |
-
 ### Play
 
-| | |
-|---|---|
-| ![Lighthouse Keeper](media/screens/keeper.png) | **Lighthouse Keeper.** Ships head for the rocks in three lanes; tap a lane to light it and turn the ship away. Game A is slower, Game B faster with more ships. Three misses and it is over. |
-| ![21](media/screens/21-c64.png) | **21.** Blackjack against a cartoon dealer, ten hands a match. Tap HIT or STAND, or knock on the table: once to stand, twice to hit. |
-| ![Runner](media/screens/runner-amiga.png) | **Runner.** Tap the top of the screen to jump, the bottom to duck. Archers, bugs, pits and ledges; the scenery changes every 400 m. |
+![Runner, Amiga-style](media/screens/runner-amiga.png)
 
-High scores are kept on the board.
+Lighthouse Keeper and 21 (above), and **Runner**: tap the top of the screen to jump, the bottom to duck. Archers, bugs,
+pits and ledges; the scenery changes every 400 m. High scores are kept on the board.
 
 ### Tools
 
