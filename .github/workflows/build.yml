@@ -2,6 +2,8 @@ name: Build
 
 # Every push builds the firmware. A push to main also publishes the web installer (GitHub Pages) with that build;
 # a tag like v1.2.0 also attaches the binaries to a GitHub release.
+# The binaries get a SHA256SUMS.txt and a signed build provenance attestation (Sigstore, stored by GitHub): anyone can
+# check that a .bin was built here from this repository with `gh attestation verify phosphor.bin -R melihkoray/phosphor`.
 on:
   push:
     branches: [main]
@@ -19,6 +21,11 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write           # the attestation's signing certificate
+      attestations: write
+      artifact-metadata: write
     steps:
       - uses: actions/checkout@v4
 
@@ -40,6 +47,15 @@ jobs:
           cp "$(find ~/.arduino15/packages/esp32/hardware/esp32 -name boot_app0.bin | head -1)" out/boot_app0.bin
           cp build/firmware.ino.bin out/phosphor.bin
           ls -l out
+
+      - name: Checksums
+        run: cd out && sha256sum *.bin | tee SHA256SUMS.txt
+
+      - name: Attest that the binaries were built here
+        if: github.event_name != 'pull_request'
+        uses: actions/attest@v4
+        with:
+          subject-path: out/*.bin
 
       - uses: actions/upload-artifact@v4
         with:
@@ -85,4 +101,4 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" out/*.bin --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+        run: gh release create "$GITHUB_REF_NAME" out/*.bin out/SHA256SUMS.txt --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
