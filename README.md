@@ -19,6 +19,12 @@ running, three games and a few small tools. Every page is drawn four times, as a
 > Installing replaces whatever runs on the board now, the Waveshare factory demo included. It is not backed up and
 > Phosphor cannot restore it. On a first install, tick **Erase device** in the installer for a clean start.
 
+> [!IMPORTANT]
+> **Original board only, for now.** Since June 2026 Waveshare ships a V2 revision of this board (**Rev1.1** printed
+> on the board, a **V2** QC label on the case) with the backlight and the screen reset on different pins. Phosphor is
+> built and tested on the original board and does not support V2 yet: on a V2 board the screen is likely to stay dark.
+> V2 support is planned.
+
 ## Knock on the table to play 21
 
 ![21 against a cartoon dealer, Amiga-style](media/readme/21.gif)
@@ -114,7 +120,8 @@ settings page on your phone) and About (version, and a note when a newer one is 
 
 ## Setup
 
-You need the [Waveshare ESP32-S3-Touch-LCD-3.49](https://www.waveshare.com/esp32-s3-touch-lcd-3.49.htm) and a USB-C data cable.
+You need the [Waveshare ESP32-S3-Touch-LCD-3.49](https://www.waveshare.com/esp32-s3-touch-lcd-3.49.htm) (the original
+version, not V2 yet: see the note at the top) and a USB-C data cable.
 
 1. Open the [installer page](https://melihkoray.github.io/phosphor/), connect the board with a USB-C data cable, press
    **Install Phosphor** and pick **USB JTAG/serial debug unit** from the port list (`cu.usbmodem…` on a Mac, `COMx` on
