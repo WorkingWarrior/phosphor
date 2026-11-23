@@ -152,13 +152,13 @@ static void sendStatus()
            "{\"name\":\"%s\",\"fw\":\"%s\",\"ip\":\"%s\",\"rssi\":%d,\"mode\":\"%s\","
            "\"temp_c\":%.2f,\"humidity\":%.1f,\"battery_v\":%.2f,\"uptime_s\":%lu,"
            "\"heap_free\":%u,\"psram_free\":%u,\"update\":\"%s\",\"update_heap\":[%u,%u],\"update_code\":%d,"
-           "\"model\":\"%s\",\"width\":%d,\"height\":%d,\"format\":\"%s\",\"speaker\":%s,\"volume\":%d,\"inverted\":%s,\"display\":%d,\"brightness\":%d,\"dim\":%d,\"reset\":\"%s\"%s}",
+           "\"model\":\"%s\",\"width\":%d,\"height\":%d,\"format\":\"%s\",\"speaker\":%s,\"volume\":%d,\"inverted\":%s,\"display\":%d,\"brightness\":%d,\"dim\":%d,\"reset\":\"%s\",\"board_rev\":\"%s\"%s}",
            state.name.c_str(), FW_VERSION, Net_Ip().c_str(), Net_Rssi(), mode,
            isnan(state.temp_c) ? 0.0 : state.temp_c, isnan(state.humi) ? 0.0 : state.humi, state.batt_v,
            (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getFreePsram(), UpdateCheck_Newer(), (unsigned)uh0, (unsigned)uh1, UpdateCheck_Code(),
            board().model(), board().width(), board().height(), board().frameFormat(),
            Audio_Ready() ? "true" : "false", Audio_Volume(), state.inverted ? "true" : "false", board().displayOn(), board().brightness(), board().dimLevel(),
-           Watchdog_ResetReason(), knock);
+           Watchdog_ResetReason(), board().boardRevision(), knock);
   server.send(200, "application/json", json);
 }
 

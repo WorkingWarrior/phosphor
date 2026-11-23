@@ -75,6 +75,8 @@ class Board {
   // GET /settings page, GET/POST /api/settings in the board's text format; nullptr / empty = no settings page.
   virtual const char *settingsPage() const { return nullptr; }
   virtual String settingsText() { return String(); }
+  // Detected board revision for /status, "" where there is only one.
+  virtual const char *boardRevision() const { return ""; }
   virtual bool applySettings(const String &body, String &err) { return false; }
 
   virtual DateTime now() = 0;

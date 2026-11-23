@@ -75,6 +75,7 @@ class Touch349Board : public Board {
   const char *settingsPage() const override { return SETTINGS_PAGE; }
   String settingsText() override { return settings::text(); }
   bool applySettings(const String &body, String &err) override { return settings::apply(body, err); }
+  const char *boardRevision() const override { return rev_info_; }
   // Speaker amplifier (TCA9554 EXIO7); called from the radio task.
   void setAmp(bool on);
 
@@ -82,6 +83,8 @@ class Touch349Board : public Board {
   void initPanel();
   void initBacklight();
   void initExpander();
+  // Which board revision this is, see the .cpp. Call with the panel running, before the backlight.
+  void detectRevision();
   void setPowerLatch(bool closed);
   void setExpanderBit(int bit, bool on);
   void initTouch();
@@ -112,6 +115,8 @@ class Touch349Board : public Board {
   I2cMasterBus i2c_;        // RTC, TCA9554
   I2cMasterBus touch_i2c_;  // AXS15231B touch
   i2c_master_dev_handle_t expander_ = nullptr;
+  bool v2_ = false;
+  char rev_info_[24] = "";
   i2c_master_dev_handle_t touch_ = nullptr;
   esp_lcd_panel_handle_t panel_ = nullptr;
   SemaphoreHandle_t flush_done_ = nullptr;

@@ -24,8 +24,10 @@
 #define LCD_D1_PIN 12
 #define LCD_D2_PIN 13
 #define LCD_D3_PIN 14
-#define LCD_RST_PIN 21
-#define LCD_BL_PIN 8
+// V1 and V2 (PCB "Rev1.1") swap two pairs: backlight <-> expander INT, panel reset <-> panel TE.
+#define V1_LCD_RST_PIN 21
+#define V1_LCD_BL_PIN 8
+#define V2_LCD_BL_PIN 42
 
 #define I2C_SCL_PIN 48
 #define I2C_SDA_PIN 47
@@ -41,6 +43,7 @@
 // TCA9554 registers and the pin that holds the battery power switch closed.
 #define TCA_REG_OUTPUT 0x01
 #define TCA_REG_CONFIG 0x03
+#define TCA_EXIO_V2_BL_EN 1
 #define TCA_EXIO_BATTERY_LATCH 6
 #define TCA_EXIO_AMP 7  // speaker amplifier enable
 
@@ -127,6 +130,24 @@ void Touch349Board::initExpander()
   i2c_.i2c_write_buff(expander_, TCA_REG_CONFIG, &config, 1);
 }
 
+// V2 (PCB "Rev1.1") wires the panel's TE output to GPIO21, where V1 has the panel reset. With TE switched on (0x35) the
+// panel pulses that pin once a frame; only those pulses mean V2. On V1 the pull-up just keeps the reset released.
+void Touch349Board::detectRevision()
+{
+  const int PIN = V1_LCD_RST_PIN;
+  int edges = 0, last = digitalRead(PIN);
+  const uint32_t t0 = micros();
+  while (micros() - t0 < 150000) {
+    int v = digitalRead(PIN);
+    if (v != last) edges++;
+    last = v;
+  }
+  // 9 frames at 60 Hz = about 18 edges; far more would be noise
+  v2_ = edges >= 6 && edges <= 80;
+  snprintf(rev_info_, sizeof(rev_info_), "%s te=%d", v2_ ? "v2" : "v1", edges);
+  Serial.printf("touch349: board %s\n", rev_info_);
+}
+
 void Touch349Board::setPowerLatch(bool closed) { setExpanderBit(TCA_EXIO_BATTERY_LATCH, closed); }
 
 void Touch349Board::setAmp(bool on) { setExpanderBit(TCA_EXIO_AMP, on); }
@@ -166,10 +187,7 @@ void Touch349Board::initPanel()
   // Counts finished transfers; up to two chunks can be in flight (one per DMA buffer).
   flush_done_ = xSemaphoreCreateCounting(2, 0);
 
-  gpio_config_t rst = {};
-  rst.mode = GPIO_MODE_OUTPUT;
-  rst.pin_bit_mask = 1ULL << LCD_RST_PIN;
-  gpio_config(&rst);
+  pinMode(V1_LCD_RST_PIN, INPUT_PULLUP);  // TE on V2; driven only once V1 is known
 
   spi_bus_config_t bus = {};
   bus.data0_io_num = LCD_D0_PIN;
@@ -198,6 +216,7 @@ void Touch349Board::initPanel()
   static const axs15231b_lcd_init_cmd_t init_cmds[] = {
     { 0x11, no_param, 0, 100 },  // sleep out
     { 0x29, no_param, 0, 100 },  // display on
+    { 0x35, no_param, 1, 0 },    // TE on, for detectRevision()
   };
   axs15231b_vendor_config_t vendor = {};
   vendor.flags.use_qspi_interface = 1;
@@ -211,11 +230,27 @@ void Touch349Board::initPanel()
   panel_cfg.vendor_config = &vendor;
   ESP_ERROR_CHECK(esp_lcd_new_panel_axs15231b(io, &panel_cfg, &panel_));
 
-  gpio_set_level((gpio_num_t)LCD_RST_PIN, 1);
+  ESP_ERROR_CHECK(esp_lcd_panel_init(panel_));
+  detectRevision();
+  if (v2_) {
+    // Reset is on the expander there and not needed; the backlight enable is too.
+    setExpanderBit(TCA_EXIO_V2_BL_EN, true);
+    if (expander_) {
+      uint8_t config = 0xff;
+      i2c_.i2c_read_buff(expander_, TCA_REG_CONFIG, &config, 1);
+      config &= ~(1 << TCA_EXIO_V2_BL_EN);
+      i2c_.i2c_write_buff(expander_, TCA_REG_CONFIG, &config, 1);
+    }
+    return;
+  }
+  const gpio_num_t rst = (gpio_num_t)V1_LCD_RST_PIN;
+  digitalWrite(rst, HIGH);
+  pinMode(rst, OUTPUT);
+  gpio_set_level(rst, 1);
   vTaskDelay(pdMS_TO_TICKS(30));
-  gpio_set_level((gpio_num_t)LCD_RST_PIN, 0);
+  gpio_set_level(rst, 0);
   vTaskDelay(pdMS_TO_TICKS(250));
-  gpio_set_level((gpio_num_t)LCD_RST_PIN, 1);
+  gpio_set_level(rst, 1);
   vTaskDelay(pdMS_TO_TICKS(30));
   ESP_ERROR_CHECK(esp_lcd_panel_init(panel_));
 }
@@ -231,7 +266,7 @@ void Touch349Board::initBacklight()
   ledc_timer_config(&timer);
 
   ledc_channel_config_t channel = {};
-  channel.gpio_num = LCD_BL_PIN;
+  channel.gpio_num = v2_ ? V2_LCD_BL_PIN : V1_LCD_BL_PIN;
   channel.speed_mode = LEDC_LOW_SPEED_MODE;
   channel.channel = LEDC_CHANNEL_1;
   channel.intr_type = LEDC_INTR_DISABLE;
