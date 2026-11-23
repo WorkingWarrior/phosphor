@@ -243,6 +243,7 @@ void Touch349Board::initPanel()
     }
     return;
   }
+  // Pin and timing as in Waveshare's V1 demo (09_LVGL_V8_Test).
   const gpio_num_t rst = (gpio_num_t)V1_LCD_RST_PIN;
   digitalWrite(rst, HIGH);
   pinMode(rst, OUTPUT);
@@ -252,6 +253,7 @@ void Touch349Board::initPanel()
   vTaskDelay(pdMS_TO_TICKS(250));
   gpio_set_level(rst, 1);
   vTaskDelay(pdMS_TO_TICKS(30));
+  pinMode(rst, INPUT_PULLUP);  // let go: harmless on V1, and no fight with TE should a V2 ever be missed
   ESP_ERROR_CHECK(esp_lcd_panel_init(panel_));
 }
 
