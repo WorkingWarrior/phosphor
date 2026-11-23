@@ -20,9 +20,9 @@ running, three games and a few small tools. Every page is drawn four times, as a
 > Phosphor cannot restore it. On a first install, tick **Erase device** in the installer for a clean start.
 
 > [!IMPORTANT]
-> **Built and tested on the V2 board** (a **V2** sticker on the case, **Rev1.1** printed on the board). Known issue on V2
-> with v2.0.0: the brightness setting has no effect, because Waveshare moved the backlight to another pin. The original
-> V1 board has not been tested.
+> **Built and tested on the V2 board** (a **V2** sticker on the case, **Rev1.1** printed on the board). The firmware
+> detects the board version when it starts. The V1 board has its own code path, but it has not been tested. On v2.0.0 the
+> brightness setting has no effect on V2: update to v2.0.1.
 
 ## Knock on the table to play 21
 
