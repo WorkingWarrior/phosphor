@@ -21,8 +21,9 @@ running, three games and a few small tools. Every page is drawn four times, as a
 
 > [!IMPORTANT]
 > **Built and tested on the V2 board** (a **V2** sticker on the case, **Rev1.1** printed on the board). The firmware
-> detects the board version when it starts. The V1 board has its own code path, but it has not been tested. On v2.0.0 the
-> brightness setting has no effect on V2: update to v2.0.1.
+> detects the board version when it starts. V1 should work: its pins and panel reset match Waveshare's own V1 demo. Nobody has
+> confirmed it yet, so if you run it on a V1, please [open an issue](https://github.com/melihkoray/phosphor/issues) and
+> say how it went. On v2.0.0 the brightness setting has no effect on V2: update.
 
 ## Knock on the table to play 21
 
