@@ -2,7 +2,7 @@
 
 [![Build](https://github.com/melihkoray/phosphor/actions/workflows/build.yml/badge.svg)](https://github.com/melihkoray/phosphor/actions/workflows/build.yml)
 [![Built and signed by GitHub Actions](https://img.shields.io/badge/built%20%26%20signed-GitHub%20Actions-2ea44f?logo=githubactions&logoColor=white)](https://github.com/melihkoray/phosphor/attestations)
-[![VirusTotal: 0 of 59 engines](https://img.shields.io/badge/VirusTotal-0%2F59%20(v2.0.1)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/6dcd4a61b678629fd72b59ace38702d2e4999e80a27d23986362ccaff639936f)
+[![VirusTotal: 0 of 61 engines](https://img.shields.io/badge/VirusTotal-0%2F61%20(v2.0.2)-2ea44f?logo=virustotal&logoColor=white)](https://www.virustotal.com/gui/file/9efc70694101580fcef897c6525e87db4b76faa0925c411bf40a54ddf860b0bd)
 
 ![Phosphor on the Waveshare 3.49" bar: the snowy cabin, the fireplace, the ocean liner, the radio, 21, a storm and the fish tank](media/readme/board-3d.webp)
 
@@ -216,7 +216,7 @@ The main endpoints, plain HTTP on your local network (`GET /status` also tells y
   ([workflow](.github/workflows/build.yml)), not on anyone's computer. Since 22 Nov 2026 every build also gets a
   `SHA256SUMS.txt` and a signed [build provenance attestation](https://github.com/melihkoray/phosphor/attestations): to
   check that a `.bin` came from here, run `gh attestation verify phosphor.bin -R melihkoray/phosphor` (GitHub CLI).
-  The v2.0.1 release `phosphor.bin` scans clean on [VirusTotal](https://www.virustotal.com/gui/file/6dcd4a61b678629fd72b59ace38702d2e4999e80a27d23986362ccaff639936f) (0 of 59 engines).
+  The v2.0.2 release `phosphor.bin` scans clean on [VirusTotal](https://www.virustotal.com/gui/file/9efc70694101580fcef897c6525e87db4b76faa0925c411bf40a54ddf860b0bd) (0 of 61 engines).
 
 ## Credits and license
 
