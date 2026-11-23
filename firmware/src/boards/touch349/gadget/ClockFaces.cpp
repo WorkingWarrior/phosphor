@@ -406,28 +406,29 @@ void RadioFaces_Draw(const RadioFaceData &f)
     int width = textWidth(f.line.c_str(), 2), box = right + 12 - 16;
     int span = width + 60, off = width > box ? (millis() / 30) % span : 0;
     clip(16, 70, right + 12, 100);
-    label(f.line, 16 - off, 80, ink, amiga);
-    if (width > box) label(f.line, 16 - off + span, 80, ink, amiga);
+    int ly = amiga ? 74 : 80;  // the Amiga tracker rows start higher than the dial
+    label(f.line, 16 - off, ly, ink, amiga);
+    if (width > box) label(f.line, 16 - off + span, ly, ink, amiga);
   }
   noClip();
   // The right title strip stays outside the companion's drawing area.
   clip(422, 4, 632, 28);
   label("STEREO", 440, 10, f.playing ? (amiga ? WHITE : green) : dim, amiga);
-  label(f.time, 568, 10, amiga ? WHITE : dim, amiga, 2, atari ? 0 : 12);
+  label(f.time, atari ? 568 : 549, 10, amiga ? WHITE : dim, amiga);
   noClip();
   if (amiga) {
     static uint32_t tick = 0, last = 0;
     uint32_t now = millis();
     if (f.playing && last) tick += min(uint32_t(200), uint32_t(now - last));
     last = now;
-    clip(16, 98, right + 12, 130);
+    clip(16, 96, right + 12, 128);
     for (int k = 0; k < 2; k++) {
-      int row = (tick / 150 + k) % 64, y = 98 + k * 16;
+      int row = (tick / 150 + k) % 64, y = 96 + k * 16;
       if (!k) rect(16, y, right - 4, 16, ORANGE);
       char line[24];
       snprintf(line, sizeof(line), "%02X  %s %02d  %s", row, row % 3 ? "C-4" : "---", row % 16,
                row % 2 ? "A#3" : "F-2");
-      label(line, 16, y, k ? WHITE : 0, k != 0);
+      label(line, 16, y + 1, k ? WHITE : 0, k != 0);
     }
     noClip();
   } else {

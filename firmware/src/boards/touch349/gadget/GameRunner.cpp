@@ -264,8 +264,18 @@ void sunAt(int cx, int cy, int r, uint16_t c)  // the 2600 has no round shapes
 
 void cloud(int cx, int cy, uint16_t c)
 {
-  rect(cx, cy, 64, 12, c);
-  rect(cx + 12, cy - 8, 40, 8, c);
+  if (theme::current() == theme::ATARI) {  // wide playfield blocks
+    rect(cx, cy, 64, 12, c);
+    rect(cx + 16, cy - 8, 32, 8, c);
+    return;
+  }
+  // x and width of each row, top down: two puffs on a flat base (C64 double-wide pixels, Amiga finer rows)
+  static const uint8_t PUFF[][2] = { { 28, 12 }, { 22, 24 }, { 18, 32 }, { 10, 44 }, { 6, 56 }, { 2, 64 }, { 0, 68 }, { 2, 64 }, { 8, 52 } };
+  int rh = theme::current() == theme::C64 ? 4 : 3, y = cy - 12;
+  for (auto &r : PUFF) {
+    rect(cx + r[0], y, r[1], rh, c);
+    y += rh;
+  }
 }
 
 void building(int x, int base, int w, int h, uint16_t c, uint16_t win)
@@ -304,7 +314,7 @@ void drawProps(int z, int cell, const Scene &sn, bool vfd)
       if (vfd) {
         for (int k = 0; k < 6; k++) rect(pmod(k * 131 - cell / 8, 760) - 60, 24 + (k * 37) % 70, 3, 3, sn.near_c);
       } else {
-        for (int k = 0; k < 3; k++) cloud(pmod(k * 230 + 60 - cell / 6, 760) - 100, 30 + k * 16, sn.near_c);
+        for (int k = 0; k < 3; k++) cloud(pmod(k * 230 + 60 - cell / 6, 760) - 100, 30 + k * 16, theme::current() == theme::C64 ? px::rgb(108, 94, 181) : sn.near_c);  // white would hide the score
       }
       break;
     case 1:  // desert: mesas, a few cacti, the sun

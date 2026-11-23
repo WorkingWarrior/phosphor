@@ -8,7 +8,11 @@
 #include "Motion.h"
 #include "Radio.h"
 #include "Settings.h"
+#include "ClockFaces.h"
+#include "MachineDigits.h"
+#include "RetroScene.h"
 #include "Theme.h"
+#include "ThemeFonts.h"
 #include "Vfd.h"
 
 using namespace vfd;
@@ -38,6 +42,85 @@ static void ellipse(int cx, int cy, int rx, int ry, uint16_t color)
 }
 
 static uint16_t rgb(int r, int g, int b) { return px::rgb(r, g, b); }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Machine themes: each tool as a little program of that machine (its font, color bands and pixel size)
+// ---------------------------------------------------------------------------------------------------------------------
+
+static bool machine() { return theme::current() != theme::VFD; }
+
+struct MachineInk {
+  uint16_t bright, dim, hot, good;
+};
+static MachineInk minks()
+{
+  switch (theme::current()) {
+    case theme::C64: return { rgb(255, 255, 255), rgb(149, 149, 149), rgb(184, 199, 111), rgb(154, 210, 132) };
+    case theme::AMIGA: return { rgb(255, 255, 255), rgb(187, 187, 204), rgb(255, 153, 0), rgb(136, 238, 102) };
+    default: return { rgb(236, 236, 236), rgb(160, 160, 200), rgb(252, 188, 116), rgb(92, 186, 92) };
+  }
+}
+
+// Switches to the machine font while in scope.
+struct MachineFont {
+  Style saved = style();
+  MachineFont()
+  {
+    auto t = theme::current();
+    setStyle({ t == theme::C64 ? &C64_FONT : t == theme::AMIGA ? &AMIGA_FONT : &VFD_FONT, false, false, false });
+  }
+  ~MachineFont() { setStyle(saved); }
+};
+
+// Outlined text, at most w wide: the pitch shrinks until it fits.
+static void mtext(const char *s, int x, int y, int p, uint16_t c, int w = W)
+{
+  while (p > 2 && textWidth(s, p) > w) p--;
+  for (int dx = -2; dx <= 2; dx += 2)
+    for (int dy = -2; dy <= 2; dy += 2)
+      if (dx || dy) text(s, x + dx, y + dy, p, Ink{ rgb(0, 0, 0) });
+  text(s, x, y, p, Ink{ c });
+}
+
+// Horizontal color bands (raster bars).
+static void mbands(int x, int y, int w, int h, const uint16_t *c, int n)
+{
+  for (int i = 0; i < n; i++) {
+    int y0 = y + h * i / n, y1 = y + h * (i + 1) / n;
+    rect(x, y0, w, y1 - y0, c[i]);
+  }
+}
+
+
+// The weather pages' sky as the backdrop ("stars", "clear"...); plain when there is no asset pack.
+static void msky(const char *sky)
+{
+  if (theme::current() == theme::ATARI) {  // its stars are text-sized blocks: bands only
+    static const uint16_t NIGHT[] = { px::rgb(0, 0, 60), px::rgb(0, 8, 88), px::rgb(8, 20, 116), px::rgb(20, 36, 140) };
+    mbands(0, 0, W, H, NIGHT, 4);
+    return;
+  }
+  char name[24];
+  snprintf(name, sizeof(name), "sky_%s_%s", sky, theme::def().key);
+  if (!RetroPicture_Draw(name)) clear();
+}
+
+static int blockW() { return theme::current() == theme::C64 ? 4 : theme::current() == theme::ATARI ? 8 : 2; }
+static int blockH() { return theme::current() == theme::AMIGA ? 2 : 4; }
+
+// Ellipse on the machine's pixel grid, one color per band from top to bottom.
+static void mellipse(int cx, int cy, int rx, int ry, const uint16_t *bands, int n)
+{
+  int bw = blockW(), bh = blockH();
+  for (int dy = -ry; dy < ry; dy += bh) {
+    float f = (dy + bh * 0.5f) / (float)ry;
+    f = 1.0f - f * f;
+    int dx = ((int)(rx * sqrtf(f < 0 ? 0 : f)) + bw / 2) / bw * bw;
+    if (!dx) dx = bw;
+    rect(cx - dx, cy + dy, 2 * dx, bh, bands[constrain((dy + ry) * n / (2 * ry), 0, n - 1)]);
+  }
+}
+static void mdisc(int cx, int cy, int r, uint16_t c) { mellipse(cx, cy, r, r, &c, 1); }
 
 // ---------------------------------------------------------------------------------------------------------------------
 // Spirit level
@@ -118,6 +201,57 @@ static bool levelGesture(Gesture g, int, int)
   return true;
 }
 
+// A builder's level: a wooden (2600: brown) beam with a yellow-green vial, and a bull's-eye.
+static void levelMachine(float ax, float ay, bool flat, bool level)
+{
+  MachineFont font;
+  MachineInk k = minks();
+  auto t = theme::current();
+  static const uint16_t W64[] = { px::rgb(67, 57, 0), px::rgb(111, 79, 37), px::rgb(111, 79, 37), px::rgb(154, 103, 89), px::rgb(111, 79, 37), px::rgb(111, 79, 37), px::rgb(67, 57, 0) };
+  static const uint16_t WAM[] = { px::rgb(238, 187, 119), px::rgb(204, 136, 68), px::rgb(187, 119, 51), px::rgb(170, 102, 51), px::rgb(153, 85, 34), px::rgb(136, 68, 17), px::rgb(85, 34, 0) };
+  static const uint16_t WAT[] = { px::rgb(180, 122, 48), px::rgb(160, 104, 36), px::rgb(136, 92, 16), px::rgb(120, 76, 12), px::rgb(104, 64, 8), px::rgb(88, 52, 0), px::rgb(68, 40, 0) };
+  static const uint16_t V64[] = { px::rgb(88, 141, 67), px::rgb(154, 210, 132), px::rgb(184, 199, 111), px::rgb(184, 199, 111), px::rgb(154, 210, 132), px::rgb(88, 141, 67) };
+  static const uint16_t VAM[] = { px::rgb(102, 136, 0), px::rgb(170, 204, 17), px::rgb(221, 255, 85), px::rgb(204, 238, 51), px::rgb(170, 204, 17), px::rgb(102, 136, 0) };
+  static const uint16_t VAT[] = { px::rgb(92, 120, 24), px::rgb(132, 160, 40), px::rgb(176, 200, 64), px::rgb(176, 200, 64), px::rgb(132, 160, 40), px::rgb(92, 120, 24) };
+  const uint16_t *wood = t == theme::C64 ? W64 : t == theme::AMIGA ? WAM : WAT, *vial = t == theme::C64 ? V64 : t == theme::AMIGA ? VAM : VAT;
+  clear();
+  mbands(0, 38, 430, 64, wood, 7);
+  if (t != theme::ATARI)
+    for (int i = 0; i < 26; i++) rect((i * 53) % 400, 42 + (i * 23) % 54, 18 + (i * 7) % 22, 2, wood[i % 3 ? 5 : 1]);  // grain
+  const int TX = 40, TY = 48, TW = 348, TH = 44, TC = TX + TW / 2;
+  rect(TX - 4, TY - 4, TW + 8, TH + 8, 0);
+  mbands(TX, TY, TW, TH, vial, 6);
+  int bx = constrain(TC - (int)(ax * 14.0f), TX + 24, TX + TW - 25);
+  uint16_t air = level ? k.bright : rgb(255, 255, 221);
+  uint16_t edge = vial[0];
+  mellipse(bx, TY + TH / 2, 22, 18, &edge, 1);
+  mellipse(bx, TY + TH / 2, 18, 14, &air, 1);
+  for (int x : { TC - 30, TC + 28 }) rect(x, TY, 3, TH, 0);
+
+  const int RX = 528, RY = 88, RR = 64;
+  mellipse(RX, RY, RR + 8, RR + 8, wood, 7);
+  mdisc(RX, RY, RR, 0);
+  mellipse(RX, RY, RR - 4, RR - 4, vial, 6);
+  mdisc(RX, RY, 24, vial[0]);
+  mdisc(RX, RY, 20, vial[2]);
+  float ox = -ax * 5.0f, oy = -ay * 5.0f, len = sqrtf(ox * ox + oy * oy);
+  if (len > RR - 20) ox *= (RR - 20) / len, oy *= (RR - 20) / len;
+  mdisc(RX + (int)ox, RY + (int)oy, 16, 0);
+  mdisc(RX + (int)ox, RY + (int)oy, 12, air);
+
+  if (millis() < level_note_until) mtext(level_note_clear ? L("ZERO CLEARED", "SIFIR SİLİNDİ") : L("ZERO SET", "SIFIR AYARLANDI"), 24, 14, 2, k.hot);
+  else {
+    mtext(L("SPIRIT LEVEL", "SU TERAZİSİ"), 24, 14, 2, k.dim);
+    if (level) mtext(L("LEVEL", "DÜZ"), 404 - textWidth(L("LEVEL", "DÜZ"), 2), 14, 2, k.good);
+  }
+  char buf[24];
+  snprintf(buf, sizeof(buf), "%+.1f°", ax);
+  mtext(buf, 24, 122, 4, level ? k.good : k.bright);
+  snprintf(buf, sizeof(buf), "%+.1f°", ay);
+  mtext(buf, 262, 132, 3, k.dim);
+  mtext(flat ? "X / Y" : "X / Z", 262, 110, 2, k.dim);
+}
+
 static void levelDraw(const DateTime &)
 {
   clear();
@@ -127,6 +261,7 @@ static void levelDraw(const DateTime &)
   ax -= zero_x;
   ay -= zero_y;
   bool level = fabsf(ax) < 0.5f && fabsf(ay) < 0.5f;
+  if (machine()) return levelMachine(ax, ay, flat, level);
   uint16_t bubble = level ? HOT : LIT;
 
   // the long vial
@@ -226,6 +361,47 @@ static bool coinGesture(Gesture g, int, int)
   return false;
 }
 
+// A gold coin over the night sky, on the machine's pixel grid.
+static void coinMachine(int cx, int cy, int R, int ry, int face)
+{
+  MachineFont font;
+  MachineInk k = minks();
+  auto t = theme::current();
+  static const uint16_t G64[] = { px::rgb(255, 255, 255), px::rgb(184, 199, 111), px::rgb(184, 199, 111), px::rgb(184, 199, 111), px::rgb(111, 79, 37), px::rgb(111, 79, 37) };
+  static const uint16_t GAM[] = { px::rgb(255, 255, 204), px::rgb(255, 238, 136), px::rgb(255, 221, 85), px::rgb(255, 187, 51), px::rgb(238, 153, 17), px::rgb(204, 119, 0), px::rgb(153, 85, 0) };
+  static const uint16_t GAT[] = { px::rgb(252, 224, 140), px::rgb(236, 200, 96), px::rgb(216, 172, 64), px::rgb(196, 148, 44), px::rgb(172, 124, 28), px::rgb(148, 100, 16) };
+  static const uint16_t S64[] = { px::rgb(255, 255, 255), px::rgb(149, 149, 149), px::rgb(149, 149, 149), px::rgb(149, 149, 149), px::rgb(108, 108, 108), px::rgb(68, 68, 68) };
+  static const uint16_t SAM[] = { px::rgb(255, 255, 255), px::rgb(221, 221, 238), px::rgb(204, 204, 221), px::rgb(170, 170, 187), px::rgb(136, 136, 153), px::rgb(102, 102, 119), px::rgb(68, 68, 85) };
+  static const uint16_t SAT[] = { px::rgb(236, 236, 236), px::rgb(214, 214, 214), px::rgb(192, 192, 192), px::rgb(170, 170, 170), px::rgb(142, 142, 142), px::rgb(111, 111, 111) };
+  const uint16_t *m = face ? (t == theme::C64 ? S64 : t == theme::AMIGA ? SAM : SAT) : t == theme::C64 ? G64 : t == theme::AMIGA ? GAM : GAT;  // heads gold, tails silver
+  int n = t == theme::AMIGA ? 7 : 6;
+  msky("stars");
+  uint16_t black = 0, rim = m[n - 1], mid = m[2];
+  mellipse(cx, cy + 4, R + 4, ry + 4, &black, 1);
+  mellipse(cx, cy + 6, R, ry, &rim, 1);
+  mellipse(cx, cy, R, ry, m, n);
+  if (ry > 20) {
+    mellipse(cx, cy, R - 8, ry - 8, &rim, 1);
+    mellipse(cx, cy, R - 10, ry - 10, &mid, 1);
+  }
+  if (ry > 38) {
+    const char *f = face ? "T" : L("H", "Y");
+    text(f, cx - textWidth(f, 6) / 2 + 2, cy - 19, 6, Ink{ m[0] });
+    text(f, cx - textWidth(f, 6) / 2, cy - 21, 6, Ink{ rgb(0, 0, 0) });
+  }
+  const int X0 = 226;
+  if (flipping) mtext("...", X0, 40, 6, k.dim);
+  else if (last_face < 0) {
+    mtext(L("TAP TO FLIP", "DOKUN: AT"), X0, 36, 4, k.bright, 400);
+    mtext(L("OR SHAKE IT", "YA DA SALLA"), X0, 78, 2, k.dim);
+  } else mtext(last_face ? L("TAILS", "TURA") : L("HEADS", "YAZI"), X0, 34, 7, last_face ? k.bright : k.hot, 400);
+  char buf[40];
+  snprintf(buf, sizeof(buf), "%s %u", L("HEADS", "YAZI"), coin_count[0]);
+  mtext(buf, X0, 128, 3, k.hot, 190);
+  snprintf(buf, sizeof(buf), "%s %u", L("TAILS", "TURA"), coin_count[1]);
+  mtext(buf, X0 + 204, 128, 3, k.bright, 190);
+}
+
 static void coinDraw(const DateTime &)
 {
   clear();
@@ -242,6 +418,7 @@ static void coinDraw(const DateTime &)
   }
   int ry = max(3, (int)(R * fabsf(c)));
   int cy = CY - (int)hop;
+  if (machine()) return coinMachine(CX, cy - 6, R, ry, face);
   if (style().glow) ellipse(CX, cy, R + 3, ry + 3, HALO);
   ellipse(CX, cy + 4, R, ry, DIM);  // the rim
   ellipse(CX, cy, R, ry, face ? HOT : LIT);
@@ -323,6 +500,46 @@ static bool breatheGesture(Gesture g, int, int)
   return false;
 }
 
+// The box as nested color frames over a quiet sky.
+static void breatheMachine(int CX, int CY, int big, int sz)
+{
+  MachineFont font;
+  MachineInk k = minks();
+  auto t = theme::current();
+  static const uint16_t A64[] = { px::rgb(108, 94, 181), px::rgb(112, 164, 178), px::rgb(154, 210, 132), px::rgb(255, 255, 255) };
+  static const uint16_t B64[] = { px::rgb(104, 55, 43), px::rgb(154, 103, 89), px::rgb(184, 199, 111), px::rgb(255, 255, 255) };
+  static const uint16_t AAM[] = { px::rgb(0, 68, 170), px::rgb(0, 119, 221), px::rgb(68, 187, 255), px::rgb(204, 238, 255) };
+  static const uint16_t BAM[] = { px::rgb(170, 51, 0), px::rgb(221, 102, 0), px::rgb(255, 170, 34), px::rgb(255, 238, 170) };
+  static const uint16_t AAT[] = { px::rgb(24, 60, 140), px::rgb(52, 100, 180), px::rgb(100, 148, 212), px::rgb(164, 208, 236) };
+  static const uint16_t BAT[] = { px::rgb(140, 60, 28), px::rgb(184, 100, 52), px::rgb(224, 148, 92), px::rgb(252, 208, 164) };
+  const uint16_t *c = br_phase % 2 ? (t == theme::C64 ? B64 : t == theme::AMIGA ? BAM : BAT) : (t == theme::C64 ? A64 : t == theme::AMIGA ? AAM : AAT);
+  msky("stars");
+  int bw = blockW();
+  rect(CX - big / 2 - 4, CY - big / 2 - 4, big + 8, big + 8, 0);
+  for (int i = 0; i < 4; i++) frame(CX - big / 2 - 4 + i, CY - big / 2 - 4 + i, big + 8 - 2 * i, big + 8 - 2 * i, i < 2 ? k.dim : 0);
+  for (int i = 0; i < 4; i++) {
+    int h = sz / 2 * (4 - i) / 4 / bw * bw;
+    rect(CX - h, CY - h, 2 * h, 2 * h, c[i]);
+  }
+  const int X0 = 196;
+  bool fresh = !br_running && !br_phase && !br_elapsed && !br_cycles;
+  if (fresh) {
+    mtext(L("TAP TO START", "BAŞLAMAK İÇİN DOKUN"), X0, 48, 4, k.bright, 424);
+    mtext(L("BOX BREATHING 4-4-4-4", "KUTU NEFESİ 4-4-4-4"), X0, 92, 2, k.dim);
+  } else {
+    static const char *const EN[4] = { "BREATHE IN", "HOLD", "BREATHE OUT", "HOLD" };
+    static const char *const TR[4] = { "NEFES AL", "TUT", "NEFES VER", "TUT" };
+    mtext(L(EN[br_phase], TR[br_phase]), X0, 18, 4, br_phase % 2 ? k.hot : k.bright, 424);
+    MachineDigits_Draw(String(4 - (int)(br_elapsed / 1000)), X0, 64, 56, 84, 0, br_phase % 2);
+    char buf[24];
+    snprintf(buf, sizeof(buf), "%s %d", L("CYCLES", "TUR"), br_cycles);
+    mtext(buf, 290, 84, 3, k.bright, 330);
+    if (!br_running) mtext(L("PAUSED", "DURAKLADI"), 290, 116, 2, k.hot);
+  }
+  const char *b = br_beep ? L("BEEP ON", "BİP AÇIK") : L("BEEP OFF", "BİP KAPALI");
+  mtext(b, 620 - textWidth(b, 2), 144, 2, k.dim);
+}
+
 static void breatheDraw(const DateTime &)
 {
   clear();
@@ -330,6 +547,7 @@ static void breatheDraw(const DateTime &)
   float t = constrain((float)br_elapsed / PHASE_MS, 0.0f, 1.0f);
   float e = t * t * (3 - 2 * t);
   int sz = br_phase == 0 ? SMALL + (int)((BIG - SMALL) * e) : br_phase == 1 ? BIG : br_phase == 2 ? BIG - (int)((BIG - SMALL) * e) : SMALL;
+  if (machine()) return breatheMachine(CX, CY, BIG, sz);
   frame(CX - BIG / 2 - 2, CY - BIG / 2 - 2, BIG + 4, BIG + 4, GHOST);
   if (style().glow) rect(CX - sz / 2 - 2, CY - sz / 2 - 2, sz + 4, sz + 4, HALO);
   rect(CX - sz / 2, CY - sz / 2, sz, sz, br_phase % 2 ? HOT : LIT);
@@ -402,22 +620,56 @@ static bool scoreGesture(Gesture g, int x, int y)
   return false;
 }
 
+// Two courts, one color each, big cartridge digits.
+static void scoreMachine(bool armed)
+{
+  MachineFont font;
+  MachineInk k = minks();
+  auto t = theme::current();
+  static const uint16_t L64[] = { px::rgb(53, 40, 121), px::rgb(108, 94, 181) }, R64[] = { px::rgb(104, 55, 43), px::rgb(154, 103, 89) };
+  static const uint16_t LAM[] = { px::rgb(0, 17, 85), px::rgb(0, 34, 119), px::rgb(0, 68, 153), px::rgb(17, 102, 187), px::rgb(68, 136, 204) };
+  static const uint16_t RAM[] = { px::rgb(68, 0, 17), px::rgb(102, 0, 17), px::rgb(136, 17, 17), px::rgb(170, 51, 17), px::rgb(204, 85, 34) };
+  static const uint16_t LAT[] = { px::rgb(0, 28, 100), px::rgb(20, 48, 124), px::rgb(40, 68, 144), px::rgb(60, 88, 164) };
+  static const uint16_t RAT[] = { px::rgb(92, 20, 12), px::rgb(116, 36, 20), px::rgb(140, 56, 32), px::rgb(164, 76, 44) };
+  const int mid = W / 2;
+  if (t == theme::C64) {  // two hires colors per court, blended by a checker of double-wide pixels
+    for (int h = 0; h < 2; h++) {
+      const uint16_t *c = h ? R64 : L64;
+      rect(h * mid, 0, mid, H, c[0]);
+      for (int y = 120; y < H; y += 4)
+        for (int x = h * mid + ((y / 4) & 1) * 4; x < (h + 1) * mid; x += y < 144 ? 16 : 8) rect(x, y, 4, 4, c[1]);
+    }
+  } else {
+    bool am = t == theme::AMIGA;
+    mbands(0, 0, mid, H, am ? LAM : LAT, am ? 5 : 4);
+    mbands(mid, 0, W - mid, H, am ? RAM : RAT, am ? 5 : 4);
+  }
+  for (int y = 44; y < H; y += 16) rect(mid - 4, y, 8, 8, k.bright);  // the net
+  for (int h = 0; h < 2; h++) MachineDigits_Draw(String(score[h]), (h ? W * 3 / 4 : W / 4) - (score[h] > 9 ? 78 : 35), 40, 70, 104, 16, h && t != theme::C64);  // the C64's red would sink into the red court
+  uint16_t face = armed ? k.hot : 0;
+  rect(RESET_X, RESET_Y, RESET_W, RESET_H, face);
+  if (t == theme::AMIGA && !armed) {
+    rect(RESET_X, RESET_Y, RESET_W, RESET_H, rgb(85, 85, 102));
+    rect(RESET_X, RESET_Y, RESET_W, 2, k.bright);
+    rect(RESET_X, RESET_Y, 2, RESET_H, k.bright);
+    rect(RESET_X, RESET_Y + RESET_H - 2, RESET_W, 2, 0);
+    rect(RESET_X + RESET_W - 2, RESET_Y, 2, RESET_H, 0);
+  } else frame(RESET_X, RESET_Y, RESET_W, RESET_H, k.bright);
+  const char *label = armed ? L("AGAIN?", "TEKRAR?") : L("RESET", "SIFIRLA");
+  text(label, textX(label, 2, RESET_X, RESET_X + RESET_W), RESET_Y + 7, 2, Ink{ armed ? rgb(0, 0, 0) : k.bright });
+}
+
 static void scoreDraw(const DateTime &)
 {
+  if (machine()) return scoreMachine(reset_armed_until && (int32_t)(millis() - reset_armed_until) < 0);
   clear();
   rect(W / 2 - 1, 46, 2, 112, GHOST);
-  bool vfdLook = theme::current() == theme::VFD;
   for (int h = 0; h < 2; h++) {
     char d[4];
     snprintf(d, sizeof(d), "%2d", score[h]);
     int cx = h ? W * 3 / 4 : W / 4;
     Ink ink = h ? Ink{ HOT, HOTH, GHOST } : Ink{ LIT, HALO, GHOST };
-    if (vfdLook) {
-      seg(d, cx - 76, 44, 70, 112, 14, 12, ink);
-    } else {
-      int p = 11;
-      text(d, cx - textWidth(d, p) / 2, 62, p, h ? HOT_INK : LIT_INK);
-    }
+    seg(d, cx - 76, 44, 70, 112, 14, 12, ink);
   }
   // the reset key, top middle: tap it twice within two seconds
   bool armed = reset_armed_until && (int32_t)(millis() - reset_armed_until) < 0;
@@ -511,6 +763,8 @@ static void lampDraw(const DateTime &)
     uint16_t ink = lum > 110 ? 0 : 0xFFFF;
     const char *n = L(lc.en, lc.tr);
     int p = 3;
+    MachineFont font;  // the VFD look keeps its own style
+    if (!machine()) setStyle(font.saved);
     rect(textX(n, p, 0, W) - 10, 126, textWidth(n, p) + 20, 34, color);
     text(n, textX(n, p, 0, W), 132, p, Ink{ ink });
   }

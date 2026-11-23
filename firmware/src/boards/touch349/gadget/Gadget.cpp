@@ -449,9 +449,9 @@ static void drawRadio(const DateTime &now)
     f.group = s.group; f.groups = settings::groupCount();
     for (int i = 0; i < f.groups; i++) { f.genres[i] = settings::group(i).key; f.genres[i].toUpperCase(); }
     switch (rs) {
-      case RadioState::Off: f.line = L("STOPPED · TAP TO PLAY", "DURDU · ÇALMAK İÇİN DOKUN"); break;
+      case RadioState::Off: f.line = L("STOPPED: TAP TO PLAY", "DURDU · DOKUN: ÇAL"); break;  // 20 machine cells fit beside the companion
       case RadioState::Connecting: f.line = String(L("CONNECTING", "BAĞLANIYOR")) + String("...").substring(0, (millis() / 400) % 4); break;
-      case RadioState::Failed: f.line = L("NO SIGNAL · TAP TO RETRY", "BAĞLANAMADI · TEKRAR DOKUN"); break;
+      case RadioState::Failed: f.line = L("NO SIGNAL: TAP AGAIN", "BAĞLANAMADI · DOKUN"); break;
       case RadioState::Playing: f.line = Radio_Title(); if (!f.line.length()) f.line = L("LIVE", "CANLI YAYIN"); break;
     }
     radio_world = true;
