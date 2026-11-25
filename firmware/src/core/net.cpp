@@ -135,12 +135,14 @@ section{background:#fff;border:1px solid #dedbd2;border-radius:10px;padding:14px
 textarea,input[type=text]{width:100%;box-sizing:border-box;font:inherit;padding:8px;border:1px solid #cfccc2;border-radius:6px}
 button{font:inherit;padding:8px 14px;border:0;border-radius:6px;background:#1d1c1a;color:#fff;margin-top:8px;cursor:pointer}
 #msg{min-height:1.5em;color:#6b6860}
+a{color:#1d1c1a}
 </style></head><body>
 <h1 id="name">Phosphor</h1><small id="info"></small>
 <section><b>Send text</b>
 <input type="text" id="title" placeholder="Title (optional)" style="margin-top:8px">
 <textarea id="text" rows="4" placeholder="What should the screen say?" style="margin-top:8px"></textarea>
 <button onclick="sendText()">Send</button> <button onclick="post('/clock')">Back to clock</button></section>
+<section><b>Settings</b><br><small>City, language, clock, timers, radio stations, pages</small><br><a href="/settings">Open the settings page</a></section>
 <div id="msg"></div>
 <script>
 const $=id=>document.getElementById(id);
